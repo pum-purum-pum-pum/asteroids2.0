@@ -5,4 +5,4 @@ authors = ["vlad <vladzhukovtirko@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-sdl2 = "0.32.2"
+astro_lib = {path = "lib"}

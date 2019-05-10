@@ -1,10 +1,13 @@
-extern crate sdl2; 
+use astro_lib::prelude::*;
+mod components;
+mod systems;
 
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use std::time::Duration;
- 
+
+
 pub fn main() {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
