@@ -4,23 +4,18 @@ use std::path::Path;
 use astro_lib as al;
 use astro_lib::prelude::*;
 use al::gfx::{draw_image};
-use al::types::*;
-
-use specs::prelude::*;
-use specs::World as SpecsWorld;
-use sdl2::pixels::Color;
-use sdl2::event::Event;
-use sdl2::keyboard::Keycode;
-use sdl2::render::{TextureCreator};
-use sdl2::image::{LoadTexture};
-
+use al::types::{*};
 mod components;
 mod systems;
 
-use systems::KinematicSystem;
-use components::*;
+use sdl2::pixels::Color;
+use sdl2::event::Event;
+use sdl2::keyboard::Keycode;
+use sdl2::render::{Canvas, Texture, TextureCreator};
+use sdl2::image::{LoadTexture, InitFlag};
 
-pub fn main() -> Result<(), String> {
+#[no_mangle]
+pub extern fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
  
@@ -29,7 +24,7 @@ pub fn main() -> Result<(), String> {
         .position_centered()
         .build()
         .unwrap();
-    let _gl_context = window.gl_create_context().unwrap();
+    let gl_context = window.gl_create_context().unwrap();
     let mut canvas = window.into_canvas().build().unwrap();
     
     canvas.set_draw_color(Color::RGB(0, 255, 255));
@@ -41,30 +36,11 @@ pub fn main() -> Result<(), String> {
     let texture = texture_creator.load_texture(image_path)?;
     let mut event_pump = sdl_context.event_pump().unwrap();
     let mut i = 0;
-
-
-    // ------------------- SPECS SETUP
-    let mut specs_world = SpecsWorld::new();
-    specs_world.register::<Position>();
-    specs_world.register::<Velocity>();
-    let mut dispatcher = DispatcherBuilder::new()
-        .with(KinematicSystem{}, "kinematic_system", &[])
-        .build();
-    specs_world.create_entity()
-        .with(Position::new(0f32, 0f32))
-        .with(Velocity::new(10f32, 10f32))
-        .build();
-    // ------------------------------
     'running: loop {
         i = (i + 1) % 255;
         canvas.set_draw_color(Color::RGB(i, 64, 255 - i));
         canvas.clear();
-        {
-            let positions = specs_world.write_storage::<Position>();
-            for position in positions.join() {
-                draw_image(&mut canvas, position.0, Vector2::new(100f32, 100f32), &texture)?;
-            }
-        }
+        draw_image(&mut canvas, Point2::new(0f32, 0f32), Vector2::new(100f32, 100f32), &texture)?;
         for event in event_pump.poll_iter() {
             match event {
                 Event::Quit {..} |
@@ -78,8 +54,6 @@ pub fn main() -> Result<(), String> {
 
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
-        dispatcher.dispatch(&mut specs_world.res);
-        specs_world.maintain();
     }
     Ok(())
 }
