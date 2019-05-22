@@ -8,6 +8,7 @@ use al::types::*;
 
 use specs::prelude::*;
 use specs::World as SpecsWorld;
+use shrev::EventChannel;
 use sdl2::pixels::Color;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -17,7 +18,7 @@ use sdl2::image::{LoadTexture};
 mod components;
 mod systems;
 
-use systems::KinematicSystem;
+use systems::{KinematicSystem, ControlSystem};
 use components::*;
 
 pub fn main() -> Result<(), String> {
@@ -39,21 +40,24 @@ pub fn main() -> Result<(), String> {
     
     let texture_creator : TextureCreator<_> = canvas.texture_creator();
     let texture = texture_creator.load_texture(image_path)?;
-    let mut event_pump = sdl_context.event_pump().unwrap();
+    let mut event_pump = sdl_context.event_pump()?;
     let mut i = 0;
 
-
+    let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
     specs_world.register::<Position>();
     specs_world.register::<Velocity>();
-    let mut dispatcher = DispatcherBuilder::new()
-        .with(KinematicSystem{}, "kinematic_system", &[])
-        .build();
-    specs_world.create_entity()
+    let character = specs_world.create_entity()
         .with(Position::new(0f32, 0f32))
         .with(Velocity::new(10f32, 10f32))
         .build();
+    let control_system = ControlSystem::new(keys_channel.register_reader(), character); 
+    let mut dispatcher = DispatcherBuilder::new()
+        .with(KinematicSystem{}, "kinematic_system", &[])
+        .with(control_system, "control_system", &[])
+        .build();
+    specs_world.add_resource(keys_channel);
     // ------------------------------
     'running: loop {
         i = (i + 1) % 255;
@@ -74,8 +78,12 @@ pub fn main() -> Result<(), String> {
                 _ => {}
             }
         }
-        // The rest of the game loop goes here...
-
+        let keys_iter: Vec<Keycode> = event_pump
+            .keyboard_state()
+            .pressed_scancodes()
+            .filter_map(Keycode::from_scancode)
+            .collect();
+        specs_world.write_resource::<EventChannel<Keycode>>().iter_write(keys_iter);
         canvas.present();
         ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
         dispatcher.dispatch(&mut specs_world.res);
