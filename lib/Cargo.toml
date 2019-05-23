@@ -11,6 +11,7 @@ specs-derive = "0.4.0"
 nalgebra = "0.18.0"
 gl = "0.10.0"
 shrev = "1.1.1"
+glium = "0.24.0"
 
 [dependencies.sdl2]
 version = "0.32.2"
