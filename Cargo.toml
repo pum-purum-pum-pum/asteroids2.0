@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 astro_lib = {path = "lib"}
+image = "0.21.1"
 
 [lib]
 crate-type = ["cdylib"]

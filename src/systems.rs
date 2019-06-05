@@ -67,7 +67,6 @@ impl<'a> System<'a> for ControlSystem {
                 Keycode::Down | Keycode::S => {
                     character_velocity.0.y = (character_velocity.0.y + THRUST_FORCE).min(VELOCITY_MAX);
                 }
-
                 _ => ()
             }
         }

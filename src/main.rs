@@ -1,33 +1,25 @@
-use std::time::Duration;
-use std::path::Path;
-
-use astro_lib as al;
 use astro_lib::prelude::*;
-use al::gfx::{draw_image};
-use al::types::*;
 
 use specs::prelude::*;
 use specs::World as SpecsWorld;
 use shrev::EventChannel;
-use sdl2::pixels::Color;
-use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::render::{TextureCreator};
-use sdl2::image::{LoadTexture};
+use nalgebra::{Isometry3, Vector3};
 
 use glium::Surface;
 use glium;
-use glium::{implement_vertex};
 
 mod components;
 mod systems;
 mod resources;
 mod gfx_backend;
+mod gfx;
 
 use systems::{KinematicSystem, ControlSystem};
 use components::*;
 use resources::*;
 use gfx_backend::DisplayBuild;
+use gfx::{Canvas, ImageData, load_texture};
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
@@ -38,10 +30,6 @@ pub fn main() -> Result<(), String> {
         .position_centered()
         .build_glium()
         .unwrap();
-
-    let image_path = Path::new("assets/player.png");
-    let mut i = 0;
-
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
@@ -60,48 +48,23 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(MouseState::default());
     // ------------------------------
 
-
-#[derive(Copy, Clone)]
-    struct Vertex {
-        position: [f32; 2],
-    }
-
-    implement_vertex!(Vertex, position);
-
-    let vertex1 = Vertex { position: [-0.5, -0.5] };
-    let vertex2 = Vertex { position: [ 0.0,  0.5] };
-    let vertex3 = Vertex { position: [ 0.5, -0.25] };
-    let shape = vec![vertex1, vertex2, vertex3];
-
-    let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
-
-    let vertex_shader_src = r#"
-        #version 130
-        in vec2 position;
-        void main() {
-            gl_Position = vec4(position, 0.0, 1.0);
-        }
-    "#;
-
-    let fragment_shader_src = r#"
-        #version 130
-        out vec4 color;
-        void main() {
-            color = vec4(1.0, 0.0, 0.0, 1.0);
-        }
-    "#;
-
-    let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
-
+    let canvas = Canvas::new(&display);
+    let image_data = ImageData::new(&display, "player").unwrap();
     let mut running = true;
     let mut event_pump = sdl_context.event_pump().unwrap();
 
     while running {
         let mut target = display.draw();
-        target.clear_color(0.0, 0.0, 1.0, 1.0);
-        target.draw(&vertex_buffer, &indices, &program, &glium::uniforms::EmptyUniforms,
-                    &Default::default()).unwrap();
+        target.clear_color(0.0, 0.0, 0.0, 1.0);
+        canvas.render(
+            &display, 
+            &mut target, 
+            &image_data, 
+            &Isometry3::new(
+                Vector3::new(0f32, 0f32, 0f32),
+                Vector3::new(0f32, 0f32, 0f32),
+            )
+        ).unwrap();
         target.finish().unwrap();
 
         for event in event_pump.poll_iter() {
@@ -112,38 +75,6 @@ pub fn main() -> Result<(), String> {
                 _ => ()
             }
         }
-}
-    // 'running: loop {
-    //     let state = event_pump.mouse_state();
-    //     eprintln!("{}, {}", state.x(), state.y());
-    //     specs_world.write_resource::<MouseState>().set_position(state.x(), state.y());
-    //     i = (i + 1) % 255;
-    //     canvas.clear();
-    //     {
-    //         let positions = specs_world.write_storage::<Position>();
-    //         for position in positions.join() {
-    //             draw_image(&mut canvas, position.0, Vector2::new(100f32, 100f32), &texture)?;
-    //         }
-    //     }
-    //     for event in event_pump.poll_iter() {
-    //         match event {
-    //             Event::Quit {..} |
-    //             Event::KeyDown { keycode: Some(Keycode::Escape), .. } => {
-    //                 break 'running;
-    //             },
-    //             _ => {}
-    //         }
-    //     }
-    //     let keys_iter: Vec<Keycode> = event_pump
-    //         .keyboard_state()
-    //         .pressed_scancodes()
-    //         .filter_map(Keycode::from_scancode)
-    //         .collect();
-    //     specs_world.write_resource::<EventChannel<Keycode>>().iter_write(keys_iter);
-    //     canvas.present();
-    //     ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
-    //     dispatcher.dispatch(&mut specs_world.res);
-    //     specs_world.maintain();
-    // }
+    }
     Ok(())
 }

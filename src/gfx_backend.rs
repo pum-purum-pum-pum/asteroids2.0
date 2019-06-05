@@ -7,7 +7,7 @@ use std::rc::Rc;
 use std::os::raw::c_void;
 
 use astro_lib::prelude::*;
-use sdl2::video::{GLContext, WindowBuildError, Window};
+use sdl2::video::{WindowBuildError, Window};
 use sdl2::VideoSubsystem;
 
 use glium::SwapBuffersError;
@@ -18,9 +18,6 @@ use glium::IncompatibleOpenGl;
 // struct Backend {
 //     gl_context: GLContext,
 // }
-
-
-pub type Display = SDL2Facade;
 
 
 #[derive(Debug)]
@@ -57,7 +54,7 @@ impl std::error::Error for GliumSdl2Error {
 
     fn cause(&self) -> Option<&std::error::Error> {
         match *self {
-            GliumSdl2Error::WindowBuildError(ref err) => err.cause(),
+            GliumSdl2Error::WindowBuildError(ref err) => err.source(),
             GliumSdl2Error::ContextCreationError(_) => None
         }
     }
@@ -93,11 +90,11 @@ impl Deref for SDL2Facade {
 }
 
 impl SDL2Facade {
-    pub fn window(&self) -> &Window {
+    pub fn _window(&self) -> &Window {
         self.backend.window()
     }
 
-    pub fn window_mut(&mut self) -> &mut Window {
+    pub fn _window_mut(&mut self) -> &mut Window {
         self.backend.window_mut()
     }
 
