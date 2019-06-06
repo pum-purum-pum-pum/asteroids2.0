@@ -9,7 +9,7 @@ use glium::{implement_vertex, uniform, DrawError};
 use glium::index::PrimitiveType;
 use glium::texture::{SrgbTexture2d, TextureCreationError};
 use glium::draw_parameters::Blend;
-use nalgebra::{Isometry3, Vector3};
+use nalgebra::{Isometry3};
 use image;
 use image::{ImageError};
 
@@ -75,12 +75,14 @@ pub struct ImageData{
     positions: glium::VertexBuffer<Vertex>,
     indices: glium::IndexBuffer<u16>,
     texture: glium::texture::SrgbTexture2d,
+    dim_scales: Vector2,
+    scale: f32,
 }
 
 impl ImageData {
     /// panic if failed to create buffers. TODO Result
-    /// image_name - is name of image to load in assets directory
-    pub fn new(display: &SDL2Facade, image_name: &str) -> Result<Self, LoadTextureError> {
+    /// image_name - is name of the image to load in assets directory
+    pub fn new(display: &SDL2Facade, image_name: &str, scale: f32) -> Result<Self, LoadTextureError> {
         let positions = vec![
             [-1f32, -1f32],
             [-1f32, 1f32],
@@ -104,10 +106,14 @@ impl ImageData {
             &[0u16, 1, 2, 2, 3, 0],
         ).unwrap();
         let texture = load_texture(display, image_name)?;
+        let dimensions = texture.dimensions();
+        let mut dimensions = Vector2::new(1.0, dimensions.1 as f32 / dimensions.0 as f32);
         Ok(ImageData {
             positions: vertex_buffer,
             indices: indices,
-            texture: texture
+            texture: texture,
+            dim_scales: dimensions,
+            scale: scale,
         })
     }
 }
@@ -124,16 +130,21 @@ impl Canvas {
         let vertex_shader_src = r#"
             #version 130
             in vec2 tex_coords;
+            in vec2 position;
             out vec2 v_tex_coords;
 
             uniform mat4 perspective;
             uniform mat4 view;
             uniform mat4 model;
+            uniform float scale;
+            uniform vec2 dim_scales;
+            
+            vec2 position_scaled;
 
-            in vec2 position;
             void main() {
                 v_tex_coords = tex_coords;
-                gl_Position = perspective * view * model * vec4(position, 0.0, 1.0);
+                position_scaled = scale * dim_scales * position;
+                gl_Position = perspective * view * model * vec4(position_scaled, 0.0, 1.0);
             }
         "#;
 
@@ -200,6 +211,7 @@ impl Canvas {
             blend: Blend::alpha_blending(),
             ..Default::default()
         };
+        let scales = image_data.dim_scales;
         target.draw(
             &image_data.positions, 
             &image_data.indices, 
@@ -208,7 +220,9 @@ impl Canvas {
                 model: model,
                 view: self.get_view(),
                 perspective: Self::perspective(dims.0, dims.1),
-                tex: processed_texture
+                tex: processed_texture,
+                dim_scales: (scales.x, scales.y),
+                scale: image_data.scale,
             },
             &draw_params,
         )

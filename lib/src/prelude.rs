@@ -5,3 +5,5 @@ pub use specs;
 pub use sdl2;
 pub use shrev;
 pub use glium;
+
+pub use crate::types::{*};
