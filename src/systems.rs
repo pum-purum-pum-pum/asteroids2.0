@@ -35,7 +35,7 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
     let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
         rotation
     } else {
-        aim.x.atan2(-aim.y)
+        -(-aim.x).atan2(aim.y)
     };
 
     let angle_diff = angle_shortest_dist(rotation, target_rot);
@@ -65,7 +65,7 @@ impl<'a> System<'a> for RenderingSystem {
             character_markers,
             image_data,
             display,
-            canvas,
+            mut canvas,
         ) = data;
         let mut target = display.draw();
             target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -76,6 +76,7 @@ impl<'a> System<'a> for RenderingSystem {
                 image, 
                 &iso.0,
             ).unwrap();
+            canvas.update_observer(Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y));
         }
         target.finish().unwrap();
     }
@@ -147,7 +148,7 @@ impl<'a> System<'a> for ControlSystem {
         let dt = 1f32 / 60f32;
         for (iso, vel, spin, _) in (&isometries, &mut velocities, &mut spins, &character_markers).join(){
             let player_torque = dt * calculate_player_ship_spin_for_aim(
-                Vector2::new(mouse_state.x, -mouse_state.y) -
+                Vector2::new(mouse_state.x, mouse_state.y) -
                 Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
                 iso.rotation(), 
                 spin.0

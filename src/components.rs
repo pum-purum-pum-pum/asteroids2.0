@@ -27,7 +27,7 @@ impl Mouse {
         &mut self, 
         x: i32, 
         y: i32, 
-        observer: &Isometry3,
+        observer: Point3,
         width_u: u32,
         height_u: u32,
     ) {

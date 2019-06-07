@@ -9,12 +9,12 @@ use glium::{implement_vertex, uniform, DrawError};
 use glium::index::PrimitiveType;
 use glium::texture::{SrgbTexture2d, TextureCreationError};
 use glium::draw_parameters::Blend;
-use nalgebra::{Isometry3};
 use image;
 use image::{ImageError};
 
 use crate::gfx_backend::SDL2Facade;
 
+const Z_CANVAS: f32 = 0f32;
 const Z_FAR: f32 = 10f32;
 
 #[derive(Copy, Clone)]
@@ -123,7 +123,7 @@ impl ImageData {
 /// 2D graphics on screen
 pub struct Canvas {
     program: glium::Program, // @vlad TODO: we want to use many programs
-    observer: nalgebra::Isometry3<f32>,
+    observer: Point3,
 }
 
 impl Canvas {
@@ -163,21 +163,17 @@ impl Canvas {
         let program = glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap();
         Canvas{
             program: program,
-            observer: 
-                Isometry3::new(
-                    Vector3::new(0f32, 0f32, Z_FAR), 
-                    Vector3::new(0f32, 0f32, 0f32)
-                ),
+            observer: Point3::new(0f32, 0f32, Z_FAR), 
         }
     }
 
-    pub fn observer(&self,) -> &Isometry3<f32> {
-        &self.observer
+    pub fn observer(&self,) -> Point3 {
+        self.observer
     }
 
-    fn update_observer(&mut self, pos: Point2) {
-        self.observer.translation.vector.x = pos.x;
-        self.observer.translation.vector.y = pos.y;
+    pub fn update_observer(&mut self, pos: Point2) {
+        self.observer.x = pos.x;
+        self.observer.y = pos.y;
     }
 
     pub fn render(
@@ -185,7 +181,7 @@ impl Canvas {
         display: &SDL2Facade,
         target: &mut glium::Frame,
         image_data: &ImageData,
-        model: &Isometry3<f32>,
+        model: &Isometry3,
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
@@ -199,14 +195,16 @@ impl Canvas {
             ..Default::default()
         };
         let scales = image_data.dim_scales;
+        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
             &image_data.positions, 
             &image_data.indices, 
             &self.program,
             &uniform! {
                 model: model,
-                view: get_view(&self.observer),
-                perspective: perspective(dims.0, dims.1),
+                view: view,
+                perspective: perspective,
                 tex: processed_texture,
                 dim_scales: (scales.x, scales.y),
                 scale: image_data.scale,
@@ -216,30 +214,19 @@ impl Canvas {
     }
 }
 
-
-fn get_view(observer: &Isometry3<f32>) -> [[f32; 4]; 4] {
-    observer.to_homogeneous().into()
+fn get_view(observer: Point3) -> Isometry3 {
+    let mut target = observer.clone();
+    target.z = Z_CANVAS;
+    Isometry3::look_at_rh(&observer, &target, &Vector3::y())
 }
 
-
-// TODO: rewrite with nalgebra https://www.nalgebra.org/cg_recipes/
-
-pub fn perspective(width: u32, height: u32) -> [[f32; 4]; 4] {
-    let aspect_ratio = height as f32 / width as f32;
-    let fov: f32 = 3.141592 / 3.0;
-    let zfar = 1024.0;
-    let znear = 0.1;
-    let f = 1.0 / (fov / 2.0).tan();
-    [
-        [f * aspect_ratio, 0.0, 0.0, 0.0],
-        [0.0, f, 0.0, 0.0],
-        [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
-        [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0],
-    ]
+pub fn perspective(width: u32, height: u32) -> Perspective3 {
+    let aspect_ratio = width as f32 / height as f32;
+    Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 1000.0)
 }
 
 pub fn unproject(
-    observer: &Isometry3<f32>,
+    observer: Point3,
     window_coord: &Point2,
     width: u32,
     height: u32,
@@ -247,7 +234,7 @@ pub fn unproject(
     let begin_ray = Point4::new(window_coord.x, window_coord.y, 0f32, 1f32);
     let ingame_window_coord = Point4::new(window_coord.x, window_coord.y, Z_FAR, 1f32);
     let perspective: Matrix4 = perspective(width, height).into();
-    let view: Matrix4 = observer.to_homogeneous().into();
+    let view: Matrix4 = get_view(observer).to_homogeneous().into();
     let inverse_transform = (perspective * view).try_inverse().unwrap();
     let unprojected_begin = inverse_transform * begin_ray;
     let unprojected_end = inverse_transform * ingame_window_coord;
@@ -265,7 +252,7 @@ pub fn unproject(
 }
 
 pub fn unproject_with_z(
-    observer: &Isometry3<f32>,
+    observer: Point3,
     window_coord: &Point2,
     z_coord: f32,
     width: u32,
