@@ -35,11 +35,10 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
     let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
         rotation
     } else {
-        aim.x.atan2(aim.y)
+        aim.x.atan2(-aim.y)
     };
 
     let angle_diff = angle_shortest_dist(rotation, target_rot);
-    dbg!(angle_diff);
 
     (angle_diff * 100.0 - speed * 55.0)
 }
@@ -148,15 +147,11 @@ impl<'a> System<'a> for ControlSystem {
         let dt = 1f32 / 60f32;
         for (iso, vel, spin, _) in (&isometries, &mut velocities, &mut spins, &character_markers).join(){
             let player_torque = dt * calculate_player_ship_spin_for_aim(
-                Vector2::new(mouse_state.x, mouse_state.y) -
+                Vector2::new(mouse_state.x, -mouse_state.y) -
                 Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
                 iso.rotation(), 
                 spin.0
             );
-            // dbg!((Vector2::new(mouse_state.x, mouse_state.y)-
-            //     Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y)));
-            // dbg!(player_torque);
-            dbg!(iso.rotation());
             spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
             for key in keys_channel.read(&mut self.reader) {
                 match key {
@@ -167,10 +162,10 @@ impl<'a> System<'a> for ControlSystem {
                         vel.0.x = (vel.0.x + THRUST_FORCE).min(VELOCITY_MAX);
                     }
                     Keycode::Up | Keycode::W =>  {
-                        vel.0.y = (vel.0.y - THRUST_FORCE).max(-VELOCITY_MAX);
+                        vel.0.y = (vel.0.y + THRUST_FORCE).max(-VELOCITY_MAX);
                     }
                     Keycode::Down | Keycode::S => {
-                        vel.0.y = (vel.0.y + THRUST_FORCE).min(VELOCITY_MAX);
+                        vel.0.y = (vel.0.y - THRUST_FORCE).min(VELOCITY_MAX);
                     }
                     _ => ()
                 }

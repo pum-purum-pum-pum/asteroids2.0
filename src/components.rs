@@ -34,7 +34,6 @@ impl Mouse {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
         let (x, y) = (x as f32, y as f32);
-        dbg!(("before norm", x, y));
         let (x, y) = (
             2f32 * x / width - 1f32,
             2f32 * y / height - 1f32,
