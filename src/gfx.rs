@@ -15,6 +15,8 @@ use image::{ImageError};
 
 use crate::gfx_backend::SDL2Facade;
 
+const Z_FAR: f32 = 10f32;
+
 #[derive(Copy, Clone)]
 pub struct Vertex2 {
     pub position: [f32; 2],
@@ -122,7 +124,6 @@ impl ImageData {
 pub struct Canvas {
     program: glium::Program, // @vlad TODO: we want to use many programs
     observer: nalgebra::Isometry3<f32>,
-    observer_current: nalgebra::Isometry3<f32>,
 }
 
 impl Canvas {
@@ -164,33 +165,19 @@ impl Canvas {
             program: program,
             observer: 
                 Isometry3::new(
-                    Vector3::new(0f32, 0f32, 0f32), 
-                    Vector3::new(0f32, 0f32, 0f32)
-                ),
-            observer_current: 
-                Isometry3::new(
-                    Vector3::new(0f32, 0f32, 1f32), 
+                    Vector3::new(0f32, 0f32, Z_FAR), 
                     Vector3::new(0f32, 0f32, 0f32)
                 ),
         }
     }
 
-    fn get_view(&self) -> [[f32; 4]; 4] {
-        self.observer_current.to_homogeneous().into()
+    pub fn observer(&self,) -> &Isometry3<f32> {
+        &self.observer
     }
 
-    pub fn perspective(width: u32, height: u32) -> [[f32; 4]; 4] {
-        let aspect_ratio = height as f32 / width as f32;
-        let fov: f32 = 3.141592 / 3.0;
-        let zfar = 1024.0;
-        let znear = 0.1;
-        let f = 1.0 / (fov / 2.0).tan();
-        [
-            [f * aspect_ratio, 0.0, 0.0, 0.0],
-            [0.0, f, 0.0, 0.0],
-            [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
-            [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0],
-        ]
+    fn update_observer(&mut self, pos: Point2) {
+        self.observer.translation.vector.x = pos.x;
+        self.observer.translation.vector.y = pos.y;
     }
 
     pub fn render(
@@ -218,8 +205,8 @@ impl Canvas {
             &self.program,
             &uniform! {
                 model: model,
-                view: self.get_view(),
-                perspective: Self::perspective(dims.0, dims.1),
+                view: get_view(&self.observer),
+                perspective: perspective(dims.0, dims.1),
                 tex: processed_texture,
                 dim_scales: (scales.x, scales.y),
                 scale: image_data.scale,
@@ -227,4 +214,64 @@ impl Canvas {
             &draw_params,
         )
     }
+}
+
+
+fn get_view(observer: &Isometry3<f32>) -> [[f32; 4]; 4] {
+    observer.to_homogeneous().into()
+}
+
+
+// TODO: rewrite with nalgebra https://www.nalgebra.org/cg_recipes/
+
+pub fn perspective(width: u32, height: u32) -> [[f32; 4]; 4] {
+    let aspect_ratio = height as f32 / width as f32;
+    let fov: f32 = 3.141592 / 3.0;
+    let zfar = 1024.0;
+    let znear = 0.1;
+    let f = 1.0 / (fov / 2.0).tan();
+    [
+        [f * aspect_ratio, 0.0, 0.0, 0.0],
+        [0.0, f, 0.0, 0.0],
+        [0.0, 0.0, (zfar + znear) / (zfar - znear), 1.0],
+        [0.0, 0.0, -(2.0 * zfar * znear) / (zfar - znear), 0.0],
+    ]
+}
+
+pub fn unproject(
+    observer: &Isometry3<f32>,
+    window_coord: &Point2,
+    width: u32,
+    height: u32,
+) -> (Point3, Vector3) {
+    let begin_ray = Point4::new(window_coord.x, window_coord.y, 0f32, 1f32);
+    let ingame_window_coord = Point4::new(window_coord.x, window_coord.y, Z_FAR, 1f32);
+    let perspective: Matrix4 = perspective(width, height).into();
+    let view: Matrix4 = observer.to_homogeneous().into();
+    let inverse_transform = (perspective * view).try_inverse().unwrap();
+    let unprojected_begin = inverse_transform * begin_ray;
+    let unprojected_end = inverse_transform * ingame_window_coord;
+    let unprojected_begin = Point3::from_homogeneous(unprojected_begin.coords).unwrap();
+    let unprojected_end = Point3::from_homogeneous(unprojected_end.coords).unwrap();
+    // * Why (perspective * view)^-1
+    // * Exlanation:
+    // * * this coords then passed to the Isometry and then as model to shader
+    // * * the order is:
+    // * * perspective * view * model
+    (
+        unprojected_begin,
+        nalgebra::normalize(&(unprojected_end - unprojected_begin)),
+    )
+}
+
+pub fn unproject_with_z(
+    observer: &Isometry3<f32>,
+    window_coord: &Point2,
+    z_coord: f32,
+    width: u32,
+    height: u32,
+) -> Point3 {
+    let (pos, dir) = unproject(observer, window_coord, width, height);
+    let z_safe_scaler = (-pos.z + z_coord) / dir.z;
+    return pos + dir * z_safe_scaler;
 }

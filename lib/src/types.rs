@@ -4,9 +4,16 @@ use std::ops::{Deref, DerefMut};
 use specs_derive::{Component};
 use specs::prelude::*;
 
+pub use nalgebra::Rotation3;
+pub use nalgebra::Unit;
 pub type Point2 = nalgebra::Point2<f32>;
+pub type Point3 = nalgebra::Point3<f32>;
+pub type Point4 = nalgebra::Point4<f32>;
+pub type Matrix4 = nalgebra::Matrix4<f32>;
 pub type Vector2 = nalgebra::Vector2<f32>;
 pub type Vector3 = nalgebra::Vector3<f32>;
+pub type Isometry3 = nalgebra::Isometry3<f32>;
+pub type Isometry2 = nalgebra::Isometry2<f32>;
 
 
 unsafe impl<T> Send for ThreadPin<T> {}

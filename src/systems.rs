@@ -13,8 +13,37 @@ use crate::components::{*};
 use crate::gfx::{ImageData};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
-const THRUST_FORCE: f32 = 0.8f32;
-const VELOCITY_MAX: f32 = 20f32;
+const THRUST_FORCE: f32 = 0.01f32;
+const VELOCITY_MAX: f32 = 1f32;
+// const MAX_ROTATION_SPEED: f32 = 0.1f32;
+const MAX_TORQUE: f32 = 10f32;
+
+/// Calculate the shortest distance between two angles expressed in radians.
+///
+/// Based on https://gist.github.com/shaunlebron/8832585
+pub fn angle_shortest_dist(a0: f32, a1: f32) -> f32 {
+    let max = std::f32::consts::PI * 2.0;
+    let da = (a1 - a0) % max;
+    2.0 * da % max - da
+}
+
+/// Calculate spin for rotating the player's ship towards a given direction.
+///
+/// Inspired by proportional-derivative controllers, but approximated with just the current spin
+/// instead of error derivatives. Uses arbitrary constants tuned for player control.
+pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f32) -> f32 {
+    let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
+        rotation
+    } else {
+        aim.x.atan2(aim.y)
+    };
+
+    let angle_diff = angle_shortest_dist(rotation, target_rot);
+    dbg!(angle_diff);
+
+    (angle_diff * 100.0 - speed * 55.0)
+}
+
 
 #[derive(Default)]
 pub struct RenderingSystem;
@@ -23,7 +52,7 @@ type Image = ThreadPin<ImageData>;
 
 impl<'a> System<'a> for RenderingSystem {
     type SystemData = (
-        ReadStorage<'a, Position>,
+        ReadStorage<'a, Isometry>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, Image>,
 
@@ -33,7 +62,7 @@ impl<'a> System<'a> for RenderingSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            positions,
+            isometries,
             character_markers,
             image_data,
             display,
@@ -41,15 +70,12 @@ impl<'a> System<'a> for RenderingSystem {
         ) = data;
         let mut target = display.draw();
             target.clear_color(0.0, 0.0, 0.0, 1.0);
-        for (pos, _, image) in (&positions, &character_markers, &image_data).join() {
+        for (iso, image) in (&isometries, &image_data).join() {
             canvas.render(
                 &display, 
                 &mut target, 
                 image, 
-                &Isometry3::new(
-                    Vector3::new(pos.0.x, pos.0.y, 0f32),
-                    Vector3::new(0f32, 0f32, 3f32),
-                )
+                &iso.0,
             ).unwrap();
         }
         target.finish().unwrap();
@@ -60,17 +86,30 @@ pub struct KinematicSystem;
 
 impl<'a> System<'a> for KinematicSystem {
     type SystemData = (
-        WriteStorage<'a, Position>,
+        WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
+        ReadStorage<'a, Spin>,
     );
+
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            mut positions,
+            mut isometries,
             mut velocities,
+            spins,
         ) = data;
-        for (position, velocity) in (&mut positions, &mut velocities).join() {
-            position.0 += velocity.0;
+        // TODO add dt -- time delta for period
+        for (
+            mut isometry, 
+            velocity, 
+            spin
+        ) in (
+                &mut isometries, 
+                &mut velocities, 
+                &spins
+        ).join() {
+            isometry += velocity;
+            isometry.add_spin(spin.0);
             velocity.0 *= DAMPING_FACTOR;
         }
     }
@@ -78,40 +117,63 @@ impl<'a> System<'a> for KinematicSystem {
 
 pub struct ControlSystem {
     reader: ReaderId<Keycode>,
-    character: specs::Entity,
 }
 
 impl ControlSystem {
-    pub fn new(reader: ReaderId<Keycode>, character: specs::Entity) -> Self {
-        ControlSystem{ reader: reader, character: character }
+    pub fn new(reader: ReaderId<Keycode>) -> Self {
+        ControlSystem{ reader: reader }
     }
 }
 
 impl<'a> System<'a> for ControlSystem {
     type SystemData = (
-        WriteStorage<'a, Position>,
+        WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Spin>,
+        ReadStorage<'a, CharacterMarker>,
         Read<'a, EventChannel<Keycode>>,
+        Read<'a, Mouse>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (_positions, mut velocities, keys_channel) = data;
-        for key in keys_channel.read(&mut self.reader) {
-            let character_velocity = velocities.get_mut(self.character).unwrap();
-            match key {
-                Keycode::Left | Keycode::A => {
-                    character_velocity.0.x = (character_velocity.0.x - THRUST_FORCE).max(-VELOCITY_MAX);
+        let (
+            isometries, 
+            mut velocities, 
+            mut spins,
+            character_markers, 
+            keys_channel,
+            mouse_state,
+        ) = data;
+        // TODO add dt in params
+        let dt = 1f32 / 60f32;
+        for (iso, vel, spin, _) in (&isometries, &mut velocities, &mut spins, &character_markers).join(){
+            let player_torque = dt * calculate_player_ship_spin_for_aim(
+                Vector2::new(mouse_state.x, mouse_state.y) -
+                Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                iso.rotation(), 
+                spin.0
+            );
+            // dbg!((Vector2::new(mouse_state.x, mouse_state.y)-
+            //     Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y)));
+            // dbg!(player_torque);
+            dbg!(iso.rotation());
+            spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+            for key in keys_channel.read(&mut self.reader) {
+                match key {
+                    Keycode::Left | Keycode::A => {
+                        vel.0.x = (vel.0.x - THRUST_FORCE).max(-VELOCITY_MAX);
+                    }
+                    Keycode::Right | Keycode::D => {
+                        vel.0.x = (vel.0.x + THRUST_FORCE).min(VELOCITY_MAX);
+                    }
+                    Keycode::Up | Keycode::W =>  {
+                        vel.0.y = (vel.0.y - THRUST_FORCE).max(-VELOCITY_MAX);
+                    }
+                    Keycode::Down | Keycode::S => {
+                        vel.0.y = (vel.0.y + THRUST_FORCE).min(VELOCITY_MAX);
+                    }
+                    _ => ()
                 }
-                Keycode::Right | Keycode::D => {
-                    character_velocity.0.x = (character_velocity.0.x + THRUST_FORCE).min(VELOCITY_MAX);
-                }
-                Keycode::Up | Keycode::W =>  {
-                    character_velocity.0.y = (character_velocity.0.y - THRUST_FORCE).max(-VELOCITY_MAX);
-                }
-                Keycode::Down | Keycode::S => {
-                    character_velocity.0.y = (character_velocity.0.y + THRUST_FORCE).min(VELOCITY_MAX);
-                }
-                _ => ()
             }
         }
     }
