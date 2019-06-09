@@ -7,10 +7,10 @@ use shrev::EventChannel;
 use sdl2::keyboard::Keycode;
 use glium::Surface;
 use glium;
-use nalgebra::{Isometry3, Vector3};
 
 use crate::components::{*};
-use crate::gfx::{ImageData};
+use crate::gfx::{ImageData, GeometryData};
+use crate::geometry::LightningPolygon;
 
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -76,7 +76,20 @@ impl<'a> System<'a> for RenderingSystem {
                 image, 
                 &iso.0,
             ).unwrap();
+        }
+        for (iso, _) in (&isometries, &character_markers).join() {
             canvas.update_observer(Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y));
+        }
+        let mut light_poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
+        let (positions, indices) = light_poly.get_triangles();
+        let geom_data = GeometryData::new(&display, &positions, &indices);
+        for (iso, _) in (&isometries, &character_markers).join() {
+            canvas.render_geometry(
+                &display,
+                &mut target, 
+                &geom_data, 
+                &iso.0
+            ).unwrap();
         }
         target.finish().unwrap();
     }

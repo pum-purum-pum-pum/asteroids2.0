@@ -15,6 +15,9 @@ mod systems;
 mod resources;
 mod gfx_backend;
 mod gfx;
+mod geometry;
+#[cfg(test)]
+mod test;
 use astro_lib::prelude::*;
 
 use systems::{KinematicSystem, ControlSystem, RenderingSystem};
@@ -22,6 +25,7 @@ use components::*;
 use resources::*;
 use gfx_backend::DisplayBuild;
 use gfx::{Canvas, ImageData, load_texture};
+use geometry::LightningPolygon;
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
@@ -35,7 +39,6 @@ pub fn main() -> Result<(), String> {
         .unwrap();
     // dbg!("hello");
     let canvas = Canvas::new(&display);
-    let image_data = ImageData::new(&display, "player", 0.5f32).unwrap();
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
@@ -44,13 +47,30 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<CharacterMarker>();
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
+    let character_image = ImageData::new(&display, "player", 0.5f32).unwrap();
     let _character = specs_world.create_entity()
         .with(Isometry::new(0f32, 0f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
-        .with(ThreadPin::new(image_data))
+        .with(ThreadPin::new(character_image))
         .with(Spin::default())
         .build();
+    let asteroid_image = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
+    let _asteroid = specs_world.create_entity()
+        .with(Isometry::new(1f32, 1f32, 0f32))
+        .with(Velocity::new(0f32, 0f32))
+        .with(ThreadPin::new(asteroid_image))
+        .with(Spin::default())
+        .build();
+    {
+        let light_image = ImageData::new(&display, "light", 4f32).unwrap();
+        let _asteroid = specs_world.create_entity()
+            .with(Isometry::new(1f32, 1f32, 0f32))
+            .with(Velocity::new(0f32, 0f32))
+            .with(ThreadPin::new(light_image))
+            .with(Spin::default())
+            .build();
+    }
     let control_system = ControlSystem::new(keys_channel.register_reader()); 
     let rendering_system = RenderingSystem::default();
     let mut dispatcher = DispatcherBuilder::new()
@@ -62,6 +82,8 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(display));
     specs_world.add_resource(Mouse{wdpi: hdpi, hdpi: hdpi,..Mouse::default()});
     specs_world.add_resource(ThreadPin::new(canvas));
+    let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
+    specs_world.add_resource(poly);
     // ------------------------------
 
     let mut event_pump = sdl_context.event_pump().unwrap();
@@ -103,16 +125,4 @@ pub fn main() -> Result<(), String> {
         }
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    use crate::nalgebra::Rotation2;
-
-    #[test]
-    fn rotation() {
-        let rot1 = Rotation2::new(1.5 * 3.14);
-        let rot2 = Rotation2::new(0.5 * 3.14);
-        dbg!((rot1.angle(), rot2.angle()));
-    }
 }

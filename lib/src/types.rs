@@ -5,6 +5,7 @@ use specs_derive::{Component};
 use specs::prelude::*;
 
 pub use nalgebra::Rotation3;
+pub use nalgebra::Rotation2;
 pub use nalgebra::Unit;
 pub type Perspective3 =  nalgebra::Perspective3<f32>;
 pub type Point2 = nalgebra::Point2<f32>;
@@ -16,6 +17,9 @@ pub type Vector3 = nalgebra::Vector3<f32>;
 pub type Isometry3 = nalgebra::Isometry3<f32>;
 pub type Isometry2 = nalgebra::Isometry2<f32>;
 
+pub use ncollide2d::query::Ray;
+pub type Segment = ncollide2d::shape::Segment<f32>;
+pub use ncollide2d::query::ray_internal::ray::RayCast;
 
 unsafe impl<T> Send for ThreadPin<T> {}
 unsafe impl<T> Sync for ThreadPin<T> {}

@@ -6,9 +6,10 @@ use al::prelude::*;
 use glium;
 use glium::Surface;
 use glium::{implement_vertex, uniform, DrawError};
-use glium::index::PrimitiveType;
+use glium::index::{PrimitiveType, IndexBuffer};
 use glium::texture::{SrgbTexture2d, TextureCreationError};
 use glium::draw_parameters::Blend;
+use glium::vertex::VertexBuffer;
 use image;
 use image::{ImageError};
 
@@ -28,6 +29,12 @@ pub struct Vertex {
     pub tex_coords: [f32; 2],
 }
 implement_vertex!(Vertex, position, tex_coords);
+
+#[derive(Copy, Clone)]
+pub struct GeometryVertex {
+    pub position: [f32; 2]
+}
+implement_vertex!(GeometryVertex, position);
 
 #[derive(Debug)]
 pub enum LoadTextureError {
@@ -72,8 +79,31 @@ pub fn load_texture(display: &SDL2Facade, name: &str) -> LoadTextureResult {
     Ok(texture)
 }
 
+pub struct GeometryData {
+    positions: glium::VertexBuffer<GeometryVertex>,
+    indices: glium::IndexBuffer<u16>,    
+}
+
+impl GeometryData {
+    pub fn new(display: &SDL2Facade, positions: &[Point2], indices: &[u16]) -> Self {
+        let shape: Vec<GeometryVertex> = positions.iter()
+            .map(|pos| { GeometryVertex{position: [pos.x, pos.y]} })
+            .collect();
+        let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
+        let indices = glium::IndexBuffer::new(
+            display,
+            PrimitiveType::TrianglesList,
+            indices,
+        ).unwrap();
+        GeometryData {
+            positions: vertex_buffer,
+            indices: indices
+        }
+    }
+}
+
 /// Contains all data that is used by glium to render image
-pub struct ImageData{
+pub struct ImageData {
     positions: glium::VertexBuffer<Vertex>,
     indices: glium::IndexBuffer<u16>,
     texture: glium::texture::SrgbTexture2d,
@@ -109,7 +139,7 @@ impl ImageData {
         ).unwrap();
         let texture = load_texture(display, image_name)?;
         let dimensions = texture.dimensions();
-        let mut dimensions = Vector2::new(1.0, dimensions.1 as f32 / dimensions.0 as f32);
+        let dimensions = Vector2::new(1.0, dimensions.1 as f32 / dimensions.0 as f32);
         Ok(ImageData {
             positions: vertex_buffer,
             indices: indices,
@@ -123,6 +153,7 @@ impl ImageData {
 /// 2D graphics on screen
 pub struct Canvas {
     program: glium::Program, // @vlad TODO: we want to use many programs
+    program_light: glium::Program, // but for now simpler=better 
     observer: Point3,
 }
 
@@ -160,9 +191,34 @@ impl Canvas {
                 color = texture_colors;
             }
         "#;
+
+        let vertex_light_shader_src = r#"
+            #version 130
+            in vec2 position;
+
+            uniform mat4 perspective;
+            uniform mat4 view;
+            uniform mat4 model;
+
+            void main() {
+                gl_Position = perspective * view * model * vec4(position, 0.0, 1.0);
+            }
+        "#;
+
+        let fragment_light_shader_src = r#"
+            #version 130
+            out vec4 color;
+
+            void main() {
+                color = vec4(1.0, 1.0, 1.0, 1.0);
+            }
+        "#;
+        
         let program = glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap();
+        let program_light = glium::Program::from_source(display, vertex_light_shader_src, fragment_light_shader_src, None).unwrap();
         Canvas{
             program: program,
+            program_light: program_light,
             observer: Point3::new(0f32, 0f32, Z_FAR), 
         }
     }
@@ -208,6 +264,34 @@ impl Canvas {
                 tex: processed_texture,
                 dim_scales: (scales.x, scales.y),
                 scale: image_data.scale,
+            },
+            &draw_params,
+        )
+    }
+
+    pub fn render_geometry(
+        &self,
+        display: &SDL2Facade,
+        target: &mut glium::Frame,
+        image_data: &GeometryData,
+        model: &Isometry3,
+    ) -> Result<(), DrawError> {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = display.get_framebuffer_dimensions();
+        let draw_params = glium::DrawParameters {
+            blend: Blend::alpha_blending(),
+            ..Default::default()
+        };
+        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        target.draw(
+            &image_data.positions, 
+            &image_data.indices, 
+            &self.program_light,
+            &uniform! {
+                model: model,
+                view: view,
+                perspective: perspective,
             },
             &draw_params,
         )
