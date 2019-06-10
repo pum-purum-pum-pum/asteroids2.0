@@ -9,15 +9,15 @@ fn rotation() {
 
 #[test]
 fn geom() {
-    use astro_lib as al;
+    use crate::geometry::*;
     use al::prelude::*;
-    use crate::geometry::{*};
+    use astro_lib as al;
 
     let mut poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32, Point2::new(0.5, 0.5));
     dbg!(&poly);
-    poly.clip_one(Geometry::Circle{
+    poly.clip_one(Geometry::Circle {
         radius: 1f32,
-        position: Point2::new(0.25, 0.25)
+        position: Point2::new(0.25, 0.25),
     });
     dbg!(&poly);
 }

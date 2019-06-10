@@ -1,16 +1,16 @@
-use std::fs::{File};
-use std::io::{BufReader, Error as IOError};
-use astro_lib as al;
 use al::prelude::*;
+use astro_lib as al;
+use std::fs::File;
+use std::io::{BufReader, Error as IOError};
 
 use glium;
+use glium::draw_parameters::Blend;
+use glium::index::PrimitiveType;
+use glium::texture::{SrgbTexture2d, TextureCreationError};
 use glium::Surface;
 use glium::{implement_vertex, uniform, DrawError};
-use glium::index::{PrimitiveType};
-use glium::texture::{SrgbTexture2d, TextureCreationError};
-use glium::draw_parameters::Blend;
 use image;
-use image::{ImageError};
+use image::ImageError;
 
 use crate::gfx_backend::SDL2Facade;
 
@@ -31,7 +31,7 @@ implement_vertex!(Vertex, position, tex_coords);
 
 #[derive(Copy, Clone)]
 pub struct GeometryVertex {
-    pub position: [f32; 2]
+    pub position: [f32; 2],
 }
 implement_vertex!(GeometryVertex, position);
 
@@ -63,11 +63,7 @@ impl From<TextureCreationError> for LoadTextureError {
 type LoadTextureResult = Result<SrgbTexture2d, LoadTextureError>;
 
 pub fn load_texture(display: &SDL2Facade, name: &str) -> LoadTextureResult {
-    let path_str = &format!(
-        "{}/assets/{}.png",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    );
+    let path_str = &format!("{}/assets/{}.png", env!("CARGO_MANIFEST_DIR"), name);
     let texture_file = File::open(path_str)?;
     let reader = BufReader::new(texture_file);
     let image = image::load(reader, image::PNG)?.to_rgba();
@@ -80,23 +76,23 @@ pub fn load_texture(display: &SDL2Facade, name: &str) -> LoadTextureResult {
 
 pub struct GeometryData {
     positions: glium::VertexBuffer<GeometryVertex>,
-    indices: glium::IndexBuffer<u16>,    
+    indices: glium::IndexBuffer<u16>,
 }
 
 impl GeometryData {
     pub fn new(display: &SDL2Facade, positions: &[Point2], indices: &[u16]) -> Self {
-        let shape: Vec<GeometryVertex> = positions.iter()
-            .map(|pos| { GeometryVertex{position: [pos.x, pos.y]} })
+        let shape: Vec<GeometryVertex> = positions
+            .iter()
+            .map(|pos| GeometryVertex {
+                position: [pos.x, pos.y],
+            })
             .collect();
         let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
-        let indices = glium::IndexBuffer::new(
-            display,
-            PrimitiveType::TrianglesList,
-            indices,
-        ).unwrap();
+        let indices =
+            glium::IndexBuffer::new(display, PrimitiveType::TrianglesList, indices).unwrap();
         GeometryData {
             positions: vertex_buffer,
-            indices: indices
+            indices: indices,
         }
     }
 }
@@ -113,29 +109,28 @@ pub struct ImageData {
 impl ImageData {
     /// panic if failed to create buffers. TODO Result
     /// image_name - is name of the image to load in assets directory
-    pub fn new(display: &SDL2Facade, image_name: &str, scale: f32) -> Result<Self, LoadTextureError> {
-        let positions = vec![
-            [-1f32, -1f32],
-            [-1f32, 1f32],
-            [1f32, 1f32],
-            [1f32, -1f32]
-        ];
-        let textures = vec![
-            [0f32, 0f32],
-            [0f32, 1f32],
-            [1f32, 1f32],
-            [1f32, 0f32]
-        ];
+    pub fn new(
+        display: &SDL2Facade,
+        image_name: &str,
+        scale: f32,
+    ) -> Result<Self, LoadTextureError> {
+        let positions = vec![[-1f32, -1f32], [-1f32, 1f32], [1f32, 1f32], [1f32, -1f32]];
+        let textures = vec![[0f32, 0f32], [0f32, 1f32], [1f32, 1f32], [1f32, 0f32]];
         let shape: Vec<Vertex> = positions
-            .into_iter().zip(textures)
-            .map(|(pos, tex)| { Vertex{position: pos, tex_coords: tex} })
+            .into_iter()
+            .zip(textures)
+            .map(|(pos, tex)| Vertex {
+                position: pos,
+                tex_coords: tex,
+            })
             .collect();
         let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
         let indices = glium::IndexBuffer::new(
             display,
             PrimitiveType::TrianglesList,
             &[0u16, 1, 2, 2, 3, 0],
-        ).unwrap();
+        )
+        .unwrap();
         let texture = load_texture(display, image_name)?;
         let dimensions = texture.dimensions();
         let dimensions = Vector2::new(1.0, dimensions.1 as f32 / dimensions.0 as f32);
@@ -151,13 +146,13 @@ impl ImageData {
 
 /// 2D graphics on screen
 pub struct Canvas {
-    program: glium::Program, // @vlad TODO: we want to use many programs
-    program_light: glium::Program, // but for now simpler=better 
+    program: glium::Program,       // @vlad TODO: we want to use many programs
+    program_light: glium::Program, // but for now simpler=better
     observer: Point3,
 }
 
 impl Canvas {
-    pub fn new(display: &SDL2Facade) -> Self{
+    pub fn new(display: &SDL2Facade) -> Self {
         let vertex_shader_src = r#"
             #version 130
             in vec2 tex_coords;
@@ -212,17 +207,25 @@ impl Canvas {
                 color = vec4(1.0, 1.0, 1.0, 1.0);
             }
         "#;
-        
-        let program = glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None).unwrap();
-        let program_light = glium::Program::from_source(display, vertex_light_shader_src, fragment_light_shader_src, None).unwrap();
-        Canvas{
+
+        let program =
+            glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None)
+                .unwrap();
+        let program_light = glium::Program::from_source(
+            display,
+            vertex_light_shader_src,
+            fragment_light_shader_src,
+            None,
+        )
+        .unwrap();
+        Canvas {
             program: program,
             program_light: program_light,
-            observer: Point3::new(0f32, 0f32, Z_FAR), 
+            observer: Point3::new(0f32, 0f32, Z_FAR),
         }
     }
 
-    pub fn observer(&self,) -> Point3 {
+    pub fn observer(&self) -> Point3 {
         self.observer
     }
 
@@ -240,13 +243,14 @@ impl Canvas {
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
-        let processed_texture = image_data.texture
+        let processed_texture = image_data
+            .texture
             .sampled()
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
             .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
 
         let draw_params = glium::DrawParameters {
-             stencil: glium::draw_parameters::Stencil {
+            stencil: glium::draw_parameters::Stencil {
                 test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
                 test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
                 reference_value_clockwise: 1,
@@ -260,8 +264,8 @@ impl Canvas {
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
-            &image_data.positions, 
-            &image_data.indices, 
+            &image_data.positions,
+            &image_data.indices,
             &self.program,
             &uniform! {
                 model: model,
@@ -302,8 +306,8 @@ impl Canvas {
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
-            &image_data.positions, 
-            &image_data.indices, 
+            &image_data.positions,
+            &image_data.indices,
             &self.program_light,
             &uniform! {
                 model: model,

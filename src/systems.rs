@@ -1,16 +1,16 @@
-use astro_lib as al;
 use al::prelude::*;
+use astro_lib as al;
 
-use specs::{Join};
-use specs::prelude::*;
-use shrev::EventChannel;
-use sdl2::keyboard::Keycode;
-use glium::Surface;
 use glium;
+use glium::Surface;
+use sdl2::keyboard::Keycode;
+use shrev::EventChannel;
+use specs::prelude::*;
+use specs::Join;
 
-use crate::components::{*};
-use crate::gfx::{ImageData, GeometryData};
-use crate::geometry::{LightningPolygon, Geometry};
+use crate::components::*;
+use crate::geometry::{Geometry, LightningPolygon};
+use crate::gfx::{GeometryData, ImageData};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -43,7 +43,6 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
     (angle_diff * 100.0 - speed * 55.0)
 }
 
-
 #[derive(Default)]
 pub struct RenderingSystem;
 
@@ -55,41 +54,37 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, Image>,
-
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (
-            isometries,
-            character_markers,
-            asteroid_markers,
-            image_data,
-            display,
-            mut canvas,
-        ) = data;
+        let (isometries, character_markers, asteroid_markers, image_data, display, mut canvas) =
+            data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         target.clear_stencil(0i32);
-                let char_pos = {
+        let char_pos = {
             let mut opt_iso = None;
             for (iso, _) in (&isometries, &character_markers).join() {
-                canvas.update_observer(Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y));
+                canvas.update_observer(Point2::new(
+                    iso.0.translation.vector.x,
+                    iso.0.translation.vector.y,
+                ));
                 opt_iso = Some(iso)
             }
             opt_iso.unwrap().0.translation.vector
         };
         // @vlad TODO rewrite it with screen borders
         let mut light_poly = LightningPolygon::new_rectangle(
-            char_pos.x - 10f32, 
-            char_pos.y - 10f32, 
-            char_pos.x + 10f32, 
-            char_pos.y + 10f32, 
-            Point2::new(char_pos.x, char_pos.y)
+            char_pos.x - 10f32,
+            char_pos.y - 10f32,
+            char_pos.x + 10f32,
+            char_pos.y + 10f32,
+            Point2::new(char_pos.x, char_pos.y),
         );
         for (iso, _) in (&isometries, &asteroid_markers).join() {
-            light_poly.clip_one(Geometry::Circle{
+            light_poly.clip_one(Geometry::Circle {
                 radius: 0.5f32,
                 position: Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
             });
@@ -100,20 +95,12 @@ impl<'a> System<'a> for RenderingSystem {
         // dbg!(&indices);
         let geom_data = GeometryData::new(&display, &positions, &indices);
         for (_iso, _char_marker) in (&isometries, &character_markers).join() {
-            canvas.render_geometry(
-                &display,
-                &mut target, 
-                &geom_data, 
-                &Isometry3::identity()
-            ).unwrap();
+            canvas
+                .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
+                .unwrap();
         }
         for (iso, image) in (&isometries, &image_data).join() {
-            canvas.render(
-                &display, 
-                &mut target, 
-                image, 
-                &iso.0,
-            ).unwrap();
+            canvas.render(&display, &mut target, image, &iso.0).unwrap();
         }
         target.finish().unwrap();
     }
@@ -127,28 +114,13 @@ impl<'a> System<'a> for KinematicSystem {
         WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Spin>,
-        ReadStorage<'a, AttachPosition>
+        ReadStorage<'a, AttachPosition>,
     );
 
-
     fn run(&mut self, data: Self::SystemData) {
-        let (
-            entities,
-            mut isometries,
-            mut velocities,
-            spins,
-            attach_positions
-        ) = data;
+        let (entities, mut isometries, mut velocities, spins, attach_positions) = data;
         // TODO add dt -- time delta for period
-        for (
-            mut isometry, 
-            velocity, 
-            spin
-        ) in (
-                &mut isometries, 
-                &mut velocities, 
-                &spins
-        ).join() {
+        for (mut isometry, velocity, spin) in (&mut isometries, &mut velocities, &spins).join() {
             isometry += velocity;
             isometry.add_spin(spin.0);
             velocity.0 *= DAMPING_FACTOR;
@@ -170,7 +142,7 @@ pub struct ControlSystem {
 
 impl ControlSystem {
     pub fn new(reader: ReaderId<Keycode>) -> Self {
-        ControlSystem{ reader: reader }
+        ControlSystem { reader: reader }
     }
 }
 
@@ -185,23 +157,20 @@ impl<'a> System<'a> for ControlSystem {
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (
-            isometries, 
-            mut velocities, 
-            mut spins,
-            character_markers, 
-            keys_channel,
-            mouse_state,
-        ) = data;
+        let (isometries, mut velocities, mut spins, character_markers, keys_channel, mouse_state) =
+            data;
         // TODO add dt in params
         let dt = 1f32 / 60f32;
-        for (iso, vel, spin, _) in (&isometries, &mut velocities, &mut spins, &character_markers).join(){
-            let player_torque = dt * calculate_player_ship_spin_for_aim(
-                Vector2::new(mouse_state.x, mouse_state.y) -
-                Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
-                iso.rotation(), 
-                spin.0
-            );
+        for (iso, vel, spin, _) in
+            (&isometries, &mut velocities, &mut spins, &character_markers).join()
+        {
+            let player_torque = dt
+                * calculate_player_ship_spin_for_aim(
+                    Vector2::new(mouse_state.x, mouse_state.y)
+                        - Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                    iso.rotation(),
+                    spin.0,
+                );
             spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
             for key in keys_channel.read(&mut self.reader) {
                 match key {
@@ -211,13 +180,13 @@ impl<'a> System<'a> for ControlSystem {
                     Keycode::Right | Keycode::D => {
                         vel.0.x = (vel.0.x + THRUST_FORCE).min(VELOCITY_MAX);
                     }
-                    Keycode::Up | Keycode::W =>  {
+                    Keycode::Up | Keycode::W => {
                         vel.0.y = (vel.0.y + THRUST_FORCE).max(-VELOCITY_MAX);
                     }
                     Keycode::Down | Keycode::S => {
                         vel.0.y = (vel.0.y - THRUST_FORCE).min(VELOCITY_MAX);
                     }
-                    _ => ()
+                    _ => (),
                 }
             }
         }

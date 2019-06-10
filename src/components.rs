@@ -1,11 +1,10 @@
-use std::ops::{AddAssign};
-use astro_lib as al;
-use al::prelude::*;
-use specs_derive::{Component};
-use specs::prelude::*;
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
-use crate::gfx::{Canvas as SDLCanvas, unproject_with_z};
-
+use al::prelude::*;
+use astro_lib as al;
+use specs::prelude::*;
+use specs_derive::Component;
+use std::ops::AddAssign;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
@@ -22,29 +21,13 @@ pub struct Mouse {
 
 impl Mouse {
     /// get system location of mouse and then unproject it into canvas coordinates
-    pub fn set_position(
-        &mut self, 
-        x: i32, 
-        y: i32, 
-        observer: Point3,
-        width_u: u32,
-        height_u: u32,
-    ) {
+    pub fn set_position(&mut self, x: i32, y: i32, observer: Point3, width_u: u32, height_u: u32) {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
         let (x, y) = (x as f32, y as f32);
-        let (x, y) = (
-            2f32 * x / width - 1f32,
-            2f32 * y / height - 1f32,
-        );
+        let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
-        let point = unproject_with_z(
-            observer,
-            &Point2::new(x, y),
-            0f32,
-            width_u,
-            height_u
-        );
+        let point = unproject_with_z(observer, &Point2::new(x, y), 0f32, width_u, height_u);
         self.x = point.x;
         self.y = point.y;
     }
@@ -76,7 +59,7 @@ pub struct Isometry(pub Isometry3);
 pub struct Spin(pub f32);
 
 impl Isometry {
-    pub fn new(x: f32, y: f32, angle: f32) -> Self{
+    pub fn new(x: f32, y: f32, angle: f32) -> Self {
         Isometry(Isometry3::new(
             Vector3::new(x, y, 0f32),
             Vector3::new(0f32, 0f32, angle),
@@ -84,9 +67,7 @@ impl Isometry {
     }
 
     pub fn add_spin(&mut self, spin: f32) {
-        let rotation = Rotation3::new(
-            Vector3::new(0f32, 0f32, spin)
-        );
+        let rotation = Rotation3::new(Vector3::new(0f32, 0f32, spin));
         self.0.rotation *= rotation;
     }
 
@@ -108,7 +89,7 @@ impl AddAssign<&Velocity> for &mut Isometry {
 pub struct Velocity(pub Vector2);
 
 impl Velocity {
-    pub fn new(x: f32, y: f32) -> Self{
+    pub fn new(x: f32, y: f32) -> Self {
         Velocity(Vector2::new(x, y))
     }
 }
