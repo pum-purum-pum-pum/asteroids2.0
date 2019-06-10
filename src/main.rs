@@ -45,10 +45,12 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Isometry>();
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
+    specs_world.register::<AsteroidMarker>();
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
+    specs_world.register::<AttachPosition>();
     let character_image = ImageData::new(&display, "player", 0.5f32).unwrap();
-    let _character = specs_world.create_entity()
+    let character = specs_world.create_entity()
         .with(Isometry::new(0f32, 0f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
@@ -59,13 +61,23 @@ pub fn main() -> Result<(), String> {
     let _asteroid = specs_world.create_entity()
         .with(Isometry::new(1f32, 1f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
+        .with(AsteroidMarker::default())
+        .with(ThreadPin::new(asteroid_image))
+        .with(Spin::default())
+        .build();
+    let asteroid_image = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
+    let _asteroid = specs_world.create_entity()
+        .with(Isometry::new(-5f32, -5f32, 0f32))
+        .with(Velocity::new(0f32, 0f32))
+        .with(AsteroidMarker::default())
         .with(ThreadPin::new(asteroid_image))
         .with(Spin::default())
         .build();
     {
-        let light_image = ImageData::new(&display, "light", 4f32).unwrap();
-        let _asteroid = specs_world.create_entity()
-            .with(Isometry::new(1f32, 1f32, 0f32))
+        let light_image = ImageData::new(&display, "light", 13f32).unwrap();
+        let _light = specs_world.create_entity()
+            .with(Isometry::new(0f32, 0f32, 0f32))
+            .with(AttachPosition(character))
             .with(Velocity::new(0f32, 0f32))
             .with(ThreadPin::new(light_image))
             .with(Spin::default())
@@ -82,8 +94,8 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(display));
     specs_world.add_resource(Mouse{wdpi: hdpi, hdpi: hdpi,..Mouse::default()});
     specs_world.add_resource(ThreadPin::new(canvas));
-    let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
-    specs_world.add_resource(poly);
+    // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
+    // specs_world.add_resource(poly);
     // ------------------------------
 
     let mut event_pump = sdl_context.event_pump().unwrap();

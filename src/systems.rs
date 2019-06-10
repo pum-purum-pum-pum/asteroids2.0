@@ -10,7 +10,7 @@ use glium;
 
 use crate::components::{*};
 use crate::gfx::{ImageData, GeometryData};
-use crate::geometry::LightningPolygon;
+use crate::geometry::{LightningPolygon, Geometry};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -53,6 +53,7 @@ impl<'a> System<'a> for RenderingSystem {
     type SystemData = (
         ReadStorage<'a, Isometry>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, Image>,
 
         WriteExpect<'a, SDLDisplay>,
@@ -63,32 +64,55 @@ impl<'a> System<'a> for RenderingSystem {
         let (
             isometries,
             character_markers,
+            asteroid_markers,
             image_data,
             display,
             mut canvas,
         ) = data;
         let mut target = display.draw();
-            target.clear_color(0.0, 0.0, 0.0, 1.0);
-        for (iso, image) in (&isometries, &image_data).join() {
-            canvas.render(
-                &display, 
-                &mut target, 
-                image, 
-                &iso.0,
-            ).unwrap();
+        target.clear_color(0.0, 0.0, 0.0, 1.0);
+        target.clear_stencil(0i32);
+                let char_pos = {
+            let mut opt_iso = None;
+            for (iso, _) in (&isometries, &character_markers).join() {
+                canvas.update_observer(Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y));
+                opt_iso = Some(iso)
+            }
+            opt_iso.unwrap().0.translation.vector
+        };
+        // @vlad TODO rewrite it with screen borders
+        let mut light_poly = LightningPolygon::new_rectangle(
+            char_pos.x - 10f32, 
+            char_pos.y - 10f32, 
+            char_pos.x + 10f32, 
+            char_pos.y + 10f32, 
+            Point2::new(char_pos.x, char_pos.y)
+        );
+        for (iso, _) in (&isometries, &asteroid_markers).join() {
+            light_poly.clip_one(Geometry::Circle{
+                radius: 0.5f32,
+                position: Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+            });
         }
-        for (iso, _) in (&isometries, &character_markers).join() {
-            canvas.update_observer(Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y));
-        }
-        let mut light_poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
+        // dbg!(&light_poly);
         let (positions, indices) = light_poly.get_triangles();
+        // dbg!(&positions);
+        // dbg!(&indices);
         let geom_data = GeometryData::new(&display, &positions, &indices);
         for (iso, _) in (&isometries, &character_markers).join() {
             canvas.render_geometry(
                 &display,
                 &mut target, 
                 &geom_data, 
-                &iso.0
+                &Isometry3::identity()
+            ).unwrap();
+        }
+        for (iso, image) in (&isometries, &image_data).join() {
+            canvas.render(
+                &display, 
+                &mut target, 
+                image, 
+                &iso.0,
             ).unwrap();
         }
         target.finish().unwrap();
@@ -99,17 +123,21 @@ pub struct KinematicSystem;
 
 impl<'a> System<'a> for KinematicSystem {
     type SystemData = (
+        Entities<'a>,
         WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Spin>,
+        ReadStorage<'a, AttachPosition>
     );
 
 
     fn run(&mut self, data: Self::SystemData) {
         let (
+            entities,
             mut isometries,
             mut velocities,
             spins,
+            attach_positions
         ) = data;
         // TODO add dt -- time delta for period
         for (
@@ -124,6 +152,14 @@ impl<'a> System<'a> for KinematicSystem {
             isometry += velocity;
             isometry.add_spin(spin.0);
             velocity.0 *= DAMPING_FACTOR;
+        }
+        let mut attach_pairs = vec![];
+        for (entity, _, attach) in (&entities, &mut isometries, &attach_positions).join() {
+            attach_pairs.push((entity, attach.0));
+        }
+        for (entity, attach) in attach_pairs.iter() {
+            let isometry = isometries.get(*attach).unwrap();
+            isometries.get_mut(*entity).unwrap().0 = isometry.0;
         }
     }
 }

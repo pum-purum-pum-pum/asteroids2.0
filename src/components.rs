@@ -63,7 +63,14 @@ impl Mouse {
 #[storage(NullStorage)]
 pub struct CharacterMarker;
 
+#[derive(Default, Component)]
+#[storage(NullStorage)]
+pub struct AsteroidMarker;
+
 #[derive(Component, Debug)]
+pub struct AttachPosition(pub specs::Entity);
+
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Isometry(pub Isometry3);
 
 #[derive(Component, Default, Debug)]

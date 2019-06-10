@@ -247,6 +247,13 @@ impl Canvas {
             .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
 
         let draw_params = glium::DrawParameters {
+             stencil: glium::draw_parameters::Stencil {
+                test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
+                test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
+                reference_value_clockwise: 1,
+                reference_value_counter_clockwise: 1,
+                ..Default::default()
+            },
             blend: Blend::alpha_blending(),
             ..Default::default()
         };
@@ -278,8 +285,19 @@ impl Canvas {
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
+        // @vlad TODO move to field
         let draw_params = glium::DrawParameters {
-            blend: Blend::alpha_blending(),
+            stencil: glium::draw_parameters::Stencil {
+                test_counter_clockwise: glium::StencilTest::AlwaysPass,
+                test_clockwise: glium::StencilTest::AlwaysPass,
+                depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
+                depth_pass_operation_clockwise: glium::StencilOperation::Replace,
+                // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
+                reference_value_clockwise: 1,
+                // reference_value_counter_clockwise: 1,
+                ..Default::default()
+            },
+            color_mask: (false, false, false, false),
             ..Default::default()
         };
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
