@@ -6,10 +6,9 @@ use al::prelude::*;
 use glium;
 use glium::Surface;
 use glium::{implement_vertex, uniform, DrawError};
-use glium::index::{PrimitiveType, IndexBuffer};
+use glium::index::{PrimitiveType};
 use glium::texture::{SrgbTexture2d, TextureCreationError};
 use glium::draw_parameters::Blend;
-use glium::vertex::VertexBuffer;
 use image;
 use image::{ImageError};
 
@@ -349,7 +348,7 @@ pub fn unproject(
     // * * perspective * view * model
     (
         unprojected_begin,
-        nalgebra::normalize(&(unprojected_end - unprojected_begin)),
+        (unprojected_end - unprojected_begin).normalize(),
     )
 }
 

@@ -1,14 +1,8 @@
-use std::time::Duration;
-use std::collections::HashSet;
-
 use specs::prelude::*;
 use specs::World as SpecsWorld;
 use shrev::EventChannel;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
-
-use glium::Surface;
-use glium;
 
 mod components;
 mod systems;
@@ -22,15 +16,13 @@ use astro_lib::prelude::*;
 
 use systems::{KinematicSystem, ControlSystem, RenderingSystem};
 use components::*;
-use resources::*;
 use gfx_backend::DisplayBuild;
-use gfx::{Canvas, ImageData, load_texture};
-use geometry::LightningPolygon;
+use gfx::{Canvas, ImageData};
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
-    let (ddpi, hdpi, vdpi) = video_subsystem.display_dpi(0i32)?;
+    let (_ddpi, hdpi, _vdpi) = video_subsystem.display_dpi(0i32)?;
  
     let display = video_subsystem.window("rust-sdl2 demo", 1700, 1000)
         .resizable()

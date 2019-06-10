@@ -95,7 +95,7 @@ impl SDL2Facade {
     }
 
     pub fn _window_mut(&mut self) -> &mut Window {
-        self.backend.window_mut()
+        self.backend._window_mut()
     }
 
     /// Start drawing on the backbuffer.
@@ -203,7 +203,7 @@ impl SDL2WindowBackend {
         window
     }
 
-    fn window_mut(&self) -> &mut Window {
+    fn _window_mut(&self) -> &mut Window {
         let ptr = self.window.get();
         let window: &mut Window = unsafe { mem::transmute(ptr) };
         window

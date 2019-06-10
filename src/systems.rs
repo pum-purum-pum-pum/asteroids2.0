@@ -99,7 +99,7 @@ impl<'a> System<'a> for RenderingSystem {
         // dbg!(&positions);
         // dbg!(&indices);
         let geom_data = GeometryData::new(&display, &positions, &indices);
-        for (iso, _) in (&isometries, &character_markers).join() {
+        for (_iso, _char_marker) in (&isometries, &character_markers).join() {
             canvas.render_geometry(
                 &display,
                 &mut target, 

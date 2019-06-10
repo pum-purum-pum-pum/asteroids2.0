@@ -1,7 +1,6 @@
-use std::ops::{AddAssign, MulAssign};
+use std::ops::{AddAssign};
 use astro_lib as al;
 use al::prelude::*;
-use al::types::*;
 use specs_derive::{Component};
 use specs::prelude::*;
 use crate::gfx_backend::SDL2Facade;

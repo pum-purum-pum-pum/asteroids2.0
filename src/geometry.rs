@@ -1,18 +1,6 @@
-use std::mem::swap;
-
 use astro_lib as al;
 use al::prelude::*;
 
-use specs::{Join};
-use specs::prelude::*;
-use shrev::EventChannel;
-use sdl2::keyboard::Keycode;
-use glium::Surface;
-use glium;
-use nalgebra::{Isometry3, Vector3};
-
-use crate::components::{*};
-use crate::gfx::{ImageData};
 const EPS: f32 = 1E-3;
 
 // @vlad TODO refactor (it's copy paste from stack overflow)
@@ -108,20 +96,6 @@ impl LightningPolygon {
         }
     }
 
-    pub fn new_clipped_rectangle(
-        x_min: f32, y_min: f32, x_max: f32, y_max: f32, 
-        center: Point2,
-        shapes: &[Geometry],
-    ) -> Self {
-        let mut poly = LightningPolygon::new_rectangle(x_min, y_min, x_max, y_max, center);
-
-        poly
-    }
-
-    pub fn update_center(&mut self, point: Point2) {
-        self.center = point;
-    }
-
     pub fn get_triangles(&mut self) -> (Vec<Point2>, Vec<u16>) {
         let mut points = vec![];
         points.push(self.center);
@@ -166,12 +140,12 @@ impl LightningPolygon {
                         }
                         _ => return
                     };
-                let mut shape_point1 = self.center + dir1;
-                let mut shape_point2 = self.center + dir2;
+                let shape_point1 = self.center + dir1;
+                let shape_point2 = self.center + dir2;
                 let ray1 = Ray::new(self.center, dir1);
                 let ray2 = Ray::new(self.center, dir2);
                 // find two points where rays intersect
-                let (mut point1, mut pid1, mut point2, mut pid2) = {
+                let (point1, pid1, point2, pid2) = {
                     // pid1 -- first point of the edge
                     // pid2 -- first point of the edge
                     let mut pi_result1 = None;
