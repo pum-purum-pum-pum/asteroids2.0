@@ -35,6 +35,7 @@ pub fn main() -> Result<(), String> {
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
+    let mut images = ThreadPin::new(Images::default());
     specs_world.register::<Isometry>();
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
@@ -42,41 +43,52 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
-    let character_image = ImageData::new(&display, "player", 0.5f32).unwrap();
+    specs_world.register::<Gun>();
+    specs_world.register::<Image>();
+    let character_image_data = ImageData::new(&display, "player", 0.5f32).unwrap();
+    let character_image = images.add_image("player".to_string(), character_image_data);
+    let asteroid_image_data = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
+    let asteroid_image = images.add_image("asteroid".to_string(), asteroid_image_data);
+    let light_image_data = ImageData::new(&display, "light", 20f32).unwrap();
+    let light_image = images.add_image("light".to_string(), light_image_data);
+    let projectile_image_data = ImageData::new(&display, "projectile", 0.1f32).unwrap();
+    let projectile_image = images.add_image("projectile".to_string(), projectile_image_data);
+    let preloaded_images = PreloadedImages{
+        projectile: projectile_image
+    };
     let character = specs_world
         .create_entity()
         .with(Isometry::new(0f32, 0f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
-        .with(ThreadPin::new(character_image))
+        .with(character_image)
+        .with(Gun::new(10u8))
         .with(Spin::default())
         .build();
-    let asteroid_image = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
     let _asteroid = specs_world
         .create_entity()
         .with(Isometry::new(1f32, 1f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(AsteroidMarker::default())
-        .with(ThreadPin::new(asteroid_image))
+        // .with(ThreadPin::new(asteroid_image))
+        .with(asteroid_image)
         .with(Spin::default())
         .build();
-    let asteroid_image = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
     let _asteroid = specs_world
         .create_entity()
         .with(Isometry::new(-5f32, -5f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(AsteroidMarker::default())
-        .with(ThreadPin::new(asteroid_image))
+        .with(asteroid_image)
         .with(Spin::default())
         .build();
     {
-        let light_image = ImageData::new(&display, "light", 13f32).unwrap();
         let _light = specs_world
             .create_entity()
             .with(Isometry::new(0f32, 0f32, 0f32))
             .with(AttachPosition(character))
             .with(Velocity::new(0f32, 0f32))
-            .with(ThreadPin::new(light_image))
+            .with(light_image)
             .with(Spin::default())
             .build();
     }
@@ -95,6 +107,8 @@ pub fn main() -> Result<(), String> {
         ..Mouse::default()
     });
     specs_world.add_resource(ThreadPin::new(canvas));
+    specs_world.add_resource(images);
+    specs_world.add_resource(preloaded_images);
     // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
     // specs_world.add_resource(poly);
     // ------------------------------

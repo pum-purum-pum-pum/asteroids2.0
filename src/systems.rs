@@ -15,7 +15,6 @@ use crate::gfx::{GeometryData, ImageData};
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
 const VELOCITY_MAX: f32 = 1f32;
-// const MAX_ROTATION_SPEED: f32 = 0.1f32;
 const MAX_TORQUE: f32 = 10f32;
 
 /// Calculate the shortest distance between two angles expressed in radians.
@@ -35,7 +34,7 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
     let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
         rotation
     } else {
-        -(-aim.x).atan2(aim.y)
+        -(-aim.x).atan2(-aim.y)
     };
 
     let angle_diff = angle_shortest_dist(rotation, target_rot);
@@ -46,8 +45,6 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
 #[derive(Default)]
 pub struct RenderingSystem;
 
-type Image = ThreadPin<ImageData>;
-
 impl<'a> System<'a> for RenderingSystem {
     type SystemData = (
         ReadStorage<'a, Isometry>,
@@ -56,10 +53,11 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Image>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
+        ReadExpect<'a, ThreadPin<Images>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (isometries, character_markers, asteroid_markers, image_data, display, mut canvas) =
+        let (isometries, character_markers, asteroid_markers, image_ids, display, mut canvas, images) =
             data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -99,13 +97,14 @@ impl<'a> System<'a> for RenderingSystem {
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
         }
-        for (iso, image) in (&isometries, &image_data).join() {
-            canvas.render(&display, &mut target, image, &iso.0).unwrap();
+        for (iso, image) in (&isometries, &image_ids).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0).unwrap();
         }
         target.finish().unwrap();
     }
 }
 
+/// here we update isometry, velocity
 pub struct KinematicSystem;
 
 impl<'a> System<'a> for KinematicSystem {
@@ -115,14 +114,24 @@ impl<'a> System<'a> for KinematicSystem {
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, Spin>,
         ReadStorage<'a, AttachPosition>,
+        ReadStorage<'a, CharacterMarker>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (entities, mut isometries, mut velocities, spins, attach_positions) = data;
+        let (
+            entities, 
+            mut isometries, 
+            mut velocities, 
+            spins, 
+            attach_positions,
+            character_markers,
+        ) = data;
         // TODO add dt -- time delta for period
         for (mut isometry, velocity, spin) in (&mut isometries, &mut velocities, &spins).join() {
             isometry += velocity;
             isometry.add_spin(spin.0);
+        }
+        for (velocity, _char) in (&mut velocities, &character_markers).join() {
             velocity.0 *= DAMPING_FACTOR;
         }
         let mut attach_pairs = vec![];
@@ -148,22 +157,36 @@ impl ControlSystem {
 
 impl<'a> System<'a> for ControlSystem {
     type SystemData = (
+        Entities<'a>,
         WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Spin>,
+        WriteStorage<'a, Image>,
         ReadStorage<'a, CharacterMarker>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
+        ReadExpect<'a, PreloadedImages>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (isometries, mut velocities, mut spins, character_markers, keys_channel, mouse_state) =
-            data;
+        let (
+            entities, 
+            mut isometries, 
+            mut velocities, 
+            mut spins, 
+            mut images,
+            character_markers, 
+            keys_channel, 
+            mouse_state,
+            preloaded_images,
+        ) = data;
         // TODO add dt in params
         let dt = 1f32 / 60f32;
-        for (iso, vel, spin, _) in
-            (&isometries, &mut velocities, &mut spins, &character_markers).join()
+        let mut character = None;
+        for (entity, iso, vel, spin, _char_marker) in
+            (&entities, &isometries, &mut velocities, &mut spins, &character_markers).join()
         {
+            character = Some(entity);
             let player_torque = dt
                 * calculate_player_ship_spin_for_aim(
                     Vector2::new(mouse_state.x, mouse_state.y)
@@ -189,6 +212,21 @@ impl<'a> System<'a> for ControlSystem {
                     _ => (),
                 }
             }
+        }
+        let character = character.unwrap();
+        if mouse_state.left {
+            let isometry = *isometries.get(character).unwrap();
+            let direction = 0.1 * Vector2::new(
+                mouse_state.x - isometry.0.translation.x,
+                mouse_state.y - isometry.0.translation.y
+            ).normalize();
+            let _bullet_entity = entities
+                .build_entity()
+                .with(Velocity::new(direction.x, direction.y), &mut velocities)
+                .with(isometry, &mut isometries)
+                .with(preloaded_images.projectile, &mut images)
+                .with(Spin::default(), &mut spins)
+                .build();
         }
     }
 }

@@ -1,4 +1,6 @@
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas};
+use std::collections::HashMap;
+use std::ops::{Index};
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
 use crate::gfx_backend::SDL2Facade;
 use al::prelude::*;
 use astro_lib as al;
@@ -9,7 +11,48 @@ use std::ops::AddAssign;
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 
+/// Index of Images structure
+#[derive(Component, Clone, Copy)]
+pub struct Image(pub usize);
+
 #[derive(Default)]
+pub struct Images {
+    images: Vec<ImageData>,
+    name_to_id: HashMap<String, usize>,
+}
+
+impl Images {
+    /// save image by it's name and return acces index
+    pub fn add_image(&mut self, name: String, image_data: ImageData) -> Image {
+        self.images.push(image_data);
+        let id = self.images.len() - 1;
+        self.name_to_id.insert(name, id);
+        Image(id)
+    }
+
+    pub fn _get_image(&self, id: Image) -> Option<&ImageData> {
+        if id.0 < self.images.len() {
+            Some(&self.images[id.0])
+        } else {
+            None
+        }
+    }
+}
+
+impl Index<Image> for Images {
+    type Output = ImageData;
+    fn index<'a>(&'a self, id: Image) -> &'a ImageData {
+        &self.images[id.0]
+    }
+}
+
+/// contains preloaded images 
+/// use it when you need to insert entity in system
+pub struct PreloadedImages {
+    pub projectile: Image,
+}
+
+#[derive(Default, Debug)]
 pub struct Mouse {
     pub x: f32,
     pub y: f32,
@@ -27,7 +70,7 @@ impl Mouse {
         let (x, y) = (x as f32, y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
-        let point = unproject_with_z(observer, &Point2::new(x, y), 0f32, width_u, height_u);
+        let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u);
         self.x = point.x;
         self.y = point.y;
     }
@@ -49,12 +92,31 @@ pub struct CharacterMarker;
 #[storage(NullStorage)]
 pub struct AsteroidMarker;
 
+/// attach entity positions to some other entity position
 #[derive(Component, Debug)]
 pub struct AttachPosition(pub specs::Entity);
 
+/// gun reloading status and time
+#[derive(Component, Debug)]
+pub struct Gun {
+    recharge_state: u8,
+    recharge_time: u8,
+}
+
+impl Gun {
+    pub fn new(recharge_time: u8) -> Self{
+        Gun {
+            recharge_state: 0u8,
+            recharge_time: recharge_time,
+        }
+    }
+}
+
+/// translation + rotation
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Isometry(pub Isometry3);
 
+/// rotation speed
 #[derive(Component, Default, Debug)]
 pub struct Spin(pub f32);
 
