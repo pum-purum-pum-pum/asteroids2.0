@@ -104,11 +104,25 @@ pub struct Gun {
 }
 
 impl Gun {
-    pub fn new(recharge_time: u8) -> Self{
+    pub fn new(recharge_time: u8) -> Self {
         Gun {
             recharge_state: 0u8,
             recharge_time: recharge_time,
         }
+    }
+
+    pub fn update(&mut self) {
+        self.recharge_state += 1u8;
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.recharge_state >= self.recharge_time
+    }
+
+    pub fn shoot(&mut self) -> bool {
+        let result = self.is_ready();
+        if result {self.recharge_state = 0u8};
+        result
     }
 }
 

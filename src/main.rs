@@ -17,7 +17,7 @@ use astro_lib::prelude::*;
 use components::*;
 use gfx::{Canvas, ImageData};
 use gfx_backend::DisplayBuild;
-use systems::{ControlSystem, KinematicSystem, RenderingSystem};
+use systems::{ControlSystem, KinematicSystem, RenderingSystem, GamePlaySystem};
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
@@ -94,9 +94,11 @@ pub fn main() -> Result<(), String> {
     }
     let control_system = ControlSystem::new(keys_channel.register_reader());
     let rendering_system = RenderingSystem::default();
+    let gameplay_sytem = GamePlaySystem::default();
     let mut dispatcher = DispatcherBuilder::new()
         .with(KinematicSystem {}, "kinematic_system", &[])
         .with(control_system, "control_system", &[])
+        .with(gameplay_sytem, "gameplay_system", &[])
         .with_thread_local(rendering_system)
         .build();
     specs_world.add_resource(keys_channel);

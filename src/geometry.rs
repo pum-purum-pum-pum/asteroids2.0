@@ -27,46 +27,6 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
     (Some(Point2::new(xy0, yt0)), Some(Point2::new(xt1, yt1)))
 }
 
-// finds tangent points to circle from external point (XX, YY)
-// //returns number of tangents (0, 1, 2)
-// function GetTangentPointsAtCircle(CenterX, CenterY, R, XX, YY: Double;
-//                                  var XT0, YT0, XT1, YT1: Double): Integer;
-// var
-//   nx, ny, xy, tx0, tx1, D: Double;
-// begin
-//   if R = 0 then //this behavior can be modified
-//     Exit(0);
-
-//   nx := (XX - CenterX) / R; //shift and scale
-//   ny := (YY - CenterY) / R;
-//   xy := nx * nx + ny * ny;
-
-//   if Math.SameValue(xy, 1.0) then begin //point lies at circumference, one tangent
-//     XT0 := XX;
-//     YT0 := YY;
-//     Exit(1);
-//   end;
-
-//   if xy < 1.0 then  //point lies inside the circle, no tangents
-//     Exit(0);
-
-//   //common case, two tangents
-//   Result := 2;
-//   D := ny * Sqrt(xy - 1);
-//   tx0 := (nx - D) / xy;
-//   tx1 := (nx + D) / xy;
-//   if ny <> 0 then begin //common case
-//     YT0 := CenterY + R * (1 - tx0 * nx) / ny;
-//     YT1 := CenterY + R * (1 - tx1 * nx) / ny;
-//   end else begin //point at the center horizontal, Y=0
-//     D := R * Sqrt(1 - tx0 * tx0);
-//     YT0 := CenterY + D;
-//     YT1 := CenterY - D;
-//   end;
-//   XT0 := CenterX + R * tx0; //restore scale and position
-//   XT1 := CenterX + R * tx1;
-// end;
-
 #[derive(Debug)]
 pub enum Geometry {
     Circle { radius: f32, position: Point2 },

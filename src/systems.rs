@@ -10,7 +10,7 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{Geometry, LightningPolygon};
-use crate::gfx::{GeometryData, ImageData};
+use crate::gfx::{GeometryData};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -162,6 +162,7 @@ impl<'a> System<'a> for ControlSystem {
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Spin>,
         WriteStorage<'a, Image>,
+        WriteStorage<'a, Gun>,
         ReadStorage<'a, CharacterMarker>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
@@ -175,6 +176,7 @@ impl<'a> System<'a> for ControlSystem {
             mut velocities, 
             mut spins, 
             mut images,
+            mut guns,
             character_markers, 
             keys_channel, 
             mouse_state,
@@ -215,18 +217,38 @@ impl<'a> System<'a> for ControlSystem {
         }
         let character = character.unwrap();
         if mouse_state.left {
-            let isometry = *isometries.get(character).unwrap();
-            let direction = 0.1 * Vector2::new(
-                mouse_state.x - isometry.0.translation.x,
-                mouse_state.y - isometry.0.translation.y
-            ).normalize();
-            let _bullet_entity = entities
-                .build_entity()
-                .with(Velocity::new(direction.x, direction.y), &mut velocities)
-                .with(isometry, &mut isometries)
-                .with(preloaded_images.projectile, &mut images)
-                .with(Spin::default(), &mut spins)
-                .build();
+            let gun = guns.get_mut(character).unwrap();
+            if gun.shoot() {
+                let isometry = *isometries.get(character).unwrap();
+                let direction = 0.1 * Vector2::new(
+                    mouse_state.x - isometry.0.translation.x,
+                    mouse_state.y - isometry.0.translation.y
+                ).normalize();
+                let _bullet_entity = entities
+                    .build_entity()
+                    .with(Velocity::new(direction.x, direction.y), &mut velocities)
+                    .with(isometry, &mut isometries)
+                    .with(preloaded_images.projectile, &mut images)
+                    .with(Spin::default(), &mut spins)
+                    .build();
+            }
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct GamePlaySystem;
+
+impl<'a> System<'a> for GamePlaySystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Gun>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (_entities, mut guns) = data;
+        for gun in (&mut guns).join() {
+            gun.update()
         }
     }
 }
