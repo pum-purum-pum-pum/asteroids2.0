@@ -17,7 +17,7 @@ use astro_lib::prelude::*;
 use components::*;
 use gfx::{Canvas, ImageData};
 use gfx_backend::DisplayBuild;
-use systems::{ControlSystem, KinematicSystem, RenderingSystem, GamePlaySystem};
+use systems::{ControlSystem, KinematicSystem, RenderingSystem, GamePlaySystem, CollisionSystem};
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
@@ -40,11 +40,13 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
     specs_world.register::<AsteroidMarker>();
+    specs_world.register::<Projectile>();
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
     specs_world.register::<Gun>();
     specs_world.register::<Image>();
+    specs_world.register::<Geometry>();
     let character_image_data = ImageData::new(&display, "player", 0.5f32).unwrap();
     let character_image = images.add_image("player".to_string(), character_image_data);
     let asteroid_image_data = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
@@ -56,6 +58,9 @@ pub fn main() -> Result<(), String> {
     let preloaded_images = PreloadedImages{
         projectile: projectile_image
     };
+    let character_shape = Geometry::Circle{
+        radius: 1f32,
+    };
     let character = specs_world
         .create_entity()
         .with(Isometry::new(0f32, 0f32, 0f32))
@@ -64,10 +69,15 @@ pub fn main() -> Result<(), String> {
         .with(character_image)
         .with(Gun::new(10u8))
         .with(Spin::default())
+        .with(character_shape)
         .build();
+    let asteroid_shape = Geometry::Circle{
+        radius: 1f32,
+    };
     let _asteroid = specs_world
         .create_entity()
-        .with(Isometry::new(1f32, 1f32, 0f32))
+        .with(asteroid_shape)
+        .with(Isometry::new(2f32, 2f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(AsteroidMarker::default())
         // .with(ThreadPin::new(asteroid_image))
@@ -76,6 +86,7 @@ pub fn main() -> Result<(), String> {
         .build();
     let _asteroid = specs_world
         .create_entity()
+        .with(asteroid_shape)
         .with(Isometry::new(-5f32, -5f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(AsteroidMarker::default())
@@ -95,10 +106,12 @@ pub fn main() -> Result<(), String> {
     let control_system = ControlSystem::new(keys_channel.register_reader());
     let rendering_system = RenderingSystem::default();
     let gameplay_sytem = GamePlaySystem::default();
+    let collision_system = CollisionSystem::default();
     let mut dispatcher = DispatcherBuilder::new()
         .with(KinematicSystem {}, "kinematic_system", &[])
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
+        .with(collision_system, "collision_system", &[])
         .with_thread_local(rendering_system)
         .build();
     specs_world.add_resource(keys_channel);
@@ -146,6 +159,7 @@ pub fn main() -> Result<(), String> {
             // dbg!((mouse_state.x, mouse_state.y));
         }
         dispatcher.dispatch(&specs_world.res);
+        specs_world.maintain();
         for event in event_pump.poll_iter() {
             use sdl2::event::Event;
 

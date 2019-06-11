@@ -1,5 +1,6 @@
 use al::prelude::*;
 use astro_lib as al;
+use crate::components::Geometry;
 
 const EPS: f32 = 1E-3;
 
@@ -27,10 +28,6 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
     (Some(Point2::new(xy0, yt0)), Some(Point2::new(xt1, yt1)))
 }
 
-#[derive(Debug)]
-pub enum Geometry {
-    Circle { radius: f32, position: Point2 },
-}
 
 /// Polygon for light rendering(just render light on this rctngl)
 /// coordinates are in world 3d space
@@ -75,13 +72,13 @@ impl LightningPolygon {
     }
 
     // slow-ugly-simple version of polygon clipping
-    pub fn clip_one(&mut self, geom: Geometry) {
+    pub fn clip_one(&mut self, geom: Geometry, position: Point2) {
         // PLAN
         // Write clipping with segment
         // then write other primitives with that
         // create rays from center to shape borders
         match geom {
-            Geometry::Circle { radius, position } => {
+            Geometry::Circle { radius } => {
                 let (dir1, dir2) = match get_tangent(position, radius, self.center) {
                     (Some(p1), Some(p2)) => (
                         Vector2::new(p2.x - self.center.x, p2.y - self.center.y),

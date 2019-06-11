@@ -9,7 +9,7 @@ use specs::prelude::*;
 use specs::Join;
 
 use crate::components::*;
-use crate::geometry::{Geometry, LightningPolygon};
+use crate::geometry::{LightningPolygon};
 use crate::gfx::{GeometryData};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
@@ -51,14 +51,23 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, Image>,
+        ReadStorage<'a, Geometry>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (isometries, character_markers, asteroid_markers, image_ids, display, mut canvas, images) =
-            data;
+        let (
+            isometries, 
+            character_markers, 
+            asteroid_markers, 
+            image_ids, 
+            geometries,
+            display, 
+            mut canvas, 
+            images
+        ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         target.clear_stencil(0i32);
@@ -81,12 +90,11 @@ impl<'a> System<'a> for RenderingSystem {
             char_pos.y + 10f32,
             Point2::new(char_pos.x, char_pos.y),
         );
-        for (iso, _) in (&isometries, &asteroid_markers).join() {
-            light_poly.clip_one(Geometry::Circle {
-                radius: 0.5f32,
-                position: Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
-            });
-        }
+        // UNCOMMENT TO ADD LIGHTS
+        // for (iso, geom, _) in (&isometries, &geometries, &asteroid_markers).join() {
+        //     light_poly.clip_one(*geom, Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+        //     );
+        // }
         // dbg!(&light_poly);
         let (positions, indices) = light_poly.get_triangles();
         // dbg!(&positions);
@@ -163,6 +171,8 @@ impl<'a> System<'a> for ControlSystem {
         WriteStorage<'a, Spin>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, Gun>,
+        WriteStorage<'a, Projectile>,
+        WriteStorage<'a, Geometry>,
         ReadStorage<'a, CharacterMarker>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
@@ -177,6 +187,8 @@ impl<'a> System<'a> for ControlSystem {
             mut spins, 
             mut images,
             mut guns,
+            mut projectiles,
+            mut geometries,
             character_markers, 
             keys_channel, 
             mouse_state,
@@ -230,6 +242,8 @@ impl<'a> System<'a> for ControlSystem {
                     .with(isometry, &mut isometries)
                     .with(preloaded_images.projectile, &mut images)
                     .with(Spin::default(), &mut spins)
+                    .with(Projectile{owner: character}, &mut projectiles)
+                    .with(Geometry::Circle{radius: 0.1}, &mut geometries)
                     .build();
             }
         }
@@ -250,5 +264,96 @@ impl<'a> System<'a> for GamePlaySystem {
         for gun in (&mut guns).join() {
             gun.update()
         }
+    }
+}
+
+#[derive(Default)]
+pub struct CollisionSystem;
+
+impl<'a> System<'a> for CollisionSystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Isometry>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Spin>,
+        ReadStorage<'a, Geometry>,
+        ReadStorage<'a, Projectile>,
+        ReadStorage<'a, AsteroidMarker>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        /// mb store kd tree where save specs::Entity based on it's isometry component in future
+        let (
+            mut entities, 
+            mut isometries, 
+            mut velocities, 
+            mut spins,
+            geometries,
+            projectiles,
+            asteroid_markers,
+        ) = data;
+        let mut collisions = vec![];
+        for entity1 in entities.join() {
+            for entity2 in entities.join() {
+                if entity1 == entity2 || entity1.id() > entity2.id() {continue};
+                match (geometries.get(entity1), geometries.get(entity2)) {
+                    (Some(geom1), Some(geom2)) => {
+                        let iso1 = isometries.get(entity1).unwrap();
+                        let iso2 = isometries.get(entity2).unwrap();
+                        match (geom1, geom2) {
+                            (Geometry::Circle{radius:r1},
+                             Geometry::Circle{radius: r2}) => {
+                                if (iso1.0.translation.vector -
+                                iso2.0.translation.vector).norm() < r1 + r2 {
+                                    collisions.push((entity1, entity2))
+                                    // dbg!("COLLISION");
+                                }
+                            }
+                            _ => ()
+                        }
+                    }
+                    _ => ()
+                }
+            }
+        }
+        // dbg!(collisions);
+        for (entity1, entity2) in collisions.iter() {
+            match (projectiles.get(*entity1), asteroid_markers.get(*entity2)) {
+                (Some(projectile), Some(_)) => {
+                    if projectile.owner != *entity2 {
+                        entities.delete(*entity1).unwrap();
+                    }
+                }
+                _ => ()
+            }
+            match (projectiles.get(*entity2), asteroid_markers.get(*entity1)) {
+                (Some(projectile), Some(_)) => {
+                    if projectile.owner != *entity1 {
+                        entities.delete(*entity2).unwrap();
+                    }
+                }
+                _ => ()
+            }
+            let iso1 = isometries.get(*entity1).unwrap().0.translation.vector;
+            let iso2 = isometries.get(*entity2).unwrap().0.translation.vector;
+            let center = (iso1 + iso2) / 2f32;
+            let attack1 = 0.001 * (iso1 - center).normalize();
+            let attack2 = 0.001 * (iso2 - center).normalize();
+            // match velocities.get_mut(*entity1) {
+            //     Some(mut velocity) => {
+            //         *velocity = Velocity::new(attack1.x, attack1.y);
+            //     }
+            //     None => ()
+            // }
+            // match velocities.get_mut(*entity2) {
+            //     Some(mut velocity) => {
+            //         *velocity = Velocity::new(attack2.x, attack2.y);
+            //     }
+            //     None => ()
+            // }
+        }
+        // for (iso1, vel1, spin1) in (&mut isometries, &mut velocities, &mut spins).join() {
+
+        // }
     }
 }

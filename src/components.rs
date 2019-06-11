@@ -6,10 +6,15 @@ use al::prelude::*;
 use astro_lib as al;
 use specs::prelude::*;
 use specs_derive::Component;
-use std::ops::AddAssign;
+use std::ops::{AddAssign};
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
+
+#[derive(Component, Debug, Clone, Copy)]
+pub enum Geometry {
+    Circle { radius: f32  },
+}
 
 /// Index of Images structure
 #[derive(Component, Clone, Copy)]
@@ -92,6 +97,11 @@ pub struct CharacterMarker;
 #[storage(NullStorage)]
 pub struct AsteroidMarker;
 
+#[derive(Component)]
+pub struct Projectile {
+    pub owner: specs::Entity,
+}
+
 /// attach entity positions to some other entity position
 #[derive(Component, Debug)]
 pub struct AttachPosition(pub specs::Entity);
@@ -112,7 +122,7 @@ impl Gun {
     }
 
     pub fn update(&mut self) {
-        self.recharge_state += 1u8;
+        self.recharge_state = u8::max(self.recharge_time, 1u8);
     }
 
     pub fn is_ready(&self) -> bool {
@@ -163,6 +173,14 @@ impl AddAssign<&Velocity> for &mut Isometry {
 
 #[derive(Component, Debug)]
 pub struct Velocity(pub Vector2);
+
+
+impl AddAssign<Velocity> for &mut Velocity {
+    fn add_assign(&mut self, other: Velocity) {
+        self.0.x += other.0.x;
+        self.0.y += other.0.y;
+    }
+}
 
 impl Velocity {
     pub fn new(x: f32, y: f32) -> Self {
