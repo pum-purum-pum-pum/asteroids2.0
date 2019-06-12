@@ -1,8 +1,9 @@
+use std::mem;
 use al::prelude::*;
 use astro_lib as al;
 use crate::components::Geometry;
 
-const EPS: f32 = 1E-3;
+pub const EPS: f32 = 1E-3;
 
 // @vlad TODO refactor (it's copy paste from stack overflow)
 /// get tangent to circle from point
@@ -12,7 +13,7 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
     if xy - 1.0 <= EPS {
         return (None, None);
     }
-    let discr = npoint.y * (xy - 1f32).sqrt();
+    let mut discr = npoint.y * (xy - 1f32).sqrt();
     let tx0 = (npoint.x - discr) / xy;
     let tx1 = (npoint.x + discr) / xy;
     let (yt0, yt1) = if npoint.y != 0f32 {
@@ -21,11 +22,12 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
             circle.y + r * (1f32 - tx1 * npoint.x) / npoint.y,
         )
     } else {
+        discr = r * (1f32 - tx0 * tx0).sqrt();
         (circle.y + discr, circle.y - discr)
     };
-    let xy0 = circle.x + r * tx0;
-    let xt1 = circle.y + r * tx1;
-    (Some(Point2::new(xy0, yt0)), Some(Point2::new(xt1, yt1)))
+    let xt0 = circle.x + r * tx0;
+    let xt1 = circle.x + r * tx1;
+    (Some(Point2::new(xt0, yt0)), Some(Point2::new(xt1, yt1)))
 }
 
 
@@ -79,7 +81,7 @@ impl LightningPolygon {
         // create rays from center to shape borders
         match geom {
             Geometry::Circle { radius } => {
-                let (dir1, dir2) = match get_tangent(position, radius, self.center) {
+                let (mut dir1, mut dir2) = match get_tangent(position, radius, self.center) {
                     (Some(p1), Some(p2)) => (
                         Vector2::new(p2.x - self.center.x, p2.y - self.center.y),
                         Vector2::new(p1.x - self.center.x, p1.y - self.center.y),

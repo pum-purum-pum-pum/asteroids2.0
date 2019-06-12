@@ -9,7 +9,7 @@ use specs::prelude::*;
 use specs::Join;
 
 use crate::components::*;
-use crate::geometry::{LightningPolygon};
+use crate::geometry::{LightningPolygon, EPS};
 use crate::gfx::{GeometryData};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
@@ -83,18 +83,26 @@ impl<'a> System<'a> for RenderingSystem {
             opt_iso.unwrap().0.translation.vector
         };
         // @vlad TODO rewrite it with screen borders
-        let mut light_poly = LightningPolygon::new_rectangle(
+        let rectangle = (
             char_pos.x - 10f32,
             char_pos.y - 10f32,
             char_pos.x + 10f32,
             char_pos.y + 10f32,
+        );
+        let mut light_poly = LightningPolygon::new_rectangle(
+            rectangle.0,
+            rectangle.1,
+            rectangle.2,
+            rectangle.3,
             Point2::new(char_pos.x, char_pos.y),
         );
         // UNCOMMENT TO ADD LIGHTS
-        // for (iso, geom, _) in (&isometries, &geometries, &asteroid_markers).join() {
-        //     light_poly.clip_one(*geom, Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
-        //     );
-        // }
+        for (iso, geom, _) in (&isometries, &geometries, &asteroid_markers).join() {
+            let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
+            if pos.x > rectangle.0 && pos.x < rectangle.2 && pos.y > rectangle.1 && pos.y < rectangle.3 {
+                light_poly.clip_one(*geom, pos);
+            }
+        }
         // dbg!(&light_poly);
         let (positions, indices) = light_poly.get_triangles();
         // dbg!(&positions);
@@ -123,6 +131,7 @@ impl<'a> System<'a> for KinematicSystem {
         ReadStorage<'a, Spin>,
         ReadStorage<'a, AttachPosition>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, AsteroidMarker>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -133,11 +142,14 @@ impl<'a> System<'a> for KinematicSystem {
             spins, 
             attach_positions,
             character_markers,
+            asteroids,
         ) = data;
         // TODO add dt -- time delta for period
         for (mut isometry, velocity, spin) in (&mut isometries, &mut velocities, &spins).join() {
             isometry += velocity;
             isometry.add_spin(spin.0);
+        }
+        for (isometry, asteroid) in (&isometries, &asteroids).join() {
         }
         for (velocity, _char) in (&mut velocities, &character_markers).join() {
             velocity.0 *= DAMPING_FACTOR;
@@ -173,6 +185,7 @@ impl<'a> System<'a> for ControlSystem {
         WriteStorage<'a, Gun>,
         WriteStorage<'a, Projectile>,
         WriteStorage<'a, Geometry>,
+        WriteStorage<'a, Lifetime>,
         ReadStorage<'a, CharacterMarker>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
@@ -189,6 +202,7 @@ impl<'a> System<'a> for ControlSystem {
             mut guns,
             mut projectiles,
             mut geometries,
+            mut lifetimes,
             character_markers, 
             keys_channel, 
             mouse_state,
@@ -232,18 +246,21 @@ impl<'a> System<'a> for ControlSystem {
             let gun = guns.get_mut(character).unwrap();
             if gun.shoot() {
                 let isometry = *isometries.get(character).unwrap();
-                let direction = 0.1 * Vector2::new(
+                let direction = 0.25 * Vector2::new(
                     mouse_state.x - isometry.0.translation.x,
                     mouse_state.y - isometry.0.translation.y
                 ).normalize();
+                let char_velocity = velocities.get(character).unwrap();
+                let projectile_velocity = Velocity::new(char_velocity.0.x + direction.x, char_velocity.0.y + direction.y);
                 let _bullet_entity = entities
                     .build_entity()
-                    .with(Velocity::new(direction.x, direction.y), &mut velocities)
+                    .with(projectile_velocity, &mut velocities)
                     .with(isometry, &mut isometries)
                     .with(preloaded_images.projectile, &mut images)
                     .with(Spin::default(), &mut spins)
                     .with(Projectile{owner: character}, &mut projectiles)
                     .with(Geometry::Circle{radius: 0.1}, &mut geometries)
+                    .with(Lifetime::new(100u8), &mut lifetimes)
                     .build();
             }
         }
@@ -257,12 +274,19 @@ impl<'a> System<'a> for GamePlaySystem {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, Gun>,
+        WriteStorage<'a, Lifetime>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (_entities, mut guns) = data;
+        let (entities, mut guns, mut lifetimes) = data;
         for gun in (&mut guns).join() {
             gun.update()
+        }
+        for (entity, lifetime) in (& entities, &mut lifetimes).join() {
+            lifetime.update();
+            if lifetime.delete() {
+                entities.delete(entity).unwrap()
+            }
         }
     }
 }
@@ -337,16 +361,19 @@ impl<'a> System<'a> for CollisionSystem {
             let iso1 = isometries.get(*entity1).unwrap().0.translation.vector;
             let iso2 = isometries.get(*entity2).unwrap().0.translation.vector;
             let center = (iso1 + iso2) / 2f32;
+            if (iso1 - center).norm() < EPS {
+                continue
+            };
             let attack1 = 0.001 * (iso1 - center).normalize();
             let attack2 = 0.001 * (iso2 - center).normalize();
             // match velocities.get_mut(*entity1) {
-            //     Some(mut velocity) => {
+            //     Some(velocity) => {
             //         *velocity = Velocity::new(attack1.x, attack1.y);
             //     }
             //     None => ()
             // }
             // match velocities.get_mut(*entity2) {
-            //     Some(mut velocity) => {
+            //     Some(velocity) => {
             //         *velocity = Velocity::new(attack2.x, attack2.y);
             //     }
             //     None => ()

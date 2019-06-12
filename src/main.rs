@@ -47,6 +47,7 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Gun>();
     specs_world.register::<Image>();
     specs_world.register::<Geometry>();
+    specs_world.register::<Lifetime>();
     let character_image_data = ImageData::new(&display, "player", 0.5f32).unwrap();
     let character_image = images.add_image("player".to_string(), character_image_data);
     let asteroid_image_data = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
@@ -67,28 +68,28 @@ pub fn main() -> Result<(), String> {
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
         .with(character_image)
-        .with(Gun::new(10u8))
+        .with(Gun::new(50u8))
         .with(Spin::default())
         .with(character_shape)
         .build();
     let asteroid_shape = Geometry::Circle{
-        radius: 1f32,
+        radius: 0.5f32,
     };
+    // let _asteroid = specs_world
+    //     .create_entity()
+    //     .with(asteroid_shape)
+    //     .with(Isometry::new(0f32, 0f32, 0f32))
+    //     .with(Velocity::new(0f32, 0.02f32))
+    //     .with(AsteroidMarker::default())
+    //     // .with(ThreadPin::new(asteroid_image))
+    //     .with(asteroid_image)
+    //     .with(Spin::default())
+    //     .build();
     let _asteroid = specs_world
         .create_entity()
         .with(asteroid_shape)
-        .with(Isometry::new(2f32, 2f32, 0f32))
-        .with(Velocity::new(0f32, 0f32))
-        .with(AsteroidMarker::default())
-        // .with(ThreadPin::new(asteroid_image))
-        .with(asteroid_image)
-        .with(Spin::default())
-        .build();
-    let _asteroid = specs_world
-        .create_entity()
-        .with(asteroid_shape)
-        .with(Isometry::new(-5f32, -5f32, 0f32))
-        .with(Velocity::new(0f32, 0f32))
+        .with(Isometry::new(0f32, 2f32, 0f32))
+        // .with(Velocity::new(0f32, 0f32))
         .with(AsteroidMarker::default())
         .with(asteroid_image)
         .with(Spin::default())

@@ -102,6 +102,29 @@ pub struct Projectile {
     pub owner: specs::Entity,
 }
 
+#[derive(Component)]
+pub struct Lifetime {
+    life_state: u8,
+    life_time: u8,
+}
+
+impl Lifetime {
+    pub fn new(live_time: u8) -> Self {
+        Lifetime {
+            life_state: 0u8,
+            life_time: live_time
+        }
+    }
+
+    pub fn update(&mut self) {
+        self.life_state = u8::min(self.life_time, self.life_state + 1u8);
+    }
+
+    pub fn delete(&self) -> bool {
+        self.life_state >= self.life_time
+    }
+}
+
 /// attach entity positions to some other entity position
 #[derive(Component, Debug)]
 pub struct AttachPosition(pub specs::Entity);
@@ -122,7 +145,7 @@ impl Gun {
     }
 
     pub fn update(&mut self) {
-        self.recharge_state = u8::max(self.recharge_time, 1u8);
+        self.recharge_state = u8::min(self.recharge_time, self.recharge_state + 1u8);
     }
 
     pub fn is_ready(&self) -> bool {
