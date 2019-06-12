@@ -11,3 +11,6 @@ image = "0.21.1"
 [lib]
 crate-type = ["cdylib"]
 path = "src/lib.rs"
+
+[profile.release]
+lto = true

@@ -103,7 +103,6 @@ pub struct ImageData {
     indices: glium::IndexBuffer<u16>,
     texture: glium::texture::SrgbTexture2d,
     dim_scales: Vector2,
-    scale: f32,
 }
 
 impl ImageData {
@@ -139,7 +138,6 @@ impl ImageData {
             indices: indices,
             texture: texture,
             dim_scales: dimensions,
-            scale: scale,
         })
     }
 }
@@ -240,6 +238,7 @@ impl Canvas {
         target: &mut glium::Frame,
         image_data: &ImageData,
         model: &Isometry3,
+        scale: f32,
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
@@ -273,7 +272,7 @@ impl Canvas {
                 perspective: perspective,
                 tex: processed_texture,
                 dim_scales: (scales.x, scales.y),
-                scale: image_data.scale,
+                scale: scale,
             },
             &draw_params,
         )

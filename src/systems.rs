@@ -1,5 +1,6 @@
 use al::prelude::*;
 use astro_lib as al;
+use rand::prelude::*;
 
 use glium;
 use glium::Surface;
@@ -16,6 +17,8 @@ const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
 const VELOCITY_MAX: f32 = 1f32;
 const MAX_TORQUE: f32 = 10f32;
+
+const ASTEROIDS_NUMBER: u8 = 10u8;
 
 /// Calculate the shortest distance between two angles expressed in radians.
 ///
@@ -52,6 +55,7 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, Image>,
         ReadStorage<'a, Geometry>,
+        ReadStorage<'a, Size>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
@@ -64,6 +68,7 @@ impl<'a> System<'a> for RenderingSystem {
             asteroid_markers, 
             image_ids, 
             geometries,
+            sizes,
             display, 
             mut canvas, 
             images
@@ -113,8 +118,8 @@ impl<'a> System<'a> for RenderingSystem {
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
         }
-        for (iso, image) in (&isometries, &image_ids).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0).unwrap();
+        for (iso, image, size) in (&isometries, &image_ids, &sizes).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0).unwrap();
         }
         target.finish().unwrap();
     }
@@ -186,6 +191,7 @@ impl<'a> System<'a> for ControlSystem {
         WriteStorage<'a, Projectile>,
         WriteStorage<'a, Geometry>,
         WriteStorage<'a, Lifetime>,
+        WriteStorage<'a, Size>,
         ReadStorage<'a, CharacterMarker>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
@@ -203,6 +209,7 @@ impl<'a> System<'a> for ControlSystem {
             mut projectiles,
             mut geometries,
             mut lifetimes,
+            mut sizes,
             character_markers, 
             keys_channel, 
             mouse_state,
@@ -252,6 +259,7 @@ impl<'a> System<'a> for ControlSystem {
                 ).normalize();
                 let char_velocity = velocities.get(character).unwrap();
                 let projectile_velocity = Velocity::new(char_velocity.0.x + direction.x, char_velocity.0.y + direction.y);
+                let size = 0.1;
                 let _bullet_entity = entities
                     .build_entity()
                     .with(projectile_velocity, &mut velocities)
@@ -259,8 +267,9 @@ impl<'a> System<'a> for ControlSystem {
                     .with(preloaded_images.projectile, &mut images)
                     .with(Spin::default(), &mut spins)
                     .with(Projectile{owner: character}, &mut projectiles)
-                    .with(Geometry::Circle{radius: 0.1}, &mut geometries)
+                    .with(Geometry::Circle{radius: size}, &mut geometries)
                     .with(Lifetime::new(100u8), &mut lifetimes)
+                    .with(Size(size), &mut sizes)
                     .build();
             }
         }
@@ -273,12 +282,34 @@ pub struct GamePlaySystem;
 impl<'a> System<'a> for GamePlaySystem {
     type SystemData = (
         Entities<'a>,
+        WriteStorage<'a, Geometry>,
+        WriteStorage<'a, Isometry>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Spin>,
         WriteStorage<'a, Gun>,
         WriteStorage<'a, Lifetime>,
+        WriteStorage<'a, AsteroidMarker>,
+        WriteStorage<'a, Image>,
+        WriteStorage<'a, Size>,
+        Write<'a, Stat>,
+        WriteExpect<'a, PreloadedImages>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (entities, mut guns, mut lifetimes) = data;
+        let (
+            entities, 
+            mut geometries,
+            mut isometries,
+            mut velocities,
+            mut spins,
+            mut guns, 
+            mut lifetimes,
+            mut asteroid_markers,
+            mut images,
+            mut sizes,
+            mut stat,
+            mut preloaded_images,
+        ) = data;
         for gun in (&mut guns).join() {
             gun.update()
         }
@@ -287,6 +318,25 @@ impl<'a> System<'a> for GamePlaySystem {
             if lifetime.delete() {
                 entities.delete(entity).unwrap()
             }
+        }
+        for _ in 0..ASTEROIDS_NUMBER - stat.asteroids_number {
+            stat.asteroids_number += 1;
+            
+            let mut rng = thread_rng();
+            let size = rng.gen_range(0.4f32, 2f32);
+            let asteroid_shape = Geometry::Circle{
+                radius: size,
+            };
+            let _asteroid = entities
+                .build_entity()
+                .with(asteroid_shape, &mut geometries)
+                .with(Isometry::new(rng.gen_range(-10f32, 10f32), rng.gen_range(-10f32, 10f32), 0f32), &mut isometries)
+                .with(Velocity::new(0f32, 0f32), &mut velocities)
+                .with(AsteroidMarker::default(), &mut asteroid_markers)
+                .with(preloaded_images.asteroid, &mut images)
+                .with(Spin(rng.gen_range(-1E-2, 1E-2)), &mut spins)
+                .with(Size(size), &mut sizes)
+                .build();
         }
     }
 }
@@ -303,6 +353,7 @@ impl<'a> System<'a> for CollisionSystem {
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Projectile>,
         ReadStorage<'a, AsteroidMarker>,
+        ReadStorage<'a, CharacterMarker>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -315,6 +366,7 @@ impl<'a> System<'a> for CollisionSystem {
             geometries,
             projectiles,
             asteroid_markers,
+            character_markers,
         ) = data;
         let mut collisions = vec![];
         for entity1 in entities.join() {
@@ -364,20 +416,30 @@ impl<'a> System<'a> for CollisionSystem {
             if (iso1 - center).norm() < EPS {
                 continue
             };
-            let attack1 = 0.001 * (iso1 - center).normalize();
-            let attack2 = 0.001 * (iso2 - center).normalize();
-            // match velocities.get_mut(*entity1) {
-            //     Some(velocity) => {
-            //         *velocity = Velocity::new(attack1.x, attack1.y);
-            //     }
-            //     None => ()
-            // }
-            // match velocities.get_mut(*entity2) {
-            //     Some(velocity) => {
-            //         *velocity = Velocity::new(attack2.x, attack2.y);
-            //     }
-            //     None => ()
-            // }
+            let attack1 = 0.005 * (iso1 - center).normalize();
+            let attack2 = 0.005 * (iso2 - center).normalize();
+
+            // character_asteroid 
+            match (character_markers.get(*entity1), asteroid_markers.get(*entity2)) {
+                (Some(_), Some(_)) => (),
+                _ => continue
+            }
+            match (asteroid_markers.get(*entity2), character_markers.get(*entity1)) {
+                (Some(_), Some(_)) => (),
+                _ => continue
+            }
+            match velocities.get_mut(*entity1) {
+                Some(velocity) => {
+                    *velocity = Velocity::new(attack1.x, attack1.y);
+                }
+                None => ()
+            }
+            match velocities.get_mut(*entity2) {
+                Some(velocity) => {
+                    *velocity = Velocity::new(attack2.x, attack2.y);
+                }
+                None => ()
+            }
         }
         // for (iso1, vel1, spin1) in (&mut isometries, &mut velocities, &mut spins).join() {
 

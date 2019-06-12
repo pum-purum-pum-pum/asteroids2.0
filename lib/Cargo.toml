@@ -13,6 +13,7 @@ gl = "0.10.0"
 shrev = "1.1.1"
 glium = "0.24.0"
 ncollide2d = "0.19.1"
+rand = "0.6.5"
 
 [dependencies.sdl2]
 version = "0.32.2"

@@ -48,6 +48,7 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Image>();
     specs_world.register::<Geometry>();
     specs_world.register::<Lifetime>();
+    specs_world.register::<Size>();
     let character_image_data = ImageData::new(&display, "player", 0.5f32).unwrap();
     let character_image = images.add_image("player".to_string(), character_image_data);
     let asteroid_image_data = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
@@ -57,10 +58,12 @@ pub fn main() -> Result<(), String> {
     let projectile_image_data = ImageData::new(&display, "projectile", 0.1f32).unwrap();
     let projectile_image = images.add_image("projectile".to_string(), projectile_image_data);
     let preloaded_images = PreloadedImages{
-        projectile: projectile_image
+        projectile: projectile_image,
+        asteroid: asteroid_image
     };
+    let char_size = 0.7f32;
     let character_shape = Geometry::Circle{
-        radius: 1f32,
+        radius: char_size,
     };
     let character = specs_world
         .create_entity()
@@ -71,28 +74,7 @@ pub fn main() -> Result<(), String> {
         .with(Gun::new(50u8))
         .with(Spin::default())
         .with(character_shape)
-        .build();
-    let asteroid_shape = Geometry::Circle{
-        radius: 0.5f32,
-    };
-    // let _asteroid = specs_world
-    //     .create_entity()
-    //     .with(asteroid_shape)
-    //     .with(Isometry::new(0f32, 0f32, 0f32))
-    //     .with(Velocity::new(0f32, 0.02f32))
-    //     .with(AsteroidMarker::default())
-    //     // .with(ThreadPin::new(asteroid_image))
-    //     .with(asteroid_image)
-    //     .with(Spin::default())
-    //     .build();
-    let _asteroid = specs_world
-        .create_entity()
-        .with(asteroid_shape)
-        .with(Isometry::new(0f32, 2f32, 0f32))
-        // .with(Velocity::new(0f32, 0f32))
-        .with(AsteroidMarker::default())
-        .with(asteroid_image)
-        .with(Spin::default())
+        .with(Size(char_size))
         .build();
     {
         let _light = specs_world
@@ -102,6 +84,7 @@ pub fn main() -> Result<(), String> {
             .with(Velocity::new(0f32, 0f32))
             .with(light_image)
             .with(Spin::default())
+            .with(Size(15f32))
             .build();
     }
     let control_system = ControlSystem::new(keys_channel.register_reader());
@@ -125,6 +108,7 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(canvas));
     specs_world.add_resource(images);
     specs_world.add_resource(preloaded_images);
+    specs_world.add_resource(Stat::default());
     // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
     // specs_world.add_resource(poly);
     // ------------------------------

@@ -11,10 +11,18 @@ use std::ops::{AddAssign};
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 
+#[derive(Default, Debug)]
+pub struct Stat {
+    pub asteroids_number: u8,
+}
+
 #[derive(Component, Debug, Clone, Copy)]
 pub enum Geometry {
     Circle { radius: f32  },
 }
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Size(pub f32);
 
 /// Index of Images structure
 #[derive(Component, Clone, Copy)]
@@ -55,6 +63,7 @@ impl Index<Image> for Images {
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
     pub projectile: Image,
+    pub asteroid: Image,
 }
 
 #[derive(Default, Debug)]
