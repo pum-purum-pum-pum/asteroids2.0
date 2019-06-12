@@ -49,17 +49,20 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Geometry>();
     specs_world.register::<Lifetime>();
     specs_world.register::<Size>();
-    let character_image_data = ImageData::new(&display, "player", 0.5f32).unwrap();
+    let background_image_data = ImageData::new(&display, "back").unwrap();
+    let background_image = images.add_image("back".to_string(), background_image_data);
+    let character_image_data = ImageData::new(&display, "player").unwrap();
     let character_image = images.add_image("player".to_string(), character_image_data);
-    let asteroid_image_data = ImageData::new(&display, "asteroid", 0.5f32).unwrap();
+    let asteroid_image_data = ImageData::new(&display, "asteroid").unwrap();
     let asteroid_image = images.add_image("asteroid".to_string(), asteroid_image_data);
-    let light_image_data = ImageData::new(&display, "light", 20f32).unwrap();
+    let light_image_data = ImageData::new(&display, "light").unwrap();
     let light_image = images.add_image("light".to_string(), light_image_data);
-    let projectile_image_data = ImageData::new(&display, "projectile", 0.1f32).unwrap();
+    let projectile_image_data = ImageData::new(&display, "projectile").unwrap();
     let projectile_image = images.add_image("projectile".to_string(), projectile_image_data);
     let preloaded_images = PreloadedImages{
         projectile: projectile_image,
-        asteroid: asteroid_image
+        asteroid: asteroid_image,
+        background: background_image
     };
     let char_size = 0.7f32;
     let character_shape = Geometry::Circle{
@@ -87,6 +90,17 @@ pub fn main() -> Result<(), String> {
             .with(Size(15f32))
             .build();
     }
+    // {
+    //     let _back = specs_world
+    //         .create_entity()
+    //         .with(Isometry::new(0f32, 0f32, 0f32))
+    //         .with(AttachPosition(character))
+    //         .with(Velocity::new(0f32, 0f32))
+    //         .with(background_image)
+    //         .with(Spin::default())
+    //         .with(Size(15f32))
+    //         .build();
+    // }
     let control_system = ControlSystem::new(keys_channel.register_reader());
     let rendering_system = RenderingSystem::default();
     let gameplay_sytem = GamePlaySystem::default();

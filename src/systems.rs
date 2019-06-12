@@ -59,6 +59,7 @@ impl<'a> System<'a> for RenderingSystem {
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
+        ReadExpect<'a, PreloadedImages>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -71,7 +72,8 @@ impl<'a> System<'a> for RenderingSystem {
             sizes,
             display, 
             mut canvas, 
-            images
+            images,
+            preloaded_images,
         ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -113,13 +115,17 @@ impl<'a> System<'a> for RenderingSystem {
         // dbg!(&positions);
         // dbg!(&indices);
         let geom_data = GeometryData::new(&display, &positions, &indices);
-        for (_iso, _char_marker) in (&isometries, &character_markers).join() {
+        for (iso, _char_marker) in (&isometries, &character_markers).join() {
+            let isometry = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
+            canvas
+                .render(&display, &mut target, &images[preloaded_images.background], &isometry, 15f32, false)
+                .unwrap();
             canvas
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
         }
         for (iso, image, size) in (&isometries, &image_ids, &sizes).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0).unwrap();
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
         }
         target.finish().unwrap();
     }

@@ -64,6 +64,7 @@ impl Index<Image> for Images {
 pub struct PreloadedImages {
     pub projectile: Image,
     pub asteroid: Image,
+    pub background: Image
 }
 
 #[derive(Default, Debug)]

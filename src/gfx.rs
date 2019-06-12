@@ -111,7 +111,6 @@ impl ImageData {
     pub fn new(
         display: &SDL2Facade,
         image_name: &str,
-        scale: f32,
     ) -> Result<Self, LoadTextureError> {
         let positions = vec![[-1f32, -1f32], [-1f32, 1f32], [1f32, 1f32], [1f32, -1f32]];
         let textures = vec![[0f32, 0f32], [0f32, 1f32], [1f32, 1f32], [1f32, 0f32]];
@@ -239,6 +238,7 @@ impl Canvas {
         image_data: &ImageData,
         model: &Isometry3,
         scale: f32,
+        with_lights: bool,
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
@@ -247,17 +247,23 @@ impl Canvas {
             .sampled()
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
             .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
-
-        let draw_params = glium::DrawParameters {
-            stencil: glium::draw_parameters::Stencil {
-                test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
-                test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
-                reference_value_clockwise: 1,
-                reference_value_counter_clockwise: 1,
+        let draw_params = if with_lights {
+            glium::DrawParameters {
+                stencil: glium::draw_parameters::Stencil {
+                    test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
+                    test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
+                    reference_value_clockwise: 1,
+                    reference_value_counter_clockwise: 1,
+                    ..Default::default()
+                },
+                blend: Blend::alpha_blending(),
                 ..Default::default()
-            },
-            blend: Blend::alpha_blending(),
-            ..Default::default()
+            }
+        } else {
+            glium::DrawParameters {
+                blend: Blend::alpha_blending(),
+                ..Default::default()
+            }
         };
         let scales = image_data.dim_scales;
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
