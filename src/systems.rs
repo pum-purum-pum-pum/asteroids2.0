@@ -50,6 +50,7 @@ pub struct RenderingSystem;
 
 impl<'a> System<'a> for RenderingSystem {
     type SystemData = (
+        Entities<'a>,
         ReadStorage<'a, Isometry>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
@@ -64,6 +65,7 @@ impl<'a> System<'a> for RenderingSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (
+            entities,
             isometries, 
             character_markers, 
             asteroid_markers, 
@@ -124,8 +126,8 @@ impl<'a> System<'a> for RenderingSystem {
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
         }
-        for (iso, image, size) in (&isometries, &image_ids, &sizes).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
+        for (entity, iso, image, size) in (&entities, &isometries, &image_ids, &sizes).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, !asteroid_markers.get(entity).is_some()).unwrap();
         }
         target.finish().unwrap();
     }
@@ -331,7 +333,7 @@ impl<'a> System<'a> for GamePlaySystem {
             let mut rng = thread_rng();
             let size = rng.gen_range(0.4f32, 2f32);
             let asteroid_shape = Geometry::Circle{
-                radius: size,
+                radius: size * 0.7,
             };
             let _asteroid = entities
                 .build_entity()
@@ -426,25 +428,24 @@ impl<'a> System<'a> for CollisionSystem {
             let attack2 = 0.005 * (iso2 - center).normalize();
 
             // character_asteroid 
-            match (character_markers.get(*entity1), asteroid_markers.get(*entity2)) {
-                (Some(_), Some(_)) => (),
-                _ => continue
-            }
-            match (asteroid_markers.get(*entity2), character_markers.get(*entity1)) {
-                (Some(_), Some(_)) => (),
-                _ => continue
-            }
-            match velocities.get_mut(*entity1) {
-                Some(velocity) => {
-                    *velocity = Velocity::new(attack1.x, attack1.y);
+            match (character_markers.get(*entity1), asteroid_markers.get(*entity2),
+                   asteroid_markers.get(*entity2), character_markers.get(*entity1)) {
+                (Some(_), Some(_), _, _) | 
+                (_, _, Some(_), Some(_)) => {
+                    match velocities.get_mut(*entity1) {
+                        Some(velocity) => {
+                            *velocity = Velocity::new(attack1.x, attack1.y);
+                        }
+                        None => ()
+                    }
+                    match velocities.get_mut(*entity2) {
+                        Some(velocity) => {
+                            *velocity = Velocity::new(attack2.x, attack2.y);
+                        }
+                        None => ()
+                    }
                 }
-                None => ()
-            }
-            match velocities.get_mut(*entity2) {
-                Some(velocity) => {
-                    *velocity = Velocity::new(attack2.x, attack2.y);
-                }
-                None => ()
+                _ => ()
             }
         }
         // for (iso1, vel1, spin1) in (&mut isometries, &mut velocities, &mut spins).join() {
