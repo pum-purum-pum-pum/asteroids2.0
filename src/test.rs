@@ -14,13 +14,39 @@ fn geom() {
     use al::prelude::*;
     use astro_lib as al;
 
-    let mut poly = LightningPolygon::new_rectangle(-5f32, 5f32, -5f32, 5f32, Point2::new(0.5, 0.5));
-    dbg!(&poly);
+    // let mut poly = LightningPolygon::new_rectangle(-10f32, -10f32, 10f32, 10f32, Point2::new(6f32, 0f32));
+    // poly.clip_one(
+    //     Geometry::Circle {
+    //         radius: 1f32,
+    //     },
+    //     Point2::new(9.5f32, 0f32)
+    // );
+
+    // poly.clip_one(
+    //     Geometry::Circle {
+    //         radius: 1f32,
+    //     },
+    //     Point2::new(8.5f32, 0f32)
+    // );
+    // // dbg!(&poly);
+    // dbg!(poly.points.len());
+
+    let mut poly = LightningPolygon::new_rectangle(-10f32, -10f32, 10f32, 10f32, Point2::new(3f32, 0f32));
     poly.clip_one(
         Geometry::Circle {
             radius: 1f32,
         },
-        Point2::new(0f32, 4f32)
+        Point2::new(8.5f32, 0f32)
     );
-    dbg!(&poly);
+    dbg!(&poly.points);
+    dbg!(poly.points.len());
+    poly.clip_one(
+        Geometry::Circle {
+            radius: 1f32,
+        },
+        Point2::new(9.5f32, 0f32)
+    );
+    // dbg!(&poly);
+    dbg!(poly.points.len());
+
 }

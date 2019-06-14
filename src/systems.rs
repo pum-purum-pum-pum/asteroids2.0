@@ -1,3 +1,6 @@
+use std::cmp::Ord;
+use std::cmp::Ordering::Equal;
+
 use al::prelude::*;
 use astro_lib as al;
 use rand::prelude::*;
@@ -105,11 +108,14 @@ impl<'a> System<'a> for RenderingSystem {
             rectangle.3,
             Point2::new(char_pos.x, char_pos.y),
         );
+        let mut data = (&entities, &isometries, &geometries, &asteroid_markers).join().collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
+        let distance = |a: &Isometry| {(char_pos - a.0.translation.vector).norm()};
+        data.sort_by(|&a, &b| {(distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal))});
         // UNCOMMENT TO ADD LIGHTS
-        for (iso, geom, _) in (&isometries, &geometries, &asteroid_markers).join() {
+        for (entity, iso, geom, _) in data.iter() {
             let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
             if pos.x > rectangle.0 && pos.x < rectangle.2 && pos.y > rectangle.1 && pos.y < rectangle.3 {
-                light_poly.clip_one(*geom, pos);
+                light_poly.clip_one(**geom, pos);
             }
         }
         // dbg!(&light_poly);

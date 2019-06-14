@@ -5,6 +5,10 @@ use crate::components::Geometry;
 
 pub const EPS: f32 = 1E-3;
 
+pub fn eq(a: f32, b: f32) -> bool {
+    (a - b).abs() < EPS
+}
+
 // @vlad TODO refactor (it's copy paste from stack overflow)
 /// get tangent to circle from point
 pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Option<Point2>) {
@@ -36,8 +40,13 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
 /// Orientation is clockwise
 #[derive(Debug)]
 pub struct LightningPolygon {
-    points: Vec<Point2>,
-    center: Point2, // position of the light
+    pub points: Vec<Point2>,
+    x_min: f32, 
+    y_min: f32, 
+    x_max: f32, 
+    y_max: f32,
+    pub center: Point2, // position of the light
+    
 }
 
 impl LightningPolygon {
@@ -50,8 +59,14 @@ impl LightningPolygon {
                 Point2::new(x_max, y_max),
                 Point2::new(x_max, y_min),
             ],
+            x_min, y_min, x_max, y_max,
             center: center,
         }
+    }
+
+    pub fn is_border_point(&self, point: Point2) -> bool {
+        eq(point.x, self.x_min) || eq(point.x, self.x_max) ||
+        eq(point.y, self.y_min) || eq(point.y, self.y_max)
     }
 
     pub fn get_triangles(&mut self) -> (Vec<Point2>, Vec<u16>) {
