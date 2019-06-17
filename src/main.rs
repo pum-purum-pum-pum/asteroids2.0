@@ -7,17 +7,20 @@ use specs::World as SpecsWorld;
 mod components;
 mod geometry;
 mod gfx;
+mod sound;
 mod gfx_backend;
-mod resources;
 mod systems;
 #[cfg(test)]
 mod test;
 use astro_lib::prelude::*;
 
+
 use components::*;
+use sound::{init_sound};
 use gfx::{Canvas, ImageData};
 use gfx_backend::DisplayBuild;
-use systems::{ControlSystem, KinematicSystem, RenderingSystem, GamePlaySystem, CollisionSystem};
+use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
+              GamePlaySystem, CollisionSystem, AISystem, SoundSystem};
 
 pub fn main() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
@@ -33,9 +36,11 @@ pub fn main() -> Result<(), String> {
     // dbg!("hello");
     let canvas = Canvas::new(&display);
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
+    let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
-    let mut images = ThreadPin::new(Images::default());
+    let images: Collector<ImageData, Image> = Collector::new_empty();
+    let mut images = ThreadPin::new(images);
     specs_world.register::<Isometry>();
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
@@ -46,19 +51,25 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<AttachPosition>();
     specs_world.register::<Gun>();
     specs_world.register::<Image>();
+    specs_world.register::<Sound>();
     specs_world.register::<Geometry>();
     specs_world.register::<Lifetime>();
     specs_world.register::<Size>();
+    specs_world.register::<EnemyMarker>();
+    specs_world.register::<LightMarker>();
+    specs_world.register::<ShipMarker>();
     let background_image_data = ImageData::new(&display, "back").unwrap();
-    let background_image = images.add_image("back".to_string(), background_image_data);
+    let background_image = images.add_item("back".to_string(), background_image_data);
     let character_image_data = ImageData::new(&display, "player").unwrap();
-    let character_image = images.add_image("player".to_string(), character_image_data);
+    let character_image = images.add_item("player".to_string(), character_image_data);
+    let enemy_image_data = ImageData::new(&display, "enemy").unwrap();
+    let enemy_image = images.add_item("enemy".to_string(), enemy_image_data);
     let asteroid_image_data = ImageData::new(&display, "asteroid").unwrap();
-    let asteroid_image = images.add_image("asteroid".to_string(), asteroid_image_data);
+    let asteroid_image = images.add_item("asteroid".to_string(), asteroid_image_data);
     let light_image_data = ImageData::new(&display, "light").unwrap();
-    let light_image = images.add_image("light".to_string(), light_image_data);
+    let light_image = images.add_item("light".to_string(), light_image_data);
     let projectile_image_data = ImageData::new(&display, "projectile").unwrap();
-    let projectile_image = images.add_image("projectile".to_string(), projectile_image_data);
+    let projectile_image = images.add_item("projectile".to_string(), projectile_image_data);
     let preloaded_images = PreloadedImages{
         projectile: projectile_image,
         asteroid: asteroid_image,
@@ -68,16 +79,33 @@ pub fn main() -> Result<(), String> {
     let character_shape = Geometry::Circle{
         radius: char_size,
     };
+    let enemy_size = 0.7f32;
+    let enemy_shape = Geometry::Circle{
+        radius: enemy_size,
+    };
     let character = specs_world
         .create_entity()
         .with(Isometry::new(0f32, 0f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
+        .with(ShipMarker::default())
         .with(character_image)
-        .with(Gun::new(50u8))
+        .with(Gun::new(12u8))
         .with(Spin::default())
         .with(character_shape)
         .with(Size(char_size))
+        .build();
+    let _enemy = specs_world
+        .create_entity()
+        .with(Isometry::new(3f32, 3f32, 0f32))
+        .with(Velocity::new(0f32, 0f32))
+        .with(EnemyMarker::default())
+        .with(ShipMarker::default())
+        .with(enemy_image)
+        .with(Gun::new(20u8))
+        .with(Spin::default())
+        .with(enemy_shape)
+        .with(Size(enemy_size))
         .build();
     {
         let _light = specs_world
@@ -88,6 +116,7 @@ pub fn main() -> Result<(), String> {
             .with(light_image)
             .with(Spin::default())
             .with(Size(15f32))
+            .with(LightMarker)
             .build();
     }
     // {
@@ -101,18 +130,28 @@ pub fn main() -> Result<(), String> {
     //         .with(Size(15f32))
     //         .build();
     // }
-    let control_system = ControlSystem::new(keys_channel.register_reader());
     let rendering_system = RenderingSystem::default();
+    let sound_system = SoundSystem::new(sounds_channel.register_reader());
+    let control_system = ControlSystem::new(keys_channel.register_reader());
     let gameplay_sytem = GamePlaySystem::default();
     let collision_system = CollisionSystem::default();
+    let ai_system = AISystem::default();
+    let (sounds, preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context)?;
+    let sounds = ThreadPin::new(sounds);
+    specs_world.add_resource(sounds);
+    specs_world.add_resource(preloaded_sounds);
+    specs_world.add_resource(ThreadPin::new(timer));
     let mut dispatcher = DispatcherBuilder::new()
         .with(KinematicSystem {}, "kinematic_system", &[])
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
-        .with(collision_system, "collision_system", &[])
+        .with(ai_system, "ai_system", &[])
+        .with(collision_system, "collision_system", &["ai_system"])
         .with_thread_local(rendering_system)
+        .with_thread_local(sound_system)
         .build();
     specs_world.add_resource(keys_channel);
+    specs_world.add_resource(sounds_channel);
     specs_world.add_resource(ThreadPin::new(display));
     specs_world.add_resource(Mouse {
         wdpi: hdpi,

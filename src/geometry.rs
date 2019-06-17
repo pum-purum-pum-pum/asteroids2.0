@@ -1,13 +1,8 @@
-use std::mem;
 use al::prelude::*;
 use astro_lib as al;
 use crate::components::Geometry;
 
 pub const EPS: f32 = 1E-3;
-
-pub fn eq(a: f32, b: f32) -> bool {
-    (a - b).abs() < EPS
-}
 
 // @vlad TODO refactor (it's copy paste from stack overflow)
 /// get tangent to circle from point
@@ -64,11 +59,6 @@ impl LightningPolygon {
         }
     }
 
-    pub fn is_border_point(&self, point: Point2) -> bool {
-        eq(point.x, self.x_min) || eq(point.x, self.x_max) ||
-        eq(point.y, self.y_min) || eq(point.y, self.y_max)
-    }
-
     pub fn get_triangles(&mut self) -> (Vec<Point2>, Vec<u16>) {
         let mut points = vec![];
         points.push(self.center);
@@ -96,7 +86,7 @@ impl LightningPolygon {
         // create rays from center to shape borders
         match geom {
             Geometry::Circle { radius } => {
-                let (mut dir1, mut dir2) = match get_tangent(position, radius, self.center) {
+                let (dir1, dir2) = match get_tangent(position, radius, self.center) {
                     (Some(p1), Some(p2)) => (
                         Vector2::new(p2.x - self.center.x, p2.y - self.center.y),
                         Vector2::new(p1.x - self.center.x, p1.y - self.center.y),

@@ -4,6 +4,7 @@ GAMEPLAY
 * collectables? (from killed enemies and asteroids probably)
 * enemies
 * ship upgrades?
+* asteroids parts
 
 MEDIA:
 * sound effects

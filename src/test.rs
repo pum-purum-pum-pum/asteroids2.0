@@ -1,4 +1,12 @@
 use crate::nalgebra::Rotation2;
+use crate::geometry::*;
+use crate::components::*;
+use al::prelude::*;
+use astro_lib as al;
+use al::prelude::sdl2;
+use std::path::Path;
+use sdl2::mixer::{InitFlag, DEFAULT_CHANNELS, AUDIO_S16LSB};
+
 
 #[test]
 fn rotation() {
@@ -9,11 +17,6 @@ fn rotation() {
 
 #[test]
 fn geom() {
-    use crate::geometry::*;
-    use crate::components::*;
-    use al::prelude::*;
-    use astro_lib as al;
-
     // let mut poly = LightningPolygon::new_rectangle(-10f32, -10f32, 10f32, 10f32, Point2::new(6f32, 0f32));
     // poly.clip_one(
     //     Geometry::Circle {
@@ -49,4 +52,26 @@ fn geom() {
     // dbg!(&poly);
     dbg!(poly.points.len());
 
+}
+
+#[test]
+fn sound() -> Result<(), String> {
+    let sdl = sdl2::init()?;
+    let _audio = sdl.audio()?;
+    let timer = sdl.timer()?;
+    let frequency = 44_100;
+    let format = AUDIO_S16LSB; // signed 16 bit samples, in little-endian byte order
+    let channels = DEFAULT_CHANNELS; // Stereo
+    let chunk_size = 1_024;
+    sdl2::mixer::open_audio(frequency, format, channels, chunk_size)?;
+    let _mixer_context = sdl2::mixer::init(
+        InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG
+    )?;
+    sdl2::mixer::allocate_channels(4);
+    println!("query spec => {:?}", sdl2::mixer::query_spec());
+    let sound_file_path = Path::new("assets/shot.wav");
+    let sound_chunk = sdl2::mixer::Chunk::from_file(sound_file_path)
+        .map_err(|e| format!("Cannot load sound file: {:?}", e))?;
+    sdl2::mixer::Channel::all().play(&sound_chunk, 0)?;
+    Ok(())
 }

@@ -1,12 +1,13 @@
-use std::collections::HashMap;
-use std::ops::{Index};
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
-use crate::gfx_backend::SDL2Facade;
-use al::prelude::*;
-use astro_lib as al;
+use std::ops::{AddAssign};
+
 use specs::prelude::*;
 use specs_derive::Component;
-use std::ops::{AddAssign};
+use astro_lib as al;
+use al::prelude::*;
+use sdl2::mixer::Chunk;
+
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
+use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
@@ -28,36 +29,32 @@ pub struct Size(pub f32);
 #[derive(Component, Clone, Copy)]
 pub struct Image(pub usize);
 
-#[derive(Default)]
-pub struct Images {
-    images: Vec<ImageData>,
-    name_to_id: HashMap<String, usize>,
-}
+#[derive(Component, Clone, Copy)]
+pub struct Sound(pub usize);
 
-impl Images {
-    /// save image by it's name and return acces index
-    pub fn add_image(&mut self, name: String, image_data: ImageData) -> Image {
-        self.images.push(image_data);
-        let id = self.images.len() - 1;
-        self.name_to_id.insert(name, id);
+
+impl Id for Image {
+    fn new(id: usize) -> Self {
         Image(id)
     }
 
-    pub fn _get_image(&self, id: Image) -> Option<&ImageData> {
-        if id.0 < self.images.len() {
-            Some(&self.images[id.0])
-        } else {
-            None
-        }
+    fn get(&self) -> usize {
+        self.0
     }
 }
 
-impl Index<Image> for Images {
-    type Output = ImageData;
-    fn index<'a>(&'a self, id: Image) -> &'a ImageData {
-        &self.images[id.0]
+impl Id for Sound {
+    fn new(id: usize) -> Self {
+        Sound(id)
+    }
+
+    fn get(&self) -> usize {
+        self.0
     }
 }
+
+pub type Images = Collector<ImageData, Image>;
+pub type Sounds = Collector<Chunk, Sound>;
 
 /// contains preloaded images 
 /// use it when you need to insert entity in system
@@ -105,7 +102,19 @@ pub struct CharacterMarker;
 
 #[derive(Default, Component)]
 #[storage(NullStorage)]
+pub struct ShipMarker;
+
+#[derive(Default, Component)]
+#[storage(NullStorage)]
+pub struct EnemyMarker;
+
+#[derive(Default, Component)]
+#[storage(NullStorage)]
 pub struct AsteroidMarker;
+
+#[derive(Default, Component)]
+#[storage(NullStorage)]
+pub struct LightMarker;
 
 #[derive(Component)]
 pub struct Projectile {

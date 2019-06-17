@@ -1,4 +1,3 @@
-use std::cmp::Ord;
 use std::cmp::Ordering::Equal;
 
 use al::prelude::*;
@@ -8,6 +7,8 @@ use rand::prelude::*;
 use glium;
 use glium::Surface;
 use sdl2::keyboard::Keycode;
+use sdl2::TimerSubsystem;
+
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::Join;
@@ -15,6 +16,7 @@ use specs::Join;
 use crate::components::*;
 use crate::geometry::{LightningPolygon, EPS};
 use crate::gfx::{GeometryData};
+use crate::sound::{PreloadedSounds};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -57,6 +59,7 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Isometry>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
+        ReadStorage<'a, LightMarker>,
         ReadStorage<'a, Image>,
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
@@ -72,6 +75,7 @@ impl<'a> System<'a> for RenderingSystem {
             isometries, 
             character_markers, 
             asteroid_markers, 
+            light_markers,
             image_ids, 
             geometries,
             sizes,
@@ -108,11 +112,12 @@ impl<'a> System<'a> for RenderingSystem {
             rectangle.3,
             Point2::new(char_pos.x, char_pos.y),
         );
+        // TODO fix lights to be able to use without sorting
         let mut data = (&entities, &isometries, &geometries, &asteroid_markers).join().collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
         let distance = |a: &Isometry| {(char_pos - a.0.translation.vector).norm()};
         data.sort_by(|&a, &b| {(distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal))});
         // UNCOMMENT TO ADD LIGHTS
-        for (entity, iso, geom, _) in data.iter() {
+        for (_entity, iso, geom, _) in data.iter() {
             let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
             if pos.x > rectangle.0 && pos.x < rectangle.2 && pos.y > rectangle.1 && pos.y < rectangle.3 {
                 light_poly.clip_one(**geom, pos);
@@ -132,10 +137,47 @@ impl<'a> System<'a> for RenderingSystem {
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
         }
-        for (entity, iso, image, size) in (&entities, &isometries, &image_ids, &sizes).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, !asteroid_markers.get(entity).is_some()).unwrap();
+        for (_entity, iso, image, size, _asteroid) in (&entities, &isometries, &image_ids, &sizes, &asteroid_markers).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
         }
+        for (_entity, iso, image, size, _light) in (&entities, &isometries, &image_ids, &sizes, &light_markers).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
+        }
+        for (_entity, iso, image, size) in (&entities, &isometries, &image_ids, &sizes).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
+        }
+
         target.finish().unwrap();
+    }
+}
+
+pub struct SoundSystem {
+    reader: ReaderId<Sound>
+}
+
+impl SoundSystem {
+    pub fn new(reader: ReaderId<Sound>) -> Self {
+        SoundSystem { reader: reader }
+    }
+}
+
+impl<'a> System<'a> for SoundSystem {
+    type SystemData = (
+        ReadExpect<'a, ThreadPin<Sounds>>,
+        WriteExpect<'a, ThreadPin<TimerSubsystem>>,
+        Write<'a, EventChannel<Sound>>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (
+            sounds,
+            _timer,
+            sounds_channel,
+        ) = data;
+        for s in sounds_channel.read(&mut self.reader) {
+            sdl2::mixer::Channel::all().play(&sounds[*s], 0).unwrap();
+        }
+        // eprintln!("SOUNDS");
     }
 }
 
@@ -161,14 +203,12 @@ impl<'a> System<'a> for KinematicSystem {
             spins, 
             attach_positions,
             character_markers,
-            asteroids,
+            _asteroids,
         ) = data;
         // TODO add dt -- time delta for period
         for (mut isometry, velocity, spin) in (&mut isometries, &mut velocities, &spins).join() {
             isometry += velocity;
             isometry.add_spin(spin.0);
-        }
-        for (isometry, asteroid) in (&isometries, &asteroids).join() {
         }
         for (velocity, _char) in (&mut velocities, &character_markers).join() {
             velocity.0 *= DAMPING_FACTOR;
@@ -210,6 +250,8 @@ impl<'a> System<'a> for ControlSystem {
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
         ReadExpect<'a, PreloadedImages>,
+        Write<'a, EventChannel<Sound>>,
+        ReadExpect<'a, PreloadedSounds>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -228,6 +270,8 @@ impl<'a> System<'a> for ControlSystem {
             keys_channel, 
             mouse_state,
             preloaded_images,
+            mut sounds_channel,
+            preloaded_sounds,
         ) = data;
         // TODO add dt in params
         let dt = 1f32 / 60f32;
@@ -274,6 +318,7 @@ impl<'a> System<'a> for ControlSystem {
                 let char_velocity = velocities.get(character).unwrap();
                 let projectile_velocity = Velocity::new(char_velocity.0.x + direction.x, char_velocity.0.y + direction.y);
                 let size = 0.1;
+                sounds_channel.single_write(preloaded_sounds.shot);
                 let _bullet_entity = entities
                     .build_entity()
                     .with(projectile_velocity, &mut velocities)
@@ -322,7 +367,7 @@ impl<'a> System<'a> for GamePlaySystem {
             mut images,
             mut sizes,
             mut stat,
-            mut preloaded_images,
+            preloaded_images,
         ) = data;
         for gun in (&mut guns).join() {
             gun.update()
@@ -368,19 +413,21 @@ impl<'a> System<'a> for CollisionSystem {
         ReadStorage<'a, Projectile>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        /// mb store kd tree where save specs::Entity based on it's isometry component in future
+        // mb store kd tree where save specs::Entity based on it's isometry component in future
         let (
-            mut entities, 
-            mut isometries, 
+            entities, 
+            isometries, 
             mut velocities, 
-            mut spins,
+            _spins,
             geometries,
             projectiles,
             asteroid_markers,
-            character_markers,
+            _character_markers,
+            ship_markers,
         ) = data;
         let mut collisions = vec![];
         for entity1 in entities.join() {
@@ -399,7 +446,6 @@ impl<'a> System<'a> for CollisionSystem {
                                     // dbg!("COLLISION");
                                 }
                             }
-                            _ => ()
                         }
                     }
                     _ => ()
@@ -433,9 +479,18 @@ impl<'a> System<'a> for CollisionSystem {
             let attack1 = 0.005 * (iso1 - center).normalize();
             let attack2 = 0.005 * (iso2 - center).normalize();
 
-            // character_asteroid 
-            match (character_markers.get(*entity1), asteroid_markers.get(*entity2),
-                   asteroid_markers.get(*entity2), character_markers.get(*entity1)) {
+            match (projectiles.get(*entity1), ship_markers.get(*entity2),
+                   ship_markers.get(*entity1), projectiles.get(*entity2)) {
+                (Some(_), Some(_), _, _) |
+                (_, _, Some(_), Some(_)) => {
+
+                }
+                _ => ()
+            }
+
+            // character_asteroid collision
+            match (ship_markers.get(*entity1), asteroid_markers.get(*entity2),
+                   asteroid_markers.get(*entity2), ship_markers.get(*entity1)) {
                 (Some(_), Some(_), _, _) | 
                 (_, _, Some(_), Some(_)) => {
                     match velocities.get_mut(*entity1) {
@@ -457,5 +512,59 @@ impl<'a> System<'a> for CollisionSystem {
         // for (iso1, vel1, spin1) in (&mut isometries, &mut velocities, &mut spins).join() {
 
         // }
+    }
+}
+
+
+#[derive(Default)]
+pub struct AISystem;
+
+impl<'a> System<'a> for AISystem {
+    type SystemData = (
+        WriteStorage<'a, Isometry>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Spin>,
+        WriteStorage<'a, EnemyMarker>,
+        ReadStorage<'a, CharacterMarker>,
+        Write<'a, Stat>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (
+            isometries,
+            mut velocities,
+            mut spins,
+            enemies,
+            character_markers,
+            _stat,
+        ) = data;
+        let _rng = thread_rng();
+        let character_position = {
+            let mut res = None;
+            for (iso, _) in (&isometries, &character_markers).join() {
+                res = Some(iso.0.translation.vector)
+            }
+            res.unwrap()
+        };
+        let dt = 1.0/60.0;
+        for (iso, vel, spin, _enemy) in (&isometries, &mut velocities, &mut spins, &enemies).join() {
+            let ship_torque = dt
+                * calculate_player_ship_spin_for_aim(
+                    Vector2::new(character_position.x, character_position.y)
+                        - Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                    iso.rotation(),
+                    spin.0,
+                );
+            spin.0 += ship_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+            let speed = 0.1f32;
+            let diff = character_position - iso.0.translation.vector;
+            if diff.norm() > 4f32 {
+                let dir = speed * (diff).normalize();
+                *vel = Velocity::new(dir.x, dir.y);
+            } else {
+                let vel_vec = DAMPING_FACTOR * vel.0;
+                *vel = Velocity::new(vel_vec.x, vel_vec.y);
+            }
+        }
     }
 }
