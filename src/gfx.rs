@@ -16,6 +16,8 @@ use crate::gfx_backend::SDL2Facade;
 
 const Z_CANVAS: f32 = 0f32;
 const Z_FAR: f32 = 10f32;
+const MAX_ADD_SPEED_Z: f32 = 5f32;
+const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 
 #[derive(Copy, Clone)]
 pub struct Vertex2 {
@@ -226,9 +228,14 @@ impl Canvas {
         self.observer
     }
 
-    pub fn update_observer(&mut self, pos: Point2) {
+    pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32) {
         self.observer.x = pos.x;
         self.observer.y = pos.y;
+        self.observer.z = (1.0 - SPEED_EMA) * self.observer.z + SPEED_EMA * (Z_FAR + MAX_ADD_SPEED_Z * speed_ratio);
+    }
+
+    pub fn get_z_shift(&self) -> f32 {
+        self.observer.z - Z_FAR
     }
 
     pub fn render(

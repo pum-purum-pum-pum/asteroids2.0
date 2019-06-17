@@ -11,3 +11,6 @@ https://store.steampowered.com/app/846030/V_Rings_of_Saturn/
 
 
 https://play.google.com/store/apps/details?id=com.herocraft.game.free.spaceshipbattles
+
+
+time speed depending on ship speed :D -- mb collectable thing

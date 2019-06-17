@@ -24,7 +24,6 @@ pub fn init_sound(sdl: &sdl2::Sdl) -> Result<(Sounds, PreloadedSounds, AudioSubs
         InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG
     )?;
     sdl2::mixer::allocate_channels(10);
-    println!("query spec => {:?}", sdl2::mixer::query_spec());
     let sound_file_path = Path::new("assets/shot.wav");
     let shot_sound_chunk = sdl2::mixer::Chunk::from_file(sound_file_path)
         .map_err(|e| format!("Cannot load sound file: {:?}", e))?;
@@ -33,7 +32,7 @@ pub fn init_sound(sdl: &sdl2::Sdl) -> Result<(Sounds, PreloadedSounds, AudioSubs
     let preloaded_sounds = PreloadedSounds {
         shot: shot
     };
-    sdl2::mixer::Channel::all().set_volume(7);
+    sdl2::mixer::Channel::all().set_volume(12);
     Ok((
         sounds,
         preloaded_sounds,

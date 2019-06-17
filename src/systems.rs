@@ -22,6 +22,8 @@ const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
 const VELOCITY_MAX: f32 = 1f32;
 const MAX_TORQUE: f32 = 10f32;
+const BACKGROUND_SIZE: f32 = 20f32;
+const LIGHT_RECTANGLE_SIZE: f32 = 20f32;
 
 const ASTEROIDS_NUMBER: u8 = 10u8;
 
@@ -57,6 +59,7 @@ impl<'a> System<'a> for RenderingSystem {
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, Isometry>,
+        ReadStorage<'a, Velocity>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, LightMarker>,
@@ -73,6 +76,7 @@ impl<'a> System<'a> for RenderingSystem {
         let (
             entities,
             isometries, 
+            velocities,
             character_markers, 
             asteroid_markers, 
             light_markers,
@@ -89,21 +93,24 @@ impl<'a> System<'a> for RenderingSystem {
         target.clear_stencil(0i32);
         let char_pos = {
             let mut opt_iso = None;
-            for (iso, _) in (&isometries, &character_markers).join() {
-                canvas.update_observer(Point2::new(
-                    iso.0.translation.vector.x,
-                    iso.0.translation.vector.y,
-                ));
+            for (iso, vel, _) in (&isometries, &velocities,  &character_markers).join() {
+                canvas.update_observer(
+                    Point2::new(
+                        iso.0.translation.vector.x,
+                        iso.0.translation.vector.y,
+                    ),
+                    vel.0.norm() / VELOCITY_MAX
+                );
                 opt_iso = Some(iso)
             }
             opt_iso.unwrap().0.translation.vector
         };
         // @vlad TODO rewrite it with screen borders
         let rectangle = (
-            char_pos.x - 10f32,
-            char_pos.y - 10f32,
-            char_pos.x + 10f32,
-            char_pos.y + 10f32,
+            char_pos.x - LIGHT_RECTANGLE_SIZE,
+            char_pos.y - LIGHT_RECTANGLE_SIZE,
+            char_pos.x + LIGHT_RECTANGLE_SIZE,
+            char_pos.y + LIGHT_RECTANGLE_SIZE,
         );
         let mut light_poly = LightningPolygon::new_rectangle(
             rectangle.0,
@@ -129,9 +136,11 @@ impl<'a> System<'a> for RenderingSystem {
         // dbg!(&indices);
         let geom_data = GeometryData::new(&display, &positions, &indices);
         for (iso, _char_marker) in (&isometries, &character_markers).join() {
-            let isometry = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
+            let mut translation_vec =iso.0.translation.vector;
+            translation_vec.z = canvas.get_z_shift();
+            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             canvas
-                .render(&display, &mut target, &images[preloaded_images.background], &isometry, 15f32, false)
+                .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
                 .unwrap();
             canvas
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
@@ -141,7 +150,10 @@ impl<'a> System<'a> for RenderingSystem {
             canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
         }
         for (_entity, iso, image, size, _light) in (&entities, &isometries, &image_ids, &sizes, &light_markers).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
+            let mut translation_vec =iso.0.translation.vector;
+            translation_vec.z = canvas.get_z_shift();
+            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+            canvas.render(&display, &mut target, &images[*image], &isometry, size.0, true).unwrap();
         }
         for (_entity, iso, image, size) in (&entities, &isometries, &image_ids, &sizes).join() {
             canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
