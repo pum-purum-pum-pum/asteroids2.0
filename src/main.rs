@@ -46,7 +46,7 @@ pub fn main() -> Result<(), String> {
     let mut particles = ThreadPin::new(particles);
     let movement_particles = particles.add_item(
         "movement".to_string(), ParticlesData::new_quad(
-            &display, -size, -size, size, size, 20)
+            &display, -size, -size, size, size, 100)
     );
     let preloaded_particles = PreloadedParticles{ movement: movement_particles };
     specs_world.register::<Isometry>();

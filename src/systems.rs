@@ -60,15 +60,17 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Isometry>,
         ReadStorage<'a, Velocity>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, LightMarker>,
+        ReadStorage<'a, Projectile>,
         ReadStorage<'a, Image>,
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
-        ReadExpect<'a, ThreadPin<ParticlesSystems>>,
+        WriteExpect<'a, ThreadPin<ParticlesSystems>>,
         ReadExpect<'a, PreloadedImages>,
         ReadExpect<'a, PreloadedParticles>,
     );
@@ -79,15 +81,17 @@ impl<'a> System<'a> for RenderingSystem {
             isometries, 
             velocities,
             character_markers, 
+            ship_markers,
             asteroid_markers, 
             light_markers,
+            projectiles,
             image_ids, 
             geometries,
             sizes,
             display, 
             mut canvas, 
             images,
-            particles_systems,
+            mut particles_systems,
             preloaded_images,
             preloaded_particles,
         ) = data;
@@ -138,21 +142,20 @@ impl<'a> System<'a> for RenderingSystem {
         // dbg!(&positions);
         // dbg!(&indices);
         let geom_data = GeometryData::new(&display, &positions, &indices);
-        for (iso, _char_marker) in (&isometries, &character_markers).join() {
-            let mut translation_vec =iso.0.translation.vector;
-            translation_vec.z = canvas.get_z_shift();
-            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+        for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
+            let translation_vec =iso.0.translation.vector;
+            let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+            let pure_isometry = isometry.clone();
+            isometry.translation.vector.z = canvas.get_z_shift();
             canvas
                 .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
                 .unwrap();
+            particles_systems[preloaded_particles.movement].update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
             canvas
-                .render_particles(&display, &mut target, &particles_systems[preloaded_particles.movement], &isometry).unwrap();
+                .render_particles(&display, &mut target, &particles_systems[preloaded_particles.movement], &pure_isometry, vel.0.norm() / VELOCITY_MAX).unwrap();
             canvas
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
-        }
-        for (_entity, iso, image, size, _asteroid) in (&entities, &isometries, &image_ids, &sizes, &asteroid_markers).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
         }
         for (_entity, iso, image, size, _light) in (&entities, &isometries, &image_ids, &sizes, &light_markers).join() {
             let mut translation_vec =iso.0.translation.vector;
@@ -160,10 +163,15 @@ impl<'a> System<'a> for RenderingSystem {
             let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             canvas.render(&display, &mut target, &images[*image], &isometry, size.0, true).unwrap();
         }
-        for (_entity, iso, image, size) in (&entities, &isometries, &image_ids, &sizes).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, true).unwrap();
+        for (_entity, iso, image, size, _asteroid) in (&entities, &isometries, &image_ids, &sizes, &asteroid_markers).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
         }
-
+        for (_entity, iso, image, size, _ship) in (&entities, &isometries, &image_ids, &sizes, &ship_markers).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
+        }
+        for (_entity, iso, image, size, _projectile) in (&entities, &isometries, &image_ids, &sizes, &projectiles).join() {
+            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
+        }
         target.finish().unwrap();
     }
 }

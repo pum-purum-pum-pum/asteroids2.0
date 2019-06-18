@@ -26,7 +26,11 @@ pub const BACKGROUND_SIZE: f32 = 20f32;
 pub struct ParticlesData {
     pub vertex_buffer: glium::VertexBuffer<GeometryVertex>,
     pub indices: glium::IndexBuffer<u16>,
-    pub per_instance: glium::VertexBuffer<WorldVertex>
+    pub per_instance: glium::VertexBuffer<WorldVertex>,
+    pub x_min: f32, 
+    pub y_min: f32, 
+    pub x_max:f32, 
+    pub y_max:f32,
 }
 
 impl ParticlesData {
@@ -38,7 +42,7 @@ impl ParticlesData {
         y_max:f32,
         num: usize,
     ) -> ParticlesData {
-        let scale = 0.1f32;
+        let scale = 0.03f32;
         let positions = vec![[-scale, -scale], [-scale, scale], [scale, scale], [scale, -scale]];
         let shape: Vec<GeometryVertex> = positions
             .into_iter()
@@ -55,18 +59,46 @@ impl ParticlesData {
         for _ in 0..num {
             let x = rng.gen_range(x_min, x_max);
             let y = rng.gen_range(y_min, y_max);
-            quad_positions.push(WorldVertex{ world_position: [x, y] });
+            let depth = 10f32;
+            let z = rng.gen_range(-depth, depth);
+            quad_positions.push(WorldVertex{ world_position: [x, y, z] });
         }
         let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
         ParticlesData {
             vertex_buffer: vertex_buffer,
             indices: indices,
-            per_instance: per_instance
+            per_instance: per_instance,
+            x_min, y_min, x_max, y_max,
         }
     }
 
-    pub fn update() {
-
+    pub fn update(&mut self, vel: Vector2) {
+        for particle in self.per_instance.map().iter_mut() {
+            particle.world_position[0] += vel.x;
+            particle.world_position[1] += vel.y;
+            let cut_low = |x, min, max| if x < min {max - min + x} else {x};
+            let cut_hight = |x, min, max| if x > max {min + x - max} else {x};
+            particle.world_position[0] = cut_low(
+                cut_hight(particle.world_position[0], self.x_min, self.x_max), 
+                self.x_min, self.x_max
+            );
+            particle.world_position[1] = cut_low(
+                cut_hight(particle.world_position[1], self.y_min, self.y_max), 
+                self.y_min, self.y_max
+            );
+            // particle.world_position[0] = 
+            //     if particle.world_position[0] > self.x_max {
+            //         self.x_min + particle.world_position[0] - self.x_max
+            //     } else {
+            //         particle.world_position[0]
+            //     };
+            // particle.world_position[1] =  
+            //     if particle.world_position[1] > self.y_max {
+            //         self.y_min + particle.world_position[1] - self.y_max
+            //     } else {
+            //         particle.world_position[1]
+            //     };
+        }
     }
 }
 
@@ -77,7 +109,7 @@ pub struct GeometryVertex {
 
 #[derive(Copy, Clone)]
 pub struct WorldVertex {
-    pub world_position: [f32; 2],
+    pub world_position: [f32; 3],
 }
 
 #[derive(Copy, Clone)]
@@ -241,26 +273,28 @@ impl Canvas {
         let vertex_shader_instancing = r#"
             #version 130
             in vec2 position;
-            in vec2 world_position;
+            in vec3 world_position;
 
             uniform mat4 perspective;
             uniform mat4 view;
             uniform mat4 model;
-
-            vec2 position_moved;
+            
+            vec3 position_moved;
 
             void main() {
-                position_moved = world_position + position;
-                gl_Position = perspective * view * model * vec4(position_moved, 0.0, 1.0);
+                position_moved = world_position + vec3(position, 0.0);
+                gl_Position = perspective * view * model * vec4(position_moved, 1.0);
             }
         "#;
 
         let fragment_shader_instancing = r#"
             #version 130
             out vec4 color;
+            uniform float transparency;
+            float alpha = 0.1;
 
             void main() {
-                color =  vec4(1.0, 1.0, 1.0, 1.0);;
+                color =  vec4(1.0, 1.0, 1.0, alpha + (1.0 - alpha) * transparency);
             }
         "#;
 
@@ -419,6 +453,7 @@ impl Canvas {
         target: &mut glium::Frame,
         particles_data: &ParticlesData,
         model: &Isometry3,
+        transparency: f32, // TODO make params structure
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
@@ -437,6 +472,7 @@ impl Canvas {
                 model: model,
                 view: view,
                 perspective: perspective,
+                transparency: transparency
             },
             &draw_params,
         )

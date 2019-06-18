@@ -1,6 +1,6 @@
 use nalgebra;
 use std::thread::{self, ThreadId};
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::{Deref, DerefMut, Index, IndexMut};
 use std::marker::PhantomData;
 use std::collections::HashMap;
 use specs_derive::{Component};
@@ -126,5 +126,11 @@ impl<T, I> Index<I> for Collector<T, I>  where I: Id{
     type Output = T;
     fn index<'a>(&'a self, id: I) -> &'a T {
         &self.items[id.get()]
+    }
+}
+
+impl<T, I> IndexMut<I> for Collector<T, I>  where I: Id{
+    fn index_mut<'a>(&'a mut self, id: I) -> &'a mut  T {
+        &mut self.items[id.get()]
     }
 }
