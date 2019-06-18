@@ -17,7 +17,7 @@ use astro_lib::prelude::*;
 
 use components::*;
 use sound::{init_sound};
-use gfx::{Canvas, ImageData};
+use gfx::{Canvas, ImageData, ParticlesData};
 use gfx_backend::DisplayBuild;
 use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
               GamePlaySystem, CollisionSystem, AISystem, SoundSystem};
@@ -41,6 +41,14 @@ pub fn main() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     let images: Collector<ImageData, Image> = Collector::new_empty();
     let mut images = ThreadPin::new(images);
+    let particles: Collector<ParticlesData, Particles> = Collector::new_empty();
+    let size = 10f32;
+    let mut particles = ThreadPin::new(particles);
+    let movement_particles = particles.add_item(
+        "movement".to_string(), ParticlesData::new_quad(
+            &display, -size, -size, size, size, 20)
+    );
+    let preloaded_particles = PreloadedParticles{ movement: movement_particles };
     specs_world.register::<Isometry>();
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
@@ -140,6 +148,8 @@ pub fn main() -> Result<(), String> {
     let sounds = ThreadPin::new(sounds);
     specs_world.add_resource(sounds);
     specs_world.add_resource(preloaded_sounds);
+    specs_world.add_resource(particles);
+    specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
     let mut dispatcher = DispatcherBuilder::new()
         .with(KinematicSystem {}, "kinematic_system", &[])

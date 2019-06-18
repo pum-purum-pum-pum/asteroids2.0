@@ -6,7 +6,7 @@ use astro_lib as al;
 use al::prelude::*;
 use sdl2::mixer::Chunk;
 
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData, ParticlesData};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
@@ -32,6 +32,10 @@ pub struct Image(pub usize);
 #[derive(Component, Clone, Copy)]
 pub struct Sound(pub usize);
 
+#[derive(Component, Clone, Copy)]
+pub struct Particles(pub usize);
+
+// TODO: make macro
 
 impl Id for Image {
     fn new(id: usize) -> Self {
@@ -53,15 +57,32 @@ impl Id for Sound {
     }
 }
 
+
+impl Id for Particles {
+    fn new(id: usize) -> Self {
+        Particles(id)
+    }
+
+    fn get(&self) -> usize {
+        self.0
+    }
+}
+
+
 pub type Images = Collector<ImageData, Image>;
 pub type Sounds = Collector<Chunk, Sound>;
+pub type ParticlesSystems = Collector<ParticlesData, Particles>;
 
-/// contains preloaded images 
+/// contains preloaded images ids
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
     pub projectile: Image,
     pub asteroid: Image,
     pub background: Image
+}
+
+pub struct PreloadedParticles {
+    pub movement: Particles,
 }
 
 #[derive(Default, Debug)]

@@ -2,6 +2,7 @@ use al::prelude::*;
 use astro_lib as al;
 use std::fs::File;
 use std::io::{BufReader, Error as IOError};
+use rand::prelude::*;
 
 use glium;
 use glium::draw_parameters::Blend;
@@ -16,12 +17,67 @@ use crate::gfx_backend::SDL2Facade;
 
 const Z_CANVAS: f32 = 0f32;
 const Z_FAR: f32 = 10f32;
-const MAX_ADD_SPEED_Z: f32 = 5f32;
+const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
+pub const BACKGROUND_SIZE: f32 = 20f32;
+
+
+/// white star like particles
+pub struct ParticlesData {
+    pub vertex_buffer: glium::VertexBuffer<GeometryVertex>,
+    pub indices: glium::IndexBuffer<u16>,
+    pub per_instance: glium::VertexBuffer<WorldVertex>
+}
+
+impl ParticlesData {
+    pub fn new_quad(
+        display: &SDL2Facade,
+        x_min: f32, 
+        y_min: f32, 
+        x_max:f32, 
+        y_max:f32,
+        num: usize,
+    ) -> ParticlesData {
+        let scale = 0.1f32;
+        let positions = vec![[-scale, -scale], [-scale, scale], [scale, scale], [scale, -scale]];
+        let shape: Vec<GeometryVertex> = positions
+            .into_iter()
+            .map(|pos| GeometryVertex{ position: pos})
+            .collect();
+        let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
+        let indices = glium::IndexBuffer::new(
+            display,
+            PrimitiveType::TrianglesList,
+            &[0u16, 1, 2, 2, 3, 0],
+        ).unwrap();
+        let mut rng = thread_rng();
+        let mut quad_positions = vec![];
+        for _ in 0..num {
+            let x = rng.gen_range(x_min, x_max);
+            let y = rng.gen_range(y_min, y_max);
+            quad_positions.push(WorldVertex{ world_position: [x, y] });
+        }
+        let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
+        ParticlesData {
+            vertex_buffer: vertex_buffer,
+            indices: indices,
+            per_instance: per_instance
+        }
+    }
+
+    pub fn update() {
+
+    }
+}
 
 #[derive(Copy, Clone)]
-pub struct Vertex2 {
+pub struct GeometryVertex {
     pub position: [f32; 2],
+}
+
+#[derive(Copy, Clone)]
+pub struct WorldVertex {
+    pub world_position: [f32; 2],
 }
 
 #[derive(Copy, Clone)]
@@ -30,12 +86,8 @@ pub struct Vertex {
     pub tex_coords: [f32; 2],
 }
 implement_vertex!(Vertex, position, tex_coords);
-
-#[derive(Copy, Clone)]
-pub struct GeometryVertex {
-    pub position: [f32; 2],
-}
 implement_vertex!(GeometryVertex, position);
+implement_vertex!(WorldVertex, world_position);
 
 #[derive(Debug)]
 pub enum LoadTextureError {
@@ -147,6 +199,7 @@ impl ImageData {
 pub struct Canvas {
     program: glium::Program,       // @vlad TODO: we want to use many programs
     program_light: glium::Program, // but for now simpler=better
+    program_instancing: glium::Program,
     observer: Point3,
 }
 
@@ -185,6 +238,32 @@ impl Canvas {
             }
         "#;
 
+        let vertex_shader_instancing = r#"
+            #version 130
+            in vec2 position;
+            in vec2 world_position;
+
+            uniform mat4 perspective;
+            uniform mat4 view;
+            uniform mat4 model;
+
+            vec2 position_moved;
+
+            void main() {
+                position_moved = world_position + position;
+                gl_Position = perspective * view * model * vec4(position_moved, 0.0, 1.0);
+            }
+        "#;
+
+        let fragment_shader_instancing = r#"
+            #version 130
+            out vec4 color;
+
+            void main() {
+                color =  vec4(1.0, 1.0, 1.0, 1.0);;
+            }
+        "#;
+
         let vertex_light_shader_src = r#"
             #version 130
             in vec2 position;
@@ -217,9 +296,13 @@ impl Canvas {
             None,
         )
         .unwrap();
+        let program_instancing =
+            glium::Program::from_source(display, vertex_shader_instancing, fragment_shader_instancing, None)
+                .unwrap();
         Canvas {
             program: program,
             program_light: program_light,
+            program_instancing: program_instancing,
             observer: Point3::new(0f32, 0f32, Z_FAR),
         }
     }
@@ -321,6 +404,35 @@ impl Canvas {
             &image_data.positions,
             &image_data.indices,
             &self.program_light,
+            &uniform! {
+                model: model,
+                view: view,
+                perspective: perspective,
+            },
+            &draw_params,
+        )
+    }
+
+    pub fn render_particles(
+        &self,
+        display: &SDL2Facade,
+        target: &mut glium::Frame,
+        particles_data: &ParticlesData,
+        model: &Isometry3,
+    ) -> Result<(), DrawError> {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = display.get_framebuffer_dimensions();
+        // @vlad TODO move to field
+        let draw_params = glium::DrawParameters {
+            blend: Blend::alpha_blending(),
+            ..Default::default()
+        };
+        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        target.draw(
+            (&particles_data.vertex_buffer, particles_data.per_instance.per_instance().unwrap()),
+            &particles_data.indices,
+            &self.program_instancing,
             &uniform! {
                 model: model,
                 view: view,

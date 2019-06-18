@@ -15,14 +15,13 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{LightningPolygon, EPS};
-use crate::gfx::{GeometryData};
+use crate::gfx::{GeometryData, BACKGROUND_SIZE};
 use crate::sound::{PreloadedSounds};
 
 const DAMPING_FACTOR: f32 = 0.95f32;
 const THRUST_FORCE: f32 = 0.01f32;
 const VELOCITY_MAX: f32 = 1f32;
 const MAX_TORQUE: f32 = 10f32;
-const BACKGROUND_SIZE: f32 = 20f32;
 const LIGHT_RECTANGLE_SIZE: f32 = 20f32;
 
 const ASTEROIDS_NUMBER: u8 = 10u8;
@@ -69,7 +68,9 @@ impl<'a> System<'a> for RenderingSystem {
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
+        ReadExpect<'a, ThreadPin<ParticlesSystems>>,
         ReadExpect<'a, PreloadedImages>,
+        ReadExpect<'a, PreloadedParticles>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -86,7 +87,9 @@ impl<'a> System<'a> for RenderingSystem {
             display, 
             mut canvas, 
             images,
+            particles_systems,
             preloaded_images,
+            preloaded_particles,
         ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -142,6 +145,8 @@ impl<'a> System<'a> for RenderingSystem {
             canvas
                 .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
                 .unwrap();
+            canvas
+                .render_particles(&display, &mut target, &particles_systems[preloaded_particles.movement], &isometry).unwrap();
             canvas
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
                 .unwrap();
