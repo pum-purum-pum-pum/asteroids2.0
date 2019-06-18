@@ -291,7 +291,7 @@ impl Canvas {
             #version 130
             out vec4 color;
             uniform float transparency;
-            float alpha = 0.1;
+            float alpha = 0.5;
 
             void main() {
                 color =  vec4(1.0, 1.0, 1.0, alpha + (1.0 - alpha) * transparency);

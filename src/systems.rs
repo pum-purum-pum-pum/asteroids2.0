@@ -48,7 +48,7 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
 
     let angle_diff = angle_shortest_dist(rotation, target_rot);
 
-    (angle_diff * 100.0 - speed * 55.0)
+    (angle_diff * 3.0 - speed * 55.0)
 }
 
 #[derive(Default)]
@@ -147,9 +147,9 @@ impl<'a> System<'a> for RenderingSystem {
             let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             let pure_isometry = isometry.clone();
             isometry.translation.vector.z = canvas.get_z_shift();
-            canvas
-                .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
-                .unwrap();
+            // canvas
+            //     .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
+            //     .unwrap();
             particles_systems[preloaded_particles.movement].update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
             canvas
                 .render_particles(&display, &mut target, &particles_systems[preloaded_particles.movement], &pure_isometry, vel.0.norm() / VELOCITY_MAX).unwrap();
@@ -313,23 +313,23 @@ impl<'a> System<'a> for ControlSystem {
                     spin.0,
                 );
             spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
-            for key in keys_channel.read(&mut self.reader) {
-                match key {
-                    Keycode::Left | Keycode::A => {
-                        vel.0.x = (vel.0.x - THRUST_FORCE).max(-VELOCITY_MAX);
-                    }
-                    Keycode::Right | Keycode::D => {
-                        vel.0.x = (vel.0.x + THRUST_FORCE).min(VELOCITY_MAX);
-                    }
-                    Keycode::Up | Keycode::W => {
-                        vel.0.y = (vel.0.y + THRUST_FORCE).max(-VELOCITY_MAX);
-                    }
-                    Keycode::Down | Keycode::S => {
-                        vel.0.y = (vel.0.y - THRUST_FORCE).min(VELOCITY_MAX);
-                    }
-                    _ => (),
-                }
-            }
+            // for key in keys_channel.read(&mut self.reader) {
+            //     match key {
+            //         Keycode::Left | Keycode::A => {
+            //             vel.0.x = (vel.0.x - THRUST_FORCE).max(-VELOCITY_MAX);
+            //         }
+            //         Keycode::Right | Keycode::D => {
+            //             vel.0.x = (vel.0.x + THRUST_FORCE).min(VELOCITY_MAX);
+            //         }
+            //         Keycode::Up | Keycode::W => {
+            //             vel.0.y = (vel.0.y + THRUST_FORCE).max(-VELOCITY_MAX);
+            //         }
+            //         Keycode::Down | Keycode::S => {
+            //             vel.0.y = (vel.0.y - THRUST_FORCE).min(VELOCITY_MAX);
+            //         }
+            //         _ => (),
+            //     }
+            // }
         }
         let character = character.unwrap();
         if mouse_state.left {
@@ -356,6 +356,13 @@ impl<'a> System<'a> for ControlSystem {
                     .with(Size(size), &mut sizes)
                     .build();
             }
+        }
+        if mouse_state.right {
+            let rotation = isometries.get(character).unwrap().0.rotation;
+            let vel = velocities.get_mut(character).unwrap();
+            let thrust = THRUST_FORCE * (rotation * Vector3::new(0.0, -1.0, 0.0));
+            let thrust = Vector2::new(thrust.x, thrust.y);
+            vel.0 += thrust;
         }
     }
 }
@@ -534,9 +541,6 @@ impl<'a> System<'a> for CollisionSystem {
                 _ => ()
             }
         }
-        // for (iso1, vel1, spin1) in (&mut isometries, &mut velocities, &mut spins).join() {
-
-        // }
     }
 }
 
