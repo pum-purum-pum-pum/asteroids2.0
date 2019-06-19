@@ -3,6 +3,10 @@ use sdl2::mouse::MouseButton;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
+use nphysics2d::object::{BodyStatus};
+use nphysics2d::world::{World};
+use ncollide2d::shape::ShapeHandle;
+use ncollide2d::world::CollisionGroups;
 
 mod components;
 mod geometry;
@@ -12,6 +16,7 @@ mod gfx_backend;
 mod systems;
 #[cfg(test)]
 mod test;
+mod physics;
 use astro_lib::prelude::*;
 
 
@@ -20,9 +25,13 @@ use sound::{init_sound};
 use gfx::{Canvas, ImageData, ParticlesData};
 use gfx_backend::DisplayBuild;
 use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
-              GamePlaySystem, CollisionSystem, AISystem, SoundSystem};
+              GamePlaySystem, CollisionSystem, AISystem, SoundSystem,
+              PhysicsSystem};
+use physics::{PHYSICS_SIMULATION_TIME, safe_maintain, CollisionId};
 
 pub fn main() -> Result<(), String> {
+    let mut phys_world: World<f32> = World::new();
+    phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
     let (_ddpi, hdpi, _vdpi) = video_subsystem.display_dpi(0i32)?;
@@ -39,6 +48,8 @@ pub fn main() -> Result<(), String> {
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
+    specs_world.add_resource(phys_world);
+    specs_world.add_resource(BodiesMap::new());
     let images: Collector<ImageData, Image> = Collector::new_empty();
     let mut images = ThreadPin::new(images);
     let particles: Collector<ParticlesData, Particles> = Collector::new_empty();
@@ -66,6 +77,7 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<EnemyMarker>();
     specs_world.register::<LightMarker>();
     specs_world.register::<ShipMarker>();
+    specs_world.register::<PhysicsComponent>();
     let background_image_data = ImageData::new(&display, "back").unwrap();
     let background_image = images.add_item("back".to_string(), background_image_data);
     let character_image_data = ImageData::new(&display, "player").unwrap();
@@ -103,7 +115,38 @@ pub fn main() -> Result<(), String> {
         .with(character_shape)
         .with(Size(char_size))
         .build();
-    let _enemy = specs_world
+    let r = 1f32;
+    let character_physics_shape = ncollide2d::shape::Ball::new(r);
+
+    let mut character_collision_groups = CollisionGroups::new();
+    character_collision_groups.set_membership(&[CollisionId::PlayerShip as usize]);
+    character_collision_groups.set_whitelist(&[
+        CollisionId::Asteroid as usize,
+        CollisionId::EnemyBullet as usize,
+        CollisionId::EnemyShip as usize,]);
+    character_collision_groups.set_blacklist(&[CollisionId::PlayerBullet as usize]);
+    
+    PhysicsComponent::safe_insert(
+        &mut specs_world.write_storage(),
+        character,
+        ShapeHandle::new(character_physics_shape),
+        Isometry2::new(Vector2::new(0f32, 0f32), 0f32),
+        BodyStatus::Dynamic,
+        &mut specs_world.write_resource(),
+        &mut specs_world.write_resource(),
+        character_collision_groups
+    );
+    let enemy_physics_shape = ncollide2d::shape::Ball::new(r);
+
+    let mut enemy_collision_groups = CollisionGroups::new();
+    enemy_collision_groups.set_membership(&[CollisionId::EnemyShip as usize]);
+    enemy_collision_groups.set_whitelist(&[
+        CollisionId::Asteroid as usize,
+        CollisionId::EnemyShip as usize,
+        CollisionId::PlayerShip as usize]);
+    enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
+
+    let enemy = specs_world
         .create_entity()
         .with(Isometry::new(3f32, 3f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
@@ -115,6 +158,16 @@ pub fn main() -> Result<(), String> {
         .with(enemy_shape)
         .with(Size(enemy_size))
         .build();
+    PhysicsComponent::safe_insert(
+        &mut specs_world.write_storage(),
+        enemy,
+        ShapeHandle::new(enemy_physics_shape),
+        Isometry2::new(Vector2::new(0f32, 0f32), 0f32),
+        BodyStatus::Dynamic,
+        &mut specs_world.write_resource(),
+        &mut specs_world.write_resource(),
+        enemy_collision_groups
+    );
     {
         let _light = specs_world
             .create_entity()
@@ -127,18 +180,8 @@ pub fn main() -> Result<(), String> {
             .with(LightMarker)
             .build();
     }
-    // {
-    //     let _back = specs_world
-    //         .create_entity()
-    //         .with(Isometry::new(0f32, 0f32, 0f32))
-    //         .with(AttachPosition(character))
-    //         .with(Velocity::new(0f32, 0f32))
-    //         .with(background_image)
-    //         .with(Spin::default())
-    //         .with(Size(15f32))
-    //         .build();
-    // }
     let rendering_system = RenderingSystem::default();
+    let phyiscs_system = PhysicsSystem::default();
     let sound_system = SoundSystem::new(sounds_channel.register_reader());
     let control_system = ControlSystem::new(keys_channel.register_reader());
     let gameplay_sytem = GamePlaySystem::default();
@@ -157,6 +200,7 @@ pub fn main() -> Result<(), String> {
         .with(gameplay_sytem, "gameplay_system", &[])
         .with(ai_system, "ai_system", &[])
         .with(collision_system, "collision_system", &["ai_system"])
+        .with(phyiscs_system, "physics_system", &["kinematic_system", "control_system", "gameplay_system", "collision_system"])
         .with_thread_local(rendering_system)
         .with_thread_local(sound_system)
         .build();
@@ -177,6 +221,7 @@ pub fn main() -> Result<(), String> {
     // ------------------------------
 
     let mut event_pump = sdl_context.event_pump().unwrap();
+    safe_maintain(&mut specs_world);
     'running: loop {
         let keys_iter: Vec<Keycode> = event_pump
             .keyboard_state()
@@ -207,7 +252,7 @@ pub fn main() -> Result<(), String> {
             // dbg!((mouse_state.x, mouse_state.y));
         }
         dispatcher.dispatch(&specs_world.res);
-        specs_world.maintain();
+        safe_maintain(&mut specs_world);
         for event in event_pump.poll_iter() {
             use sdl2::event::Event;
 
