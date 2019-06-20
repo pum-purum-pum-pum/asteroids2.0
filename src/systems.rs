@@ -20,7 +20,7 @@ use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionObjectHandle;
 
 use crate::components::*;
-use crate::geometry::{LightningPolygon, EPS, TriangulateFromCenter, Polygon};
+use crate::geometry::{LightningPolygon, EPS, TriangulateFromCenter, Polygon, generate_convex_polygon};
 use crate::gfx::{GeometryData, BACKGROUND_SIZE};
 use crate::sound::{PreloadedSounds};
 use crate::physics::CollisionId;
@@ -620,19 +620,11 @@ impl<'a> System<'a> for GamePlaySystem {
             
             let mut rng = thread_rng();
             let size = rng.gen_range(0.4f32, 2f32);
-            let r =  size * 0.7;
+            let r =  size;
             let asteroid_shape = Geometry::Circle{
                 radius: r,
             };
-            let poly = Polygon::new(
-                vec![
-                    Point2::new(-r, -r),
-                    Point2::new(-r, r),
-                    Point2::new(r/2.0, r + r/2.0),
-                    Point2::new(r, r),
-                    Point2::new(r, -r)
-                ] 
-            );
+            let poly = generate_convex_polygon(10, r);
             let spin = rng.gen_range(-1E-2, 1E-2);
             // let ball = ncollide2d::shape::Ball::new(r);
             insert_channel.single_write(

@@ -3,8 +3,32 @@ use astro_lib as al;
 use crate::components::Geometry;
 use specs::prelude::*;
 use specs_derive::Component;
+use rand::prelude::*;
+use ncollide2d::transformation::convex_hull_idx;
 
 pub const EPS: f32 = 1E-3;
+
+pub fn generate_convex_polygon(samples_num: usize, size: f32) -> Polygon {
+    let mut rng = thread_rng();
+    let mut points = vec![];
+    for _ in 0..samples_num {
+        let x = rng.gen_range(-size, size);
+        // sample from circle
+        let chord = (size * size - x * x).sqrt();
+        let y = rng.gen_range(-chord, chord);
+        points.push(Point2::new(x, y));
+    }
+    let ids = convex_hull_idx(&points);
+    // TODO opt: inplace
+    let points = {
+        let mut res = vec![];
+        for &i in ids.iter() {
+            res.push(points[i])
+        }
+        res
+    };
+    Polygon::new(points)
+}
 
 // @vlad TODO refactor (it's copy paste from stack overflow)
 /// get tangent to circle from point
