@@ -20,7 +20,7 @@ use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionObjectHandle;
 
 use crate::components::*;
-use crate::geometry::{LightningPolygon, EPS};
+use crate::geometry::{LightningPolygon, EPS, TriangulateFromCenter, Polygon};
 use crate::gfx::{GeometryData, BACKGROUND_SIZE};
 use crate::sound::{PreloadedSounds};
 use crate::physics::CollisionId;
@@ -31,7 +31,16 @@ const VELOCITY_MAX: f32 = 1f32;
 const MAX_TORQUE: f32 = 10f32;
 const LIGHT_RECTANGLE_SIZE: f32 = 20f32;
 
-const ASTEROIDS_NUMBER: u8 = 10u8;
+const ASTEROIDS_NUMBER: usize = 10usize;
+
+pub enum InsertEvent {
+    Asteroid {
+        pos: Point2,
+        polygon: Polygon,
+        light_shape: Geometry,
+        spin: f32,
+    },
+}
 
 fn iso2_iso3(iso2: &Isometry2) -> Isometry3{
      Isometry3::new(
@@ -82,6 +91,7 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Image>,
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
+        ReadStorage<'a, Polygon>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
@@ -105,6 +115,7 @@ impl<'a> System<'a> for RenderingSystem {
             image_ids, 
             geometries,
             sizes,
+            polygons,
             display, 
             mut canvas, 
             images,
@@ -155,11 +166,8 @@ impl<'a> System<'a> for RenderingSystem {
                 light_poly.clip_one(**geom, pos);
             }
         }
-        // dbg!(&light_poly);
-        let (positions, indices) = light_poly.get_triangles();
-        // dbg!(&positions);
-        // dbg!(&indices);
-        let geom_data = GeometryData::new(&display, &positions, &indices);
+        let triangulation = light_poly.triangulate();
+        let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
         for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
             let translation_vec =iso.0.translation.vector;
             let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
@@ -172,7 +180,7 @@ impl<'a> System<'a> for RenderingSystem {
             canvas
                 .render_particles(&display, &mut target, &particles_systems[preloaded_particles.movement], &pure_isometry, vel.0.norm() / VELOCITY_MAX).unwrap();
             canvas
-                .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity())
+                .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity(), true)
                 .unwrap();
         }
         for (_entity, iso, image, size, _light) in (&entities, &isometries, &image_ids, &sizes, &light_markers).join() {
@@ -181,8 +189,11 @@ impl<'a> System<'a> for RenderingSystem {
             let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             canvas.render(&display, &mut target, &images[*image], &isometry, size.0, true).unwrap();
         }
-        for (_entity, iso, image, size, _asteroid) in (&entities, &isometries, &image_ids, &sizes, &asteroid_markers).join() {
-            canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
+        for (_entity, iso, image, size, polygon, _asteroid) in (&entities, &isometries, &image_ids, &sizes, &polygons, &asteroid_markers).join() {
+            // canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
+            let triangulation = polygon.triangulate();
+            let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
+            canvas.render_geometry(&display, &mut target, &geom_data, &iso.0, false).unwrap();
         }
         for (_entity, physics_component, image, size, _ship) in (&entities, &physics, &image_ids, &sizes, &ship_markers).join() {
             let iso2 = world.rigid_body(physics_component.body_handle).unwrap().position();
@@ -446,6 +457,109 @@ impl<'a> System<'a> for ControlSystem {
     }
 }
 
+
+pub struct InsertSystem {
+    reader: ReaderId<InsertEvent>
+}
+
+impl InsertSystem {
+    pub fn new(reader: ReaderId<InsertEvent>) -> Self {
+        InsertSystem {
+            reader: reader
+        }
+    }
+}
+
+impl<'a> System<'a> for InsertSystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, PhysicsComponent>,
+        WriteStorage<'a, Geometry>,
+        WriteStorage<'a, Isometry>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Spin>,
+        WriteStorage<'a, Gun>,
+        WriteStorage<'a, Lifetime>,
+        WriteStorage<'a, AsteroidMarker>,
+        WriteStorage<'a, Image>,
+        WriteStorage<'a, Size>,
+        WriteStorage<'a, Polygon>,
+        Write<'a, Stat>,
+        WriteExpect<'a, PreloadedImages>,
+        Write<'a, World<f32>>,
+        Write<'a, BodiesMap>,
+        Read<'a, EventChannel<InsertEvent>>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (
+            entities, 
+            mut physics,
+            mut geometries,
+            mut isometries,
+            mut velocities,
+            mut spins,
+            mut guns, 
+            mut lifetimes,
+            mut asteroid_markers,
+            mut images,
+            mut sizes,
+            mut polygons,
+            mut stat,
+            preloaded_images,
+            mut world,
+            mut bodies_map,
+            insert_channel
+        ) = data;
+        for insert in insert_channel.read(&mut self.reader) {
+            match insert {
+                InsertEvent::Asteroid {
+                    pos,
+                    polygon,
+                    light_shape,
+                    spin,
+                } => {
+                    let physics_polygon = ncollide2d::shape::ConvexPolygon::try_from_points(
+                        &polygon.points()
+                    ).unwrap();
+                    let mut asteroid = entities
+                        .build_entity()
+                        .with(*light_shape, &mut geometries)
+                        .with(Isometry::new(pos.x, pos.y, 0f32), &mut isometries)
+                        .with(Velocity::new(0f32, 0f32), &mut velocities)
+                        .with(polygon.clone(), &mut polygons)
+                        .with(AsteroidMarker::default(), &mut asteroid_markers)
+                        .with(preloaded_images.asteroid, &mut images)
+                        .with(Spin(*spin), &mut spins)
+                        .with(Size(1f32), &mut sizes)
+                        .build();
+                    
+                        let mut asteroid_collision_groups = CollisionGroups::new();
+                        asteroid_collision_groups.set_membership(&[CollisionId::Asteroid as usize]);
+                        asteroid_collision_groups.set_whitelist(&[
+                            CollisionId::Asteroid as usize,
+                            CollisionId::EnemyShip as usize,
+                            CollisionId::PlayerShip as usize,
+                            CollisionId::PlayerBullet as usize,
+                            CollisionId::EnemyBullet as usize,
+                        ]);
+                    PhysicsComponent::safe_insert(
+                        &mut physics,
+                        asteroid,
+                        ShapeHandle::new(physics_polygon),
+                        Isometry2::new(Vector2::new(pos.x, pos.y), 0f32),
+                        BodyStatus::Dynamic,
+                        &mut world,
+                        &mut bodies_map,
+                        asteroid_collision_groups,
+                        10f32,
+                    );
+                }
+            }
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct GamePlaySystem;
 
@@ -462,10 +576,12 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteStorage<'a, AsteroidMarker>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, Size>,
+        WriteStorage<'a, Polygon>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
+        Write<'a, EventChannel<InsertEvent>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -481,10 +597,12 @@ impl<'a> System<'a> for GamePlaySystem {
             mut asteroid_markers,
             mut images,
             mut sizes,
+            mut polygons,
             mut stat,
             preloaded_images,
             mut world,
-            mut bodies_map
+            mut bodies_map,
+            mut insert_channel,
         ) = data;
         for gun in (&mut guns).join() {
             gun.update()
@@ -495,7 +613,9 @@ impl<'a> System<'a> for GamePlaySystem {
                 entities.delete(entity).unwrap()
             }
         }
-        for _ in 0..ASTEROIDS_NUMBER - stat.asteroids_number {
+        let cnt = asteroid_markers.count();
+        let add_cnt = if ASTEROIDS_NUMBER > cnt {ASTEROIDS_NUMBER - cnt} else {0}; 
+        for _ in 0..add_cnt {
             stat.asteroids_number += 1;
             
             let mut rng = thread_rng();
@@ -504,42 +624,25 @@ impl<'a> System<'a> for GamePlaySystem {
             let asteroid_shape = Geometry::Circle{
                 radius: r,
             };
-            let ball = ncollide2d::shape::Ball::new(r);
-            let pos = (rng.gen_range(-10f32, 10f32), rng.gen_range(-10f32, 10f32));
-            let mut asteroid = entities
-                .build_entity()
-                .with(asteroid_shape, &mut geometries)
-                .with(Isometry::new(pos.0, pos.1, 0f32), &mut isometries)
-                .with(Velocity::new(0f32, 0f32), &mut velocities)
-                .with(AsteroidMarker::default(), &mut asteroid_markers)
-                .with(preloaded_images.asteroid, &mut images)
-                .with(Spin(rng.gen_range(-1E-2, 1E-2)), &mut spins)
-                .with(Size(size), &mut sizes)
-                .build();
-            
-                let mut asteroid_collision_groups = CollisionGroups::new();
-                asteroid_collision_groups.set_membership(&[CollisionId::Asteroid as usize]);
-                asteroid_collision_groups.set_whitelist(&[
-                    CollisionId::Asteroid as usize,
-                    CollisionId::EnemyShip as usize,
-                    CollisionId::PlayerShip as usize,
-                    CollisionId::PlayerBullet as usize,
-                    CollisionId::EnemyBullet as usize,
-                ]);
-                // player_bullet_collision_groups.set_blacklist(&[]);
-            
-            PhysicsComponent::safe_insert(
-                &mut physics,
-                asteroid,
-                ShapeHandle::new(ball),
-                Isometry2::new(Vector2::new(pos.0, pos.1), 0f32),
-                BodyStatus::Dynamic,
-                &mut world,
-                &mut bodies_map,
-                asteroid_collision_groups,
-                10f32,
+            let poly = Polygon::new(
+                vec![
+                    Point2::new(-r, -r),
+                    Point2::new(-r, r),
+                    Point2::new(r/2.0, r + r/2.0),
+                    Point2::new(r, r),
+                    Point2::new(r, -r)
+                ] 
             );
-            
+            let spin = rng.gen_range(-1E-2, 1E-2);
+            // let ball = ncollide2d::shape::Ball::new(r);
+            insert_channel.single_write(
+                InsertEvent::Asteroid {
+                    pos: Point2::new(rng.gen_range(-10f32, 10f32), rng.gen_range(-10f32, 10f32)),
+                    polygon: poly,
+                    light_shape: asteroid_shape,
+                    spin: spin,
+                }
+            );
         }
     }
 }
@@ -553,7 +656,7 @@ pub struct CollisionSystem {
 impl<'a> System<'a> for CollisionSystem {
     type SystemData = (
         Entities<'a>,
-        // WriteStorage<'a, Isometry>,
+        WriteStorage<'a, Isometry>,
         // WriteStorage<'a, Velocity>,
         ReadStorage<'a, PhysicsComponent>,
         // WriteStorage<'a, Spin>,
@@ -563,20 +666,25 @@ impl<'a> System<'a> for CollisionSystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, Projectile>,
+        WriteStorage<'a, Polygon>,
         Write<'a, World<f32>>,
         Read<'a, BodiesMap>,
+        Write<'a, EventChannel<InsertEvent>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
             entities, 
+            isometries,
             physics, 
             asteroids,
             character_markers,
             ships,
             projectiles,
-            mut world, 
-            bodies_map
+            mut polygons,
+            mut world,
+            bodies_map,
+            mut insert_channel
         ) = data; 
         self.colliding_start_events.clear();
         self.colliding_end_events.clear();
@@ -618,7 +726,32 @@ impl<'a> System<'a> for CollisionSystem {
             }
             if asteroids.get(entity1).is_some() {
                 if projectiles.get(entity2).is_some() {
-                    entities.delete(entity2).unwrap();
+                    let asteroid = entity1;
+                    let projectile = entity2;
+                    entities.delete(projectile).unwrap();
+                    let position = isometries.get(asteroid).unwrap().0.translation.vector;
+                    let polygon = polygons.get(asteroid).unwrap();
+                    let new_polygons = polygon.deconstruct();
+                    if new_polygons.len() == 1 {
+
+                    } else {
+                        for poly in new_polygons.iter() {
+                            let r = poly.min_r;
+                            let asteroid_shape = Geometry::Circle{
+                                radius: r,
+                            };
+                            let mut rng = thread_rng();
+                            let insert_event = InsertEvent::Asteroid {
+                                pos: Point2::new(position.x, position.y),
+                                polygon: poly.clone(),
+                                light_shape: asteroid_shape,
+                                spin: rng.gen_range(-1E-2, 1E-2),
+                            };
+                            insert_channel.single_write(insert_event);
+                        }
+                    }
+
+                    entities.delete(asteroid).unwrap();
                 }
             }
         }

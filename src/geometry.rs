@@ -1,6 +1,8 @@
 use al::prelude::*;
 use astro_lib as al;
 use crate::components::Geometry;
+use specs::prelude::*;
+use specs_derive::Component;
 
 pub const EPS: f32 = 1E-3;
 
@@ -29,6 +31,105 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
     (Some(Point2::new(xt0, yt0)), Some(Point2::new(xt1, yt1)))
 }
 
+pub struct Triangulation {
+    pub points: Vec<Point2>,
+    pub indicies: Vec<u16>,
+}
+
+pub trait TriangulateFromCenter {
+    fn points(&self) -> &[Point2];
+    
+    fn center(&self) -> Point2;
+
+    fn triangulate(& self) -> Triangulation {
+        let mut points = vec![];
+        points.push(self.center());
+        for i in 0..self.points().len() {
+            points.push(self.points()[i].clone());
+        }
+        let mut indicies = vec![];
+        for i in 1..points.len() {
+            indicies.push(0u16);
+            indicies.push(i as u16);
+            let mut si = i as u16 + 1u16;
+            if si == points.len() as u16 {
+                si = 1u16
+            };
+            indicies.push(si);
+        }
+        Triangulation {
+            points: points, 
+            indicies: indicies
+        }
+    }
+}
+
+#[derive(Debug, Component, Clone)]
+pub struct Polygon {
+    points: Vec<Point2>,
+    mass_center: Point2,
+    pub min_r: f32,
+}
+
+impl Polygon {
+    pub fn new(mut points: Vec<Point2>) -> Self {
+        let w = 1.0 / (points.len() as f32);
+        let mut center = Point2::new(0f32, 0f32);
+        for p in points.iter() {
+            center.x += w * p.x;
+            center.y += w * p.y;
+        };
+        let mut min_r = 10f32;
+        for p in points.iter() {
+            min_r = min_r.min((p - center).norm())
+        }
+        for p in points.iter_mut() {
+            p.x -= center.x;
+            p.y -= center.y;
+        }
+        Polygon {
+            points: points,
+            mass_center: Point2::new(0f32, 0f32),
+            min_r
+        }
+    }
+
+    pub fn deconstruct(&self) -> Vec<Polygon> {
+        let mut res = vec![];
+        if self.points.len() == 3 {
+            return vec![self.clone()]
+        }
+        // dummy destruct for now
+        let triangulation = self.triangulate();
+        let points = triangulation.points;
+        let indicies = triangulation.indicies;
+        let mut i = 0usize;
+        while i < indicies.len() {
+            res.push(
+                Polygon::new( 
+                    vec![
+                        points[indicies[i] as usize], 
+                        points[indicies[i + 1] as usize], 
+                        points[indicies[i + 2] as usize]
+                    ]
+                )
+            );
+            i += 3;
+        };
+        res
+    }
+}
+
+impl TriangulateFromCenter for Polygon {
+    fn points(&self) -> &[Point2] {
+        &self.points
+    }
+
+    fn center(&self) -> Point2 {
+        self.mass_center
+    }
+
+}
 
 /// Polygon for light rendering(just render light on this rctngl)
 /// coordinates are in world 3d space
@@ -41,7 +142,16 @@ pub struct LightningPolygon {
     x_max: f32, 
     y_max: f32,
     pub center: Point2, // position of the light
-    
+}
+
+impl TriangulateFromCenter for LightningPolygon {
+    fn points(&self) -> &[Point2] {
+        &self.points
+    }
+
+    fn center(&self) -> Point2 {
+        self.center
+    }
 }
 
 impl LightningPolygon {
@@ -57,25 +167,6 @@ impl LightningPolygon {
             x_min, y_min, x_max, y_max,
             center: center,
         }
-    }
-
-    pub fn get_triangles(&mut self) -> (Vec<Point2>, Vec<u16>) {
-        let mut points = vec![];
-        points.push(self.center);
-        for i in 0..self.points.len() {
-            points.push(self.points[i].clone());
-        }
-        let mut indicies = vec![];
-        for i in 1..=self.points.len() {
-            indicies.push(0u16);
-            indicies.push(i as u16);
-            let mut si = i as u16 + 1u16;
-            if si == self.points.len() as u16 + 1u16 {
-                si = 1u16
-            };
-            indicies.push(si);
-        }
-        (points, indicies)
     }
 
     // slow-ugly-simple version of polygon clipping

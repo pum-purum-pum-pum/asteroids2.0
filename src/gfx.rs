@@ -414,23 +414,31 @@ impl Canvas {
         target: &mut glium::Frame,
         image_data: &GeometryData,
         model: &Isometry3,
+        stencil: bool,
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
         // @vlad TODO move to field
-        let draw_params = glium::DrawParameters {
-            stencil: glium::draw_parameters::Stencil {
-                test_counter_clockwise: glium::StencilTest::AlwaysPass,
-                test_clockwise: glium::StencilTest::AlwaysPass,
-                depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
-                depth_pass_operation_clockwise: glium::StencilOperation::Replace,
-                // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
-                reference_value_clockwise: 1,
-                // reference_value_counter_clockwise: 1,
+        let draw_params = if stencil {
+            glium::DrawParameters {
+                stencil: glium::draw_parameters::Stencil {
+                    test_counter_clockwise: glium::StencilTest::AlwaysPass,
+                    test_clockwise: glium::StencilTest::AlwaysPass,
+                    depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
+                    depth_pass_operation_clockwise: glium::StencilOperation::Replace,
+                    // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
+                    reference_value_clockwise: 1,
+                    // reference_value_counter_clockwise: 1,
+                    ..Default::default()
+                },
+                color_mask: (false, false, false, false),
                 ..Default::default()
-            },
-            color_mask: (false, false, false, false),
-            ..Default::default()
+            }
+        } else {
+             glium::DrawParameters {
+                blend: Blend::alpha_blending(),
+                ..Default::default()
+             }
         };
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();

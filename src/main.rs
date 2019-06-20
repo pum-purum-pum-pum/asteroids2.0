@@ -26,7 +26,7 @@ use gfx::{Canvas, ImageData, ParticlesData};
 use gfx_backend::DisplayBuild;
 use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
               GamePlaySystem, CollisionSystem, AISystem, SoundSystem,
-              PhysicsSystem};
+              PhysicsSystem, InsertSystem, InsertEvent};
 use physics::{PHYSICS_SIMULATION_TIME, safe_maintain, CollisionId};
 
 pub fn main() -> Result<(), String> {
@@ -46,6 +46,7 @@ pub fn main() -> Result<(), String> {
     let canvas = Canvas::new(&display);
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
+    let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
     specs_world.add_resource(phys_world);
@@ -78,6 +79,7 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<LightMarker>();
     specs_world.register::<ShipMarker>();
     specs_world.register::<PhysicsComponent>();
+    specs_world.register::<Polygon>();
     let background_image_data = ImageData::new(&display, "back").unwrap();
     let background_image = images.add_item("back".to_string(), background_image_data);
     let character_image_data = ImageData::new(&display, "player").unwrap();
@@ -190,6 +192,7 @@ pub fn main() -> Result<(), String> {
     let gameplay_sytem = GamePlaySystem::default();
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
+    let insert_system = InsertSystem::new(insert_channel.register_reader());
     let (sounds, preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context)?;
     let sounds = ThreadPin::new(sounds);
     specs_world.add_resource(sounds);
@@ -204,11 +207,13 @@ pub fn main() -> Result<(), String> {
         .with(ai_system, "ai_system", &[])
         .with(collision_system, "collision_system", &["ai_system"])
         .with(phyiscs_system, "physics_system", &["kinematic_system", "control_system", "gameplay_system", "collision_system"])
+        .with(insert_system, "insert_system", &["physics_system"])
         .with_thread_local(rendering_system)
         .with_thread_local(sound_system)
         .build();
     specs_world.add_resource(keys_channel);
     specs_world.add_resource(sounds_channel);
+    specs_world.add_resource(insert_channel);
     specs_world.add_resource(ThreadPin::new(display));
     specs_world.add_resource(Mouse {
         wdpi: hdpi,

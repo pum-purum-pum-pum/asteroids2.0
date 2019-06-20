@@ -6,6 +6,7 @@ use astro_lib as al;
 use al::prelude::*;
 use sdl2::mixer::Chunk;
 pub use crate::physics::{PhysicsComponent, BodiesMap};
+pub use crate::geometry::Polygon;
 
 use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData, ParticlesData};
 use crate::gfx_backend::SDL2Facade;
