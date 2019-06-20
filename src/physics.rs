@@ -71,9 +71,10 @@ impl PhysicsComponent {
             body_status: BodyStatus,
             physics_world: &mut World<f32>,
             bodies_map: &mut BodiesMap,
-            collision_groups: CollisionGroups
+            collision_groups: CollisionGroups,
+            inertia: f32
     ) -> Self {
-        let mut inertia = shape.inertia(1.0);
+        let mut inertia = shape.inertia(inertia);
         let center_of_mass = shape.center_of_mass();
         let (body_handle, body_part_handle) = {
             let rigid_body = RigidBodyDesc::new()

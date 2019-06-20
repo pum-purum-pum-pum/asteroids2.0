@@ -134,7 +134,8 @@ pub fn main() -> Result<(), String> {
         BodyStatus::Dynamic,
         &mut specs_world.write_resource(),
         &mut specs_world.write_resource(),
-        character_collision_groups
+        character_collision_groups,
+        0.5f32
     );
     let enemy_physics_shape = ncollide2d::shape::Ball::new(r);
 
@@ -143,7 +144,8 @@ pub fn main() -> Result<(), String> {
     enemy_collision_groups.set_whitelist(&[
         CollisionId::Asteroid as usize,
         CollisionId::EnemyShip as usize,
-        CollisionId::PlayerShip as usize]);
+        CollisionId::PlayerShip as usize,
+        CollisionId::PlayerBullet as usize]);
     enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
 
     let enemy = specs_world
@@ -166,7 +168,8 @@ pub fn main() -> Result<(), String> {
         BodyStatus::Dynamic,
         &mut specs_world.write_resource(),
         &mut specs_world.write_resource(),
-        enemy_collision_groups
+        enemy_collision_groups,
+        0.5f32
     );
     {
         let _light = specs_world

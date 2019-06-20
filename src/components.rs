@@ -235,7 +235,7 @@ impl AddAssign<&Velocity> for &mut Isometry {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Copy, Clone, Component, Debug)]
 pub struct Velocity(pub Vector2);
 
 

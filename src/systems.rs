@@ -1,4 +1,5 @@
 use std::cmp::Ordering::Equal;
+use std::mem::swap;
 
 use al::prelude::*;
 use astro_lib as al;
@@ -16,6 +17,7 @@ use nphysics2d::object::{BodyStatus, Body};
 use nphysics2d::world::{World};
 use ncollide2d::world::CollisionGroups;
 use ncollide2d::shape::ShapeHandle;
+use ncollide2d::world::CollisionObjectHandle;
 
 use crate::components::*;
 use crate::geometry::{LightningPolygon, EPS};
@@ -390,13 +392,14 @@ impl<'a> System<'a> for ControlSystem {
                 let isometry = *isometries.get(character).unwrap();
                 let position = isometry.0.translation.vector;
                 let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                let velocity_rel = 0.5 * direction;
                 let char_velocity = velocities.get(character).unwrap();
-                let projectile_velocity = Velocity::new(char_velocity.0.x + direction.x, char_velocity.0.y + direction.y);
+                let projectile_velocity = Velocity::new(char_velocity.0.x + velocity_rel.x, char_velocity.0.y + velocity_rel.y);
                 let size = 0.1;
                 sounds_channel.single_write(preloaded_sounds.shot);
                 let bullet = entities
                     .build_entity()
-                    .with(projectile_velocity, &mut velocities)
+                    .with(projectile_velocity.clone(), &mut velocities)
                     .with(isometry, &mut isometries)
                     .with(preloaded_images.projectile, &mut images)
                     .with(Spin::default(), &mut spins)
@@ -410,21 +413,26 @@ impl<'a> System<'a> for ControlSystem {
                 player_bullet_collision_groups.set_membership(&[CollisionId::PlayerBullet as usize]);
                 player_bullet_collision_groups.set_whitelist(&[
                     CollisionId::Asteroid as usize,
-                    CollisionId::EnemyShip as usize]);
+                    CollisionId::EnemyShip as usize,]);
                 player_bullet_collision_groups.set_blacklist(&[CollisionId::PlayerShip as usize]);
 
                 let r = 1f32;
                 let ball = ncollide2d::shape::Ball::new(r);
-                PhysicsComponent::safe_insert(
+                let bullet_physics_component = PhysicsComponent::safe_insert(
                     &mut physics,
                     bullet,
                     ShapeHandle::new(ball),
-                    Isometry2::new(Vector2::new(position.x, position.y), 0f32),
+                    Isometry2::new(Vector2::new(position.x, position.y), isometry.rotation()),
                     BodyStatus::Dynamic,
                     &mut world,
                     &mut bodies_map,
-                    player_bullet_collision_groups
+                    player_bullet_collision_groups,
+                    0.4f32
                 );
+                let body = world.rigid_body_mut(bullet_physics_component.body_handle).unwrap();
+                let mut velocity = *body.velocity();
+                *velocity.as_vector_mut() = Vector3::new(projectile_velocity.0.x, projectile_velocity.0.y, 0f32);
+                body.set_velocity(velocity);
             }
         }
         if mouse_state.right {
@@ -514,7 +522,10 @@ impl<'a> System<'a> for GamePlaySystem {
                 asteroid_collision_groups.set_whitelist(&[
                     CollisionId::Asteroid as usize,
                     CollisionId::EnemyShip as usize,
-                    CollisionId::PlayerShip as usize]);
+                    CollisionId::PlayerShip as usize,
+                    CollisionId::PlayerBullet as usize,
+                    CollisionId::EnemyBullet as usize,
+                ]);
                 // player_bullet_collision_groups.set_blacklist(&[]);
             
             PhysicsComponent::safe_insert(
@@ -525,7 +536,8 @@ impl<'a> System<'a> for GamePlaySystem {
                 BodyStatus::Dynamic,
                 &mut world,
                 &mut bodies_map,
-                asteroid_collision_groups
+                asteroid_collision_groups,
+                10f32,
             );
             
         }
@@ -533,112 +545,81 @@ impl<'a> System<'a> for GamePlaySystem {
 }
 
 #[derive(Default)]
-pub struct CollisionSystem;
+pub struct CollisionSystem {
+    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
+    colliding_end_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>
+}
 
 impl<'a> System<'a> for CollisionSystem {
     type SystemData = (
         Entities<'a>,
-        WriteStorage<'a, Isometry>,
-        WriteStorage<'a, Velocity>,
-        WriteStorage<'a, Spin>,
-        ReadStorage<'a, Geometry>,
-        ReadStorage<'a, Projectile>,
+        // WriteStorage<'a, Isometry>,
+        // WriteStorage<'a, Velocity>,
+        ReadStorage<'a, PhysicsComponent>,
+        // WriteStorage<'a, Spin>,
+        // ReadStorage<'a, Geometry>,
+        // ReadStorage<'a, Projectile>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,
+        ReadStorage<'a, Projectile>,
+        Write<'a, World<f32>>,
+        Read<'a, BodiesMap>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        // mb store kd tree where save specs::Entity based on it's isometry component in future
         let (
             entities, 
-            isometries, 
-            mut velocities, 
-            _spins,
-            geometries,
+            physics, 
+            asteroids,
+            character_markers,
+            ships,
             projectiles,
-            asteroid_markers,
-            _character_markers,
-            ship_markers,
-        ) = data;
-        let mut collisions = vec![];
-        for entity1 in entities.join() {
-            for entity2 in entities.join() {
-                if entity1 == entity2 || entity1.id() > entity2.id() {continue};
-                match (geometries.get(entity1), geometries.get(entity2)) {
-                    (Some(geom1), Some(geom2)) => {
-                        let iso1 = isometries.get(entity1).unwrap();
-                        let iso2 = isometries.get(entity2).unwrap();
-                        match (geom1, geom2) {
-                            (Geometry::Circle{radius:r1},
-                             Geometry::Circle{radius: r2}) => {
-                                if (iso1.0.translation.vector -
-                                iso2.0.translation.vector).norm() < r1 + r2 {
-                                    collisions.push((entity1, entity2))
-                                    // dbg!("COLLISION");
-                                }
-                            }
-                        }
-                    }
-                    _ => ()
+            mut world, 
+            bodies_map
+        ) = data; 
+        self.colliding_start_events.clear();
+        self.colliding_end_events.clear();
+        for event in world.contact_events() {
+            match event {
+                &ncollide2d::events::ContactEvent::Started(
+                        collision_handle1,
+                        collision_handle2,
+                ) => {
+                    self.colliding_start_events.push((collision_handle1, collision_handle2))
+                }
+                &ncollide2d::events::ContactEvent::Stopped(
+                        collision_handle1, 
+                        collision_handle2,
+                ) => {
+                    self.colliding_end_events.push((collision_handle1, collision_handle2))
                 }
             }
         }
-        // dbg!(collisions);
-        for (entity1, entity2) in collisions.iter() {
-            match (projectiles.get(*entity1), asteroid_markers.get(*entity2)) {
-                (Some(projectile), Some(_)) => {
-                    if projectile.owner != *entity2 {
-                        entities.delete(*entity1).unwrap();
-                    }
-                }
-                _ => ()
-            }
-            match (projectiles.get(*entity2), asteroid_markers.get(*entity1)) {
-                (Some(projectile), Some(_)) => {
-                    if projectile.owner != *entity1 {
-                        entities.delete(*entity2).unwrap();
-                    }
-                }
-                _ => ()
-            }
-            let iso1 = isometries.get(*entity1).unwrap().0.translation.vector;
-            let iso2 = isometries.get(*entity2).unwrap().0.translation.vector;
-            let center = (iso1 + iso2) / 2f32;
-            if (iso1 - center).norm() < EPS {
-                continue
+        for (handle1, handle2) in self.colliding_start_events.iter() {
+            let (body_handle1, body_handle2) = {
+                // get body handles
+                let collider_world = world.collider_world_mut();
+                (
+                    collider_world
+                        .collider_mut(*handle1)
+                        .unwrap()
+                        .body(),
+                    collider_world
+                        .collider_mut(*handle2)
+                        .unwrap()
+                        .body(),
+                ) 
             };
-            let attack1 = 0.005 * (iso1 - center).normalize();
-            let attack2 = 0.005 * (iso2 - center).normalize();
-
-            match (projectiles.get(*entity1), ship_markers.get(*entity2),
-                   ship_markers.get(*entity1), projectiles.get(*entity2)) {
-                (Some(_), Some(_), _, _) |
-                (_, _, Some(_), Some(_)) => {
-
-                }
-                _ => ()
+            let mut entity1 = bodies_map[&body_handle1];
+            let mut entity2 = bodies_map[&body_handle2];
+            if asteroids.get(entity2).is_some() {
+                swap(&mut entity1, &mut entity2);
             }
-
-            // character_asteroid collision
-            match (ship_markers.get(*entity1), asteroid_markers.get(*entity2),
-                   asteroid_markers.get(*entity2), ship_markers.get(*entity1)) {
-                (Some(_), Some(_), _, _) | 
-                (_, _, Some(_), Some(_)) => {
-                    match velocities.get_mut(*entity1) {
-                        Some(velocity) => {
-                            *velocity = Velocity::new(attack1.x, attack1.y);
-                        }
-                        None => ()
-                    }
-                    match velocities.get_mut(*entity2) {
-                        Some(velocity) => {
-                            *velocity = Velocity::new(attack2.x, attack2.y);
-                        }
-                        None => ()
-                    }
+            if asteroids.get(entity1).is_some() {
+                if projectiles.get(entity2).is_some() {
+                    entities.delete(entity2).unwrap();
                 }
-                _ => ()
             }
         }
     }
