@@ -10,6 +10,7 @@ use sdl2::{TimerSubsystem, AudioSubsystem};
 
 pub struct PreloadedSounds {
     pub shot: Sound,
+    pub explosion: Sound,
 }
 
 pub fn init_sound(sdl: &sdl2::Sdl) -> Result<(Sounds, PreloadedSounds, AudioSubsystem, Sdl2MixerContext, TimerSubsystem), String> {
@@ -23,14 +24,19 @@ pub fn init_sound(sdl: &sdl2::Sdl) -> Result<(Sounds, PreloadedSounds, AudioSubs
     let mixer_context = sdl2::mixer::init(
         InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG
     )?;
-    sdl2::mixer::allocate_channels(10);
+    sdl2::mixer::allocate_channels(100);
     let sound_file_path = Path::new("assets/shot.wav");
+    let explosion_file_path = Path::new("assets/explosion.wav");
     let shot_sound_chunk = sdl2::mixer::Chunk::from_file(sound_file_path)
         .map_err(|e| format!("Cannot load sound file: {:?}", e))?;
     let mut sounds = Sounds::new_empty();
+    let explosion_sound_chunk = sdl2::mixer::Chunk::from_file(explosion_file_path)
+        .map_err(|e| format!("Cannot load sound file: {:?}", e))?;
     let shot = sounds.add_item("shot".to_string(), shot_sound_chunk);
+    let explosion = sounds.add_item("explosion".to_string(), explosion_sound_chunk);
     let preloaded_sounds = PreloadedSounds {
-        shot: shot
+        shot: shot,
+        explosion: explosion
     };
     sdl2::mixer::Channel::all().set_volume(12);
     Ok((

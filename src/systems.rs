@@ -662,6 +662,8 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, World<f32>>,
         Read<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
+        Write<'a, EventChannel<Sound>>,
+        ReadExpect<'a, PreloadedSounds>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -676,7 +678,9 @@ impl<'a> System<'a> for CollisionSystem {
             mut polygons,
             mut world,
             bodies_map,
-            mut insert_channel
+            mut insert_channel,
+            mut sounds_channel,
+            preloaded_sounds,
         ) = data; 
         self.colliding_start_events.clear();
         self.colliding_end_events.clear();
@@ -724,6 +728,7 @@ impl<'a> System<'a> for CollisionSystem {
                     let position = isometries.get(asteroid).unwrap().0.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
                     let new_polygons = polygon.deconstruct();
+                    sounds_channel.single_write(preloaded_sounds.explosion);
                     if new_polygons.len() == 1 {
 
                     } else {
