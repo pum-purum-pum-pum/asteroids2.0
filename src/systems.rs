@@ -30,16 +30,50 @@ const THRUST_FORCE: f32 = 0.01f32;
 const VELOCITY_MAX: f32 = 1f32;
 const MAX_TORQUE: f32 = 10f32;
 const LIGHT_RECTANGLE_SIZE: f32 = 20f32;
+const PLAYER_BULLET_SPEED: f32 = 0.5;
+const ENEMY_BULLET_SPEED: f32 = 0.3;
 
-const ASTEROIDS_NUMBER: usize = 10usize;
+const SCREEN_AREA: f32 = 10f32;
+const PLAYER_AREA: f32 = 15f32;
+const ACTIVE_AREA: f32 = 25f32;
+// we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
+
+const ASTEROIDS_NUMBER: usize = 50usize;
+
+pub enum EntityType {
+    Player,
+    Enemy,
+}
 
 pub enum InsertEvent {
     Asteroid {
-        pos: Point2,
+        iso: Point3,
         polygon: Polygon,
         light_shape: Geometry,
         spin: f32,
     },
+    Bullet {
+        kind: EntityType, 
+        iso: Point3,
+        velocity: Point2,
+        owner: specs::Entity,
+    },
+}
+
+pub fn spawn_position(char_pos: Point2) -> Point2 {
+    let mut rng = thread_rng();
+    loop {
+        let x = rng.gen_range(-ACTIVE_AREA, ACTIVE_AREA);
+        let y = rng.gen_range(-ACTIVE_AREA, ACTIVE_AREA);
+        if x.abs() >= PLAYER_AREA || y.abs() >= PLAYER_AREA {
+            return Point2::new(char_pos.x + x, char_pos.y + y)
+        }
+    }
+}
+
+pub fn is_active(character_position: Point2, point: Point2) -> bool {
+    (point.x - character_position.x).abs() < ACTIVE_AREA && 
+    (point.y - character_position.y).abs() < ACTIVE_AREA
 }
 
 fn iso2_iso3(iso2: &Isometry2) -> Isometry3{
@@ -71,7 +105,7 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
 
     let angle_diff = angle_shortest_dist(rotation, target_rot);
 
-    (angle_diff * 3.0 - speed * 55.0)
+    (angle_diff * 10.0 - speed * 55.0)
 }
 
 #[derive(Default)]
@@ -282,6 +316,7 @@ impl<'a> System<'a> for KinematicSystem {
         ReadStorage<'a, AttachPosition>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
+        ReadStorage<'a, ShipMarker>,
         Write<'a, World<f32>>,
     );
 
@@ -295,6 +330,7 @@ impl<'a> System<'a> for KinematicSystem {
             attach_positions,
             character_markers,
             _asteroids,
+            ship_markers,
             mut world,
         ) = data;
         for (physics_component) in (&physics).join() {
@@ -304,7 +340,7 @@ impl<'a> System<'a> for KinematicSystem {
             body.set_velocity(velocity);
             body.activate();
         }
-        for (isometry, velocity, physics_component, spin, _character) in (&mut isometries, &mut velocities, &physics, &spins, &character_markers).join() {
+        for (isometry, velocity, physics_component, spin, _ship) in (&mut isometries, &mut velocities, &physics, &spins, &ship_markers).join() {
             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
             body.set_angular_velocity(spin.0);
         }
@@ -352,6 +388,7 @@ impl<'a> System<'a> for ControlSystem {
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
+        Write<'a, EventChannel<InsertEvent>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -375,6 +412,7 @@ impl<'a> System<'a> for ControlSystem {
             preloaded_sounds,
             mut world,
             mut bodies_map,
+            mut insert_channel,
         ) = data;
         // TODO add dt in params
         let dt = 1f32 / 60f32;
@@ -403,47 +441,16 @@ impl<'a> System<'a> for ControlSystem {
                 let isometry = *isometries.get(character).unwrap();
                 let position = isometry.0.translation.vector;
                 let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                let velocity_rel = 0.5 * direction;
+                let velocity_rel = PLAYER_BULLET_SPEED * direction;
                 let char_velocity = velocities.get(character).unwrap();
                 let projectile_velocity = Velocity::new(char_velocity.0.x + velocity_rel.x, char_velocity.0.y + velocity_rel.y);
-                let size = 0.1;
                 sounds_channel.single_write(preloaded_sounds.shot);
-                let bullet = entities
-                    .build_entity()
-                    .with(projectile_velocity.clone(), &mut velocities)
-                    .with(isometry, &mut isometries)
-                    .with(preloaded_images.projectile, &mut images)
-                    .with(Spin::default(), &mut spins)
-                    .with(Projectile{owner: character}, &mut projectiles)
-                    .with(Geometry::Circle{radius: size}, &mut geometries)
-                    .with(Lifetime::new(100u8), &mut lifetimes)
-                    .with(Size(size), &mut sizes)
-                    .build();
-
-                let mut player_bullet_collision_groups = CollisionGroups::new();
-                player_bullet_collision_groups.set_membership(&[CollisionId::PlayerBullet as usize]);
-                player_bullet_collision_groups.set_whitelist(&[
-                    CollisionId::Asteroid as usize,
-                    CollisionId::EnemyShip as usize,]);
-                player_bullet_collision_groups.set_blacklist(&[CollisionId::PlayerShip as usize]);
-
-                let r = 1f32;
-                let ball = ncollide2d::shape::Ball::new(r);
-                let bullet_physics_component = PhysicsComponent::safe_insert(
-                    &mut physics,
-                    bullet,
-                    ShapeHandle::new(ball),
-                    Isometry2::new(Vector2::new(position.x, position.y), isometry.rotation()),
-                    BodyStatus::Dynamic,
-                    &mut world,
-                    &mut bodies_map,
-                    player_bullet_collision_groups,
-                    0.1f32
-                );
-                let body = world.rigid_body_mut(bullet_physics_component.body_handle).unwrap();
-                let mut velocity = *body.velocity();
-                *velocity.as_vector_mut() = Vector3::new(projectile_velocity.0.x, projectile_velocity.0.y, 0f32);
-                body.set_velocity(velocity);
+                insert_channel.single_write(InsertEvent::Bullet{
+                    kind: EntityType::Player, 
+                    iso: Point3::new(position.x, position.y, isometry.0.rotation.angle()),
+                    velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                    owner: character,
+                });
             }
         }
         if mouse_state.right {
@@ -484,6 +491,7 @@ impl<'a> System<'a> for InsertSystem {
         WriteStorage<'a, Image>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, Polygon>,
+        WriteStorage<'a, Projectile>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -505,6 +513,7 @@ impl<'a> System<'a> for InsertSystem {
             mut images,
             mut sizes,
             mut polygons,
+            mut  projectiles,
             mut stat,
             preloaded_images,
             mut world,
@@ -514,7 +523,7 @@ impl<'a> System<'a> for InsertSystem {
         for insert in insert_channel.read(&mut self.reader) {
             match insert {
                 InsertEvent::Asteroid {
-                    pos,
+                    iso,
                     polygon,
                     light_shape,
                     spin,
@@ -525,7 +534,7 @@ impl<'a> System<'a> for InsertSystem {
                     let mut asteroid = entities
                         .build_entity()
                         .with(*light_shape, &mut geometries)
-                        .with(Isometry::new(pos.x, pos.y, 0f32), &mut isometries)
+                        .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
                         .with(Velocity::new(0f32, 0f32), &mut velocities)
                         .with(polygon.clone(), &mut polygons)
                         .with(AsteroidMarker::default(), &mut asteroid_markers)
@@ -547,13 +556,67 @@ impl<'a> System<'a> for InsertSystem {
                         &mut physics,
                         asteroid,
                         ShapeHandle::new(physics_polygon),
-                        Isometry2::new(Vector2::new(pos.x, pos.y), 0f32),
+                        Isometry2::new(Vector2::new(iso.x, iso.y), 0f32),
                         BodyStatus::Dynamic,
                         &mut world,
                         &mut bodies_map,
                         asteroid_collision_groups,
                         10f32,
                     );
+                }
+                InsertEvent::Bullet {
+                    kind,
+                    iso,
+                    velocity,
+                    owner
+                } => {
+                    let bullet = entities
+                        .build_entity()
+                        .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
+                        .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
+                        .with(preloaded_images.projectile, &mut images)
+                        .with(Spin::default(), &mut spins)
+                        .with(Projectile{owner: *owner}, &mut projectiles)
+                        .with(Lifetime::new(100u8), &mut lifetimes)
+                        .with(Size(0.1), &mut sizes)
+                        .build();
+                    let player_bullet_collision_groups = match kind {
+                        EntityType::Player => {
+                            let mut player_bullet_collision_groups = CollisionGroups::new();
+                            player_bullet_collision_groups.set_membership(&[CollisionId::PlayerBullet as usize]);
+                            player_bullet_collision_groups.set_whitelist(&[
+                                CollisionId::Asteroid as usize,
+                                CollisionId::EnemyShip as usize,]);
+                            player_bullet_collision_groups.set_blacklist(&[CollisionId::PlayerShip as usize]);
+                            player_bullet_collision_groups
+                        }
+                        EntityType::Enemy => {
+                            let mut player_bullet_collision_groups = CollisionGroups::new();
+                            player_bullet_collision_groups.set_membership(&[CollisionId::EnemyBullet as usize]);
+                            player_bullet_collision_groups.set_whitelist(&[
+                                CollisionId::Asteroid as usize,
+                                CollisionId::PlayerShip as usize,]);
+                            player_bullet_collision_groups.set_blacklist(&[CollisionId::EnemyShip as usize]);
+                            player_bullet_collision_groups
+                        }
+                    };
+                    let r = 1f32;
+                    let ball = ncollide2d::shape::Ball::new(r);
+                    let bullet_physics_component = PhysicsComponent::safe_insert(
+                        &mut physics,
+                        bullet,
+                        ShapeHandle::new(ball),
+                        Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
+                        BodyStatus::Dynamic,
+                        &mut world,
+                        &mut bodies_map,
+                        player_bullet_collision_groups,
+                        0.1f32
+                    );
+                    let body = world.rigid_body_mut(bullet_physics_component.body_handle).unwrap();
+                    let mut velocity_tmp = *body.velocity();
+                    *velocity_tmp.as_vector_mut() = Vector3::new(velocity.x, velocity.y, 0f32);
+                    body.set_velocity(velocity_tmp);
                 }
             }
         }
@@ -574,6 +637,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteStorage<'a, Gun>,
         WriteStorage<'a, Lifetime>,
         WriteStorage<'a, AsteroidMarker>,
+        ReadStorage<'a, CharacterMarker>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, Polygon>,
@@ -595,6 +659,7 @@ impl<'a> System<'a> for GamePlaySystem {
             mut guns, 
             mut lifetimes,
             mut asteroid_markers,
+            character_markers,
             mut images,
             mut sizes,
             mut polygons,
@@ -604,6 +669,9 @@ impl<'a> System<'a> for GamePlaySystem {
             mut bodies_map,
             mut insert_channel,
         ) = data;
+        let (char_isometry, _char) = (&isometries, &character_markers).join().next().unwrap();
+        let pos3d = char_isometry.0.translation.vector;
+        let character_position = Point2::new(pos3d.x, pos3d.y);
         for gun in (&mut guns).join() {
             gun.update()
         }
@@ -615,9 +683,7 @@ impl<'a> System<'a> for GamePlaySystem {
         }
         let cnt = asteroid_markers.count();
         let add_cnt = if ASTEROIDS_NUMBER > cnt {ASTEROIDS_NUMBER - cnt} else {0}; 
-        for _ in 0..add_cnt {
-            stat.asteroids_number += 1;
-            
+        for _ in 0..add_cnt {            
             let mut rng = thread_rng();
             let size = rng.gen_range(0.4f32, 2f32);
             let r =  size;
@@ -627,14 +693,21 @@ impl<'a> System<'a> for GamePlaySystem {
             let poly = generate_convex_polygon(10, r);
             let spin = rng.gen_range(-1E-2, 1E-2);
             // let ball = ncollide2d::shape::Ball::new(r);
+            let spawn_pos = spawn_position(character_position);
             insert_channel.single_write(
                 InsertEvent::Asteroid {
-                    pos: Point2::new(rng.gen_range(-10f32, 10f32), rng.gen_range(-10f32, 10f32)),
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, char_isometry.0.rotation.angle()),
                     polygon: poly,
                     light_shape: asteroid_shape,
                     spin: spin,
                 }
             );
+        }
+        for (entity, isometry, _asteroid) in (&entities, &isometries, &asteroid_markers).join() {
+            let pos3d = isometry.0.translation.vector;
+            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y)) {
+                entities.delete(entity).unwrap();
+            }
         }
     }
 }
@@ -725,7 +798,8 @@ impl<'a> System<'a> for CollisionSystem {
                     let asteroid = entity1;
                     let projectile = entity2;
                     entities.delete(projectile).unwrap();
-                    let position = isometries.get(asteroid).unwrap().0.translation.vector;
+                    let isometry = isometries.get(asteroid).unwrap().0;
+                    let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
                     let new_polygons = polygon.deconstruct();
                     sounds_channel.single_write(preloaded_sounds.explosion);
@@ -739,7 +813,7 @@ impl<'a> System<'a> for CollisionSystem {
                             };
                             let mut rng = thread_rng();
                             let insert_event = InsertEvent::Asteroid {
-                                pos: Point2::new(position.x, position.y),
+                                iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
                                 polygon: poly.clone(),
                                 light_shape: asteroid_shape,
                                 spin: rng.gen_range(-1E-2, 1E-2),
@@ -761,22 +835,32 @@ pub struct AISystem;
 
 impl<'a> System<'a> for AISystem {
     type SystemData = (
+        Entities<'a>,
         WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
+        ReadStorage<'a, PhysicsComponent>,
         WriteStorage<'a, Spin>,
+        WriteStorage<'a, Gun>,
         WriteStorage<'a, EnemyMarker>,
         ReadStorage<'a, CharacterMarker>,
         Write<'a, Stat>,
+        Write<'a, World<f32>>,
+        Write<'a, EventChannel<InsertEvent>>
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
+            entities,
             isometries,
             mut velocities,
+            physics,
             mut spins,
+            mut guns,
             enemies,
             character_markers,
             _stat,
+            mut world,
+            mut insert_channel,
         ) = data;
         let _rng = thread_rng();
         let character_position = {
@@ -787,17 +871,21 @@ impl<'a> System<'a> for AISystem {
             res.unwrap()
         };
         let dt = 1.0/60.0;
-        for (iso, vel, spin, _enemy) in (&isometries, &mut velocities, &mut spins, &enemies).join() {
+        for (entity, iso, vel, physics_component, spin, gun, _enemy) in (&entities, &isometries, &mut velocities, &physics, &mut spins, &mut guns, &enemies).join() {
+            let isometry = iso.0;
+            let position = isometry.translation.vector;
             let ship_torque = dt
                 * calculate_player_ship_spin_for_aim(
                     Vector2::new(character_position.x, character_position.y)
-                        - Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                        - Vector2::new(position.x, position.y),
                     iso.rotation(),
                     spin.0,
                 );
             spin.0 += ship_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
             let speed = 0.1f32;
-            let diff = character_position - iso.0.translation.vector;
+            let diff = character_position - position;
+            let velocity_rel = ENEMY_BULLET_SPEED * diff.normalize();
+            let projectile_velocity = Velocity::new(vel.0.x + velocity_rel.x, vel.0.y + velocity_rel.y);
             if diff.norm() > 4f32 {
                 let dir = speed * (diff).normalize();
                 *vel = Velocity::new(dir.x, dir.y);
@@ -805,6 +893,19 @@ impl<'a> System<'a> for AISystem {
                 let vel_vec = DAMPING_FACTOR * vel.0;
                 *vel = Velocity::new(vel_vec.x, vel_vec.y);
             }
+            let mut body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+            let mut velocity = *body.velocity();
+            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+            body.set_velocity(velocity);
+            if gun.shoot() {
+                insert_channel.single_write(InsertEvent::Bullet{
+                    kind: EntityType::Enemy, 
+                    iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
+                    velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                    owner: entity,
+                });
+            }
+
         }
     }
 }

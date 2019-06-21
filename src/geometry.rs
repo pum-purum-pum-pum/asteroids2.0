@@ -96,7 +96,7 @@ pub struct Polygon {
 }
 
 impl Polygon {
-    pub fn new(mut points: Vec<Point2>) -> Self {
+    pub fn new(points: Vec<Point2>) -> Self {
         let w = 1.0 / (points.len() as f32);
         let mut center = Point2::new(0f32, 0f32);
         for p in points.iter() {
