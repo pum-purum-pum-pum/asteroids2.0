@@ -107,10 +107,6 @@ impl Polygon {
         for p in points.iter() {
             min_r = min_r.min((p - center).norm())
         }
-        for p in points.iter_mut() {
-            p.x -= center.x;
-            p.y -= center.y;
-        }
         Polygon {
             points: points,
             mass_center: Point2::new(0f32, 0f32),

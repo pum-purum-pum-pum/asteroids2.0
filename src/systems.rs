@@ -438,7 +438,7 @@ impl<'a> System<'a> for ControlSystem {
                     &mut world,
                     &mut bodies_map,
                     player_bullet_collision_groups,
-                    0.4f32
+                    0.1f32
                 );
                 let body = world.rigid_body_mut(bullet_physics_component.body_handle).unwrap();
                 let mut velocity = *body.velocity();
