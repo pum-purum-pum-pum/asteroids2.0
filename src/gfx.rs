@@ -91,11 +91,9 @@ impl Effect {
             let depth = 1f32;
             let z = rng.gen_range(-depth, depth);
             quad_positions.push(WorldVertex{ world_position: [x, y, z] });
-            let d = Bernoulli::new(0.5);
-            let s1 = d.sample(&mut rand::thread_rng()) as u8 as f32 * 2.0 - 1.0;
-            let s2 = d.sample(&mut rand::thread_rng()) as u8 as f32 * 2.0 - 1.0;
-            let vel_x = 0.3 * s1 * rng.gen_range(0.1, 0.3);
-            let vel_y = 0.3 * s2 * rng.gen_range(0.1, 0.3);
+            let angle = rng.gen_range(0f32, 2.0 * std::f32::consts::PI);
+            let vel_x = rng.gen_range(0.05, 0.2) * f32::cos(angle);
+            let vel_y = rng.gen_range(0.05, 0.2) * f32::sin(angle);
             velocities.push(Vector2::new(vel_x, vel_y));
         }
         let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
