@@ -486,7 +486,7 @@ impl<'a> System<'a> for ControlSystem {
                 sounds_channel.single_write(preloaded_sounds.shot);
                 insert_channel.single_write(InsertEvent::Bullet{
                     kind: EntityType::Player, 
-                    iso: Point3::new(position.x, position.y, isometry.0.rotation.angle()),
+                    iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                     owner: character,
                 });
@@ -719,8 +719,8 @@ impl<'a> System<'a> for InsertSystem {
                         ParticlesData::Effect(Effect::new(
                             &display,
                             *position,
-                            100,
-                            Some(100),
+                            *num,
+                            Some(*lifetime),
                         ))
                     );
                     let explosion_particles_entity = entities.build_entity()
@@ -807,7 +807,7 @@ impl<'a> System<'a> for GamePlaySystem {
             let spawn_pos = spawn_position(character_position);
             insert_channel.single_write(
                 InsertEvent::Asteroid {
-                    iso: Point3::new(spawn_pos.x, spawn_pos.y, char_isometry.0.rotation.angle()),
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, char_isometry.0.rotation.euler_angles().2),
                     polygon: poly,
                     light_shape: asteroid_shape,
                     spin: spin,
@@ -932,8 +932,8 @@ impl<'a> System<'a> for CollisionSystem {
                     let new_polygons = polygon.deconstruct();
                     let effect = InsertEvent::Effect {
                         position: Point2::new(position.x, position.y),
-                        num: 100usize,
-                        lifetime: 50usize
+                        num: 6usize,
+                        lifetime: 20usize
                     };
                     insert_channel.single_write(effect);
                     sounds_channel.single_write(preloaded_sounds.explosion);
@@ -965,10 +965,17 @@ impl<'a> System<'a> for CollisionSystem {
             if ships.get(entity1).is_some() && projectiles.get(entity2).is_some(){
                 let ship = entity1;
                 let projectile = entity2;
+                let isometry = isometries.get(ship).unwrap().0;
+                let position = isometry.translation.vector;
                 if character_markers.get(ship).is_some() {
-
                 } else {
                     entities.delete(ship).unwrap();
+                    let effect = InsertEvent::Effect {
+                        position: Point2::new(position.x, position.y),
+                        num: 20usize,
+                        lifetime: 50usize
+                    };
+                    insert_channel.single_write(effect);
                 }
             }
         }
@@ -1046,7 +1053,7 @@ impl<'a> System<'a> for AISystem {
             if gun.shoot() {
                 insert_channel.single_write(InsertEvent::Bullet{
                     kind: EntityType::Enemy, 
-                    iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
+                    iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                     owner: entity,
                 });
