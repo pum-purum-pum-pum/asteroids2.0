@@ -3,7 +3,6 @@ use astro_lib as al;
 use std::fs::File;
 use std::io::{BufReader, Error as IOError};
 use rand::prelude::*;
-use rand::distributions::Bernoulli;
 
 use glium;
 use glium::draw_parameters::Blend;
@@ -20,7 +19,7 @@ const Z_CANVAS: f32 = 0f32;
 const Z_FAR: f32 = 10f32;
 const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
-pub const BACKGROUND_SIZE: f32 = 20f32;
+pub const _BACKGROUND_SIZE: f32 = 20f32;
 
 
 pub enum ParticlesData {
@@ -29,7 +28,7 @@ pub enum ParticlesData {
 }
 
 impl ParticlesData {
-    pub fn get_instancing_data(&self) -> &InstancingData {
+    pub fn _gfx(&self) -> &InstancingData {
         match self {
             ParticlesData::MovementParticles(particles) => {
                 &particles.gfx

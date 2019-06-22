@@ -40,7 +40,7 @@ fn geom() {
 fn sound() -> Result<(), String> {
     let sdl = sdl2::init()?;
     let _audio = sdl.audio()?;
-    let timer = sdl.timer()?;
+    let _timer = sdl.timer()?;
     let frequency = 44_100;
     let format = AUDIO_S16LSB; // signed 16 bit samples, in little-endian byte order
     let channels = DEFAULT_CHANNELS; // Stereo

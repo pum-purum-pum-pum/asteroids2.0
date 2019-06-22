@@ -8,7 +8,7 @@ use sdl2::mixer::Chunk;
 pub use crate::physics::{PhysicsComponent, BodiesMap};
 pub use crate::geometry::Polygon;
 
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData, ParticlesData, MovementParticles};
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;

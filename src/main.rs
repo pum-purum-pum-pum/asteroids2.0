@@ -22,7 +22,7 @@ use astro_lib::prelude::*;
 
 use components::*;
 use sound::{init_sound};
-use gfx::{Canvas, ImageData, MovementParticles, Effect, ParticlesData};
+use gfx::{Canvas, ImageData, MovementParticles, ParticlesData};
 use gfx_backend::DisplayBuild;
 use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
               GamePlaySystem, CollisionSystem, AISystem, SoundSystem,
@@ -78,8 +78,6 @@ pub fn main() -> Result<(), String> {
     let background_image = images.add_item("back".to_string(), background_image_data);
     let character_image_data = ImageData::new(&display, "player").unwrap();
     let character_image = images.add_item("player".to_string(), character_image_data);
-    let enemy_image_data = ImageData::new(&display, "enemy").unwrap();
-    let enemy_image = images.add_item("enemy".to_string(), enemy_image_data);
     let asteroid_image_data = ImageData::new(&display, "asteroid").unwrap();
     let asteroid_image = images.add_item("asteroid".to_string(), asteroid_image_data);
     let light_image_data = ImageData::new(&display, "light").unwrap();
@@ -122,7 +120,7 @@ pub fn main() -> Result<(), String> {
         radius: char_size,
     };
     let enemy_size = 0.7f32;
-    let enemy_shape = Geometry::Circle{
+    let _enemy_shape = Geometry::Circle{
         radius: enemy_size,
     };
     let character = specs_world

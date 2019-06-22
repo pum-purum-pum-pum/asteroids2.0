@@ -3,7 +3,7 @@ use al::prelude::*;
 use nphysics2d::world::World;
 use nphysics2d::object::{BodyHandle, ColliderHandle, BodyStatus, RigidBodyDesc, ColliderDesc};
 use nphysics2d::volumetric::volumetric::Volumetric;
-use ncollide2d::shape::{Shape, ShapeHandle};
+use ncollide2d::shape::{ShapeHandle};
 use ncollide2d::world::CollisionGroups;
 use derive_deref::{Deref, DerefMut};
 use specs::Component;
@@ -74,7 +74,7 @@ impl PhysicsComponent {
             collision_groups: CollisionGroups,
             inertia: f32
     ) -> Self {
-        let mut inertia = shape.inertia(inertia);
+        let inertia = shape.inertia(inertia);
         let center_of_mass = shape.center_of_mass();
         let (body_handle, body_part_handle) = {
             let rigid_body = RigidBodyDesc::new()
