@@ -1,8 +1,8 @@
 use al::prelude::*;
 use astro_lib as al;
+use rand::prelude::*;
 use std::fs::File;
 use std::io::{BufReader, Error as IOError};
-use rand::prelude::*;
 
 use glium;
 use glium::draw_parameters::Blend;
@@ -21,21 +21,16 @@ const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
 
-
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
-    Effect(Effect)
+    Effect(Effect),
 }
 
 impl ParticlesData {
     pub fn _gfx(&self) -> &InstancingData {
         match self {
-            ParticlesData::MovementParticles(particles) => {
-                &particles.gfx
-            }
-            ParticlesData::Effect(particles) => {
-                &particles.gfx
-            }
+            ParticlesData::MovementParticles(particles) => &particles.gfx,
+            ParticlesData::Effect(particles) => &particles.gfx,
         }
     }
 }
@@ -49,17 +44,17 @@ pub struct InstancingData {
 /// white star like particles
 pub struct MovementParticles {
     pub gfx: InstancingData,
-    pub x_min: f32, 
-    pub y_min: f32, 
-    pub x_max:f32, 
-    pub y_max:f32,
+    pub x_min: f32,
+    pub y_min: f32,
+    pub x_max: f32,
+    pub y_max: f32,
 }
 
 pub struct Effect {
     pub gfx: InstancingData,
     pub velocities: Vec<Vector2>,
     pub lifetime: Option<usize>,
-    time: usize
+    time: usize,
 }
 
 impl Effect {
@@ -70,17 +65,23 @@ impl Effect {
         lifetime: Option<usize>,
     ) -> Self {
         let scale = 0.07f32;
-        let positions = vec![[-scale, -scale], [-scale, scale], [scale, scale], [scale, -scale]];
+        let positions = vec![
+            [-scale, -scale],
+            [-scale, scale],
+            [scale, scale],
+            [scale, -scale],
+        ];
         let shape: Vec<GeometryVertex> = positions
             .into_iter()
-            .map(|pos| GeometryVertex{ position: pos})
+            .map(|pos| GeometryVertex { position: pos })
             .collect();
         let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
         let indices = glium::IndexBuffer::new(
             display,
             PrimitiveType::TrianglesList,
             &[0u16, 1, 2, 2, 3, 0],
-        ).unwrap();
+        )
+        .unwrap();
         let mut rng = thread_rng();
         let mut quad_positions = vec![];
         let mut velocities = vec![];
@@ -89,7 +90,9 @@ impl Effect {
             let y = position.y;
             let depth = 1f32;
             let z = rng.gen_range(-depth, depth);
-            quad_positions.push(WorldVertex{ world_position: [x, y, z] });
+            quad_positions.push(WorldVertex {
+                world_position: [x, y, z],
+            });
             let angle = rng.gen_range(0f32, 2.0 * std::f32::consts::PI);
             let vel_x = rng.gen_range(0.05, 0.2) * f32::cos(angle);
             let vel_y = rng.gen_range(0.05, 0.2) * f32::sin(angle);
@@ -104,13 +107,19 @@ impl Effect {
             },
             velocities: velocities,
             lifetime: lifetime,
-            time: 0
+            time: 0,
         }
     }
 
     pub fn update(&mut self) -> bool {
         self.time += 1;
-        for (particle, vel) in self.gfx.per_instance.map().iter_mut().zip(self.velocities.iter()) {
+        for (particle, vel) in self
+            .gfx
+            .per_instance
+            .map()
+            .iter_mut()
+            .zip(self.velocities.iter())
+        {
             particle.world_position[0] += vel.x;
             particle.world_position[1] += vel.y;
         }
@@ -124,24 +133,30 @@ impl Effect {
 impl MovementParticles {
     pub fn new_quad(
         display: &SDL2Facade,
-        x_min: f32, 
-        y_min: f32, 
-        x_max:f32, 
-        y_max:f32,
+        x_min: f32,
+        y_min: f32,
+        x_max: f32,
+        y_max: f32,
         num: usize,
     ) -> Self {
         let scale = 0.03f32;
-        let positions = vec![[-scale, -scale], [-scale, scale], [scale, scale], [scale, -scale]];
+        let positions = vec![
+            [-scale, -scale],
+            [-scale, scale],
+            [scale, scale],
+            [scale, -scale],
+        ];
         let shape: Vec<GeometryVertex> = positions
             .into_iter()
-            .map(|pos| GeometryVertex{ position: pos})
+            .map(|pos| GeometryVertex { position: pos })
             .collect();
         let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
         let indices = glium::IndexBuffer::new(
             display,
             PrimitiveType::TrianglesList,
             &[0u16, 1, 2, 2, 3, 0],
-        ).unwrap();
+        )
+        .unwrap();
         let mut rng = thread_rng();
         let mut quad_positions = vec![];
         for _ in 0..num {
@@ -149,7 +164,9 @@ impl MovementParticles {
             let y = rng.gen_range(y_min, y_max);
             let depth = 10f32;
             let z = rng.gen_range(-depth, depth);
-            quad_positions.push(WorldVertex{ world_position: [x, y, z] });
+            quad_positions.push(WorldVertex {
+                world_position: [x, y, z],
+            });
         }
         let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
         MovementParticles {
@@ -158,7 +175,10 @@ impl MovementParticles {
                 indices: indices,
                 per_instance: per_instance,
             },
-            x_min, y_min, x_max, y_max,
+            x_min,
+            y_min,
+            x_max,
+            y_max,
         }
     }
 
@@ -166,15 +186,17 @@ impl MovementParticles {
         for particle in self.gfx.per_instance.map().iter_mut() {
             particle.world_position[0] += vel.x;
             particle.world_position[1] += vel.y;
-            let cut_low = |x, min, max| if x < min {max - min + x} else {x};
-            let cut_hight = |x, min, max| if x > max {min + x - max} else {x};
+            let cut_low = |x, min, max| if x < min { max - min + x } else { x };
+            let cut_hight = |x, min, max| if x > max { min + x - max } else { x };
             particle.world_position[0] = cut_low(
-                cut_hight(particle.world_position[0], self.x_min, self.x_max), 
-                self.x_min, self.x_max
+                cut_hight(particle.world_position[0], self.x_min, self.x_max),
+                self.x_min,
+                self.x_max,
             );
             particle.world_position[1] = cut_low(
-                cut_hight(particle.world_position[1], self.y_min, self.y_max), 
-                self.y_min, self.y_max
+                cut_hight(particle.world_position[1], self.y_min, self.y_max),
+                self.y_min,
+                self.y_max,
             );
         }
     }
@@ -272,10 +294,7 @@ pub struct ImageData {
 impl ImageData {
     /// panic if failed to create buffers. TODO Result
     /// image_name - is name of the image to load in assets directory
-    pub fn new(
-        display: &SDL2Facade,
-        image_name: &str,
-    ) -> Result<Self, LoadTextureError> {
+    pub fn new(display: &SDL2Facade, image_name: &str) -> Result<Self, LoadTextureError> {
         let positions = vec![[-1f32, -1f32], [-1f32, 1f32], [1f32, 1f32], [1f32, -1f32]];
         let textures = vec![[0f32, 0f32], [0f32, 1f32], [1f32, 1f32], [1f32, 0f32]];
         let shape: Vec<Vertex> = positions
@@ -408,9 +427,13 @@ impl Canvas {
             None,
         )
         .unwrap();
-        let program_instancing =
-            glium::Program::from_source(display, vertex_shader_instancing, fragment_shader_instancing, None)
-                .unwrap();
+        let program_instancing = glium::Program::from_source(
+            display,
+            vertex_shader_instancing,
+            fragment_shader_instancing,
+            None,
+        )
+        .unwrap();
         Canvas {
             program: program,
             program_light: program_light,
@@ -426,7 +449,8 @@ impl Canvas {
     pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32) {
         self.observer.x = pos.x;
         self.observer.y = pos.y;
-        self.observer.z = (1.0 - SPEED_EMA) * self.observer.z + SPEED_EMA * (Z_FAR + MAX_ADD_SPEED_Z * speed_ratio);
+        self.observer.z = (1.0 - SPEED_EMA) * self.observer.z
+            + SPEED_EMA * (Z_FAR + MAX_ADD_SPEED_Z * speed_ratio);
     }
 
     pub fn get_z_shift(&self) -> f32 {
@@ -513,10 +537,10 @@ impl Canvas {
                 ..Default::default()
             }
         } else {
-             glium::DrawParameters {
+            glium::DrawParameters {
                 blend: Blend::alpha_blending(),
                 ..Default::default()
-             }
+            }
         };
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
@@ -551,7 +575,10 @@ impl Canvas {
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
-            (&instancing_data.vertex_buffer, instancing_data.per_instance.per_instance().unwrap()),
+            (
+                &instancing_data.vertex_buffer,
+                instancing_data.per_instance.per_instance().unwrap(),
+            ),
             &instancing_data.indices,
             &self.program_instancing,
             &uniform! {

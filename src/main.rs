@@ -1,33 +1,33 @@
+use ncollide2d::shape::ShapeHandle;
+use ncollide2d::world::CollisionGroups;
+use nphysics2d::object::BodyStatus;
+use nphysics2d::world::World;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
-use nphysics2d::object::{BodyStatus};
-use nphysics2d::world::{World};
-use ncollide2d::shape::ShapeHandle;
-use ncollide2d::world::CollisionGroups;
 
 mod components;
 mod geometry;
 mod gfx;
-mod sound;
 mod gfx_backend;
+mod physics;
+mod sound;
 mod systems;
 #[cfg(test)]
 mod test;
-mod physics;
 use astro_lib::prelude::*;
 
-
 use components::*;
-use sound::{init_sound};
 use gfx::{Canvas, ImageData, MovementParticles, ParticlesData};
 use gfx_backend::DisplayBuild;
-use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
-              GamePlaySystem, CollisionSystem, AISystem, SoundSystem,
-              PhysicsSystem, InsertSystem, InsertEvent};
-use physics::{PHYSICS_SIMULATION_TIME, safe_maintain, CollisionId};
+use physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
+use sound::init_sound;
+use systems::{
+    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertEvent, InsertSystem,
+    KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem,
+};
 
 pub fn main() -> Result<(), String> {
     let mut phys_world: World<f32> = World::new();
@@ -87,18 +87,15 @@ pub fn main() -> Result<(), String> {
     let enemy_image_data = ImageData::new(&display, "enemy").unwrap();
     let enemy_image = images.add_item("enemy".to_string(), enemy_image_data);
 
-    let preloaded_images = PreloadedImages{
+    let preloaded_images = PreloadedImages {
         projectile: projectile_image,
         asteroid: asteroid_image,
         enemy: enemy_image,
-        background: background_image
+        background: background_image,
     };
-    let movement_particles = ThreadPin::new(
-        ParticlesData::MovementParticles(MovementParticles::new_quad(
-                &display, -size, -size, size, size, 100
-            )
-        )
-    );
+    let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
+        MovementParticles::new_quad(&display, -size, -size, size, size, 100),
+    ));
     // let explosion_particles = ThreadPin::new(
     //     ParticlesData::Effect(Effect::new(
     //         &display,
@@ -109,20 +106,14 @@ pub fn main() -> Result<(), String> {
     // let explosion_particles_entity = specs_world.create_entity()
     //     .with(explosion_particles)
     //     .build();
-    let movement_particles_entity = specs_world.create_entity()
-        .with(movement_particles)
-        .build();
+    let movement_particles_entity = specs_world.create_entity().with(movement_particles).build();
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
     };
     let char_size = 0.7f32;
-    let character_shape = Geometry::Circle{
-        radius: char_size,
-    };
+    let character_shape = Geometry::Circle { radius: char_size };
     let enemy_size = 0.7f32;
-    let _enemy_shape = Geometry::Circle{
-        radius: enemy_size,
-    };
+    let _enemy_shape = Geometry::Circle { radius: enemy_size };
     let character = specs_world
         .create_entity()
         .with(Isometry::new(0f32, 0f32, 0f32))
@@ -143,9 +134,10 @@ pub fn main() -> Result<(), String> {
     character_collision_groups.set_whitelist(&[
         CollisionId::Asteroid as usize,
         CollisionId::EnemyBullet as usize,
-        CollisionId::EnemyShip as usize,]);
+        CollisionId::EnemyShip as usize,
+    ]);
     character_collision_groups.set_blacklist(&[CollisionId::PlayerBullet as usize]);
-    
+
     PhysicsComponent::safe_insert(
         &mut specs_world.write_storage(),
         character,
@@ -155,7 +147,7 @@ pub fn main() -> Result<(), String> {
         &mut specs_world.write_resource(),
         &mut specs_world.write_resource(),
         character_collision_groups,
-        0.5f32
+        0.5f32,
     );
     {
         let _light = specs_world
@@ -189,7 +181,16 @@ pub fn main() -> Result<(), String> {
         .with(gameplay_sytem, "gameplay_system", &[])
         .with(ai_system, "ai_system", &[])
         .with(collision_system, "collision_system", &["ai_system"])
-        .with(phyiscs_system, "physics_system", &["kinematic_system", "control_system", "gameplay_system", "collision_system"])
+        .with(
+            phyiscs_system,
+            "physics_system",
+            &[
+                "kinematic_system",
+                "control_system",
+                "gameplay_system",
+                "collision_system",
+            ],
+        )
         .with_thread_local(insert_system)
         .with_thread_local(rendering_system)
         .with_thread_local(sound_system)

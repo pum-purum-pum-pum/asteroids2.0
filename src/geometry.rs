@@ -1,10 +1,10 @@
+use crate::components::Geometry;
 use al::prelude::*;
 use astro_lib as al;
-use crate::components::Geometry;
+use ncollide2d::transformation::convex_hull_idx;
+use rand::prelude::*;
 use specs::prelude::*;
 use specs_derive::Component;
-use rand::prelude::*;
-use ncollide2d::transformation::convex_hull_idx;
 
 pub const EPS: f32 = 1E-3;
 
@@ -62,10 +62,10 @@ pub struct Triangulation {
 
 pub trait TriangulateFromCenter {
     fn points(&self) -> &[Point2];
-    
+
     fn center(&self) -> Point2;
 
-    fn triangulate(& self) -> Triangulation {
+    fn triangulate(&self) -> Triangulation {
         let mut points = vec![];
         points.push(self.center());
         for i in 0..self.points().len() {
@@ -82,8 +82,8 @@ pub trait TriangulateFromCenter {
             indicies.push(si);
         }
         Triangulation {
-            points: points, 
-            indicies: indicies
+            points: points,
+            indicies: indicies,
         }
     }
 }
@@ -102,7 +102,7 @@ impl Polygon {
         for p in points.iter() {
             center.x += w * p.x;
             center.y += w * p.y;
-        };
+        }
         let mut min_r = 10f32;
         for p in points.iter() {
             min_r = min_r.min((p - center).norm())
@@ -110,14 +110,14 @@ impl Polygon {
         Polygon {
             points: points,
             mass_center: Point2::new(0f32, 0f32),
-            min_r
+            min_r,
         }
     }
 
     pub fn deconstruct(&self) -> Vec<Polygon> {
         let mut res = vec![];
         if self.points.len() == 3 {
-            return vec![self.clone()]
+            return vec![self.clone()];
         }
         // dummy destruct for now
         let triangulation = self.triangulate();
@@ -125,17 +125,13 @@ impl Polygon {
         let indicies = triangulation.indicies;
         let mut i = 0usize;
         while i < indicies.len() {
-            res.push(
-                Polygon::new( 
-                    vec![
-                        points[indicies[i] as usize], 
-                        points[indicies[i + 1] as usize], 
-                        points[indicies[i + 2] as usize]
-                    ]
-                )
-            );
+            res.push(Polygon::new(vec![
+                points[indicies[i] as usize],
+                points[indicies[i + 1] as usize],
+                points[indicies[i + 2] as usize],
+            ]));
             i += 3;
-        };
+        }
         res
     }
 }
@@ -148,7 +144,6 @@ impl TriangulateFromCenter for Polygon {
     fn center(&self) -> Point2 {
         self.mass_center
     }
-
 }
 
 /// Polygon for light rendering(just render light on this rctngl)
@@ -157,9 +152,9 @@ impl TriangulateFromCenter for Polygon {
 #[derive(Debug)]
 pub struct LightningPolygon {
     pub points: Vec<Point2>,
-    x_min: f32, 
-    y_min: f32, 
-    x_max: f32, 
+    x_min: f32,
+    y_min: f32,
+    x_max: f32,
     y_max: f32,
     pub center: Point2, // position of the light
 }
@@ -184,7 +179,10 @@ impl LightningPolygon {
                 Point2::new(x_max, y_max),
                 Point2::new(x_max, y_min),
             ],
-            x_min, y_min, x_max, y_max,
+            x_min,
+            y_min,
+            x_max,
+            y_max,
             center: center,
         }
     }

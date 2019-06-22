@@ -1,11 +1,11 @@
-use astro_lib as al;
 use al::prelude::*;
-use nphysics2d::world::World;
-use nphysics2d::object::{BodyHandle, ColliderHandle, BodyStatus, RigidBodyDesc, ColliderDesc};
-use nphysics2d::volumetric::volumetric::Volumetric;
-use ncollide2d::shape::{ShapeHandle};
-use ncollide2d::world::CollisionGroups;
+use astro_lib as al;
 use derive_deref::{Deref, DerefMut};
+use ncollide2d::shape::ShapeHandle;
+use ncollide2d::world::CollisionGroups;
+use nphysics2d::object::{BodyHandle, BodyStatus, ColliderDesc, ColliderHandle, RigidBodyDesc};
+use nphysics2d::volumetric::volumetric::Volumetric;
+use nphysics2d::world::World;
 use specs::Component;
 
 pub const PHYSICS_SIMULATION_TIME: f32 = 1.0;
@@ -64,15 +64,15 @@ impl PhysicsComponent {
         }
     }
     pub fn safe_insert<'a>(
-            storage: &mut specs::WriteStorage<'a, PhysicsComponent>,
-            entity: specs::Entity,
-            shape: ShapeHandle<f32>,
-            default_position: Isometry2,
-            body_status: BodyStatus,
-            physics_world: &mut World<f32>,
-            bodies_map: &mut BodiesMap,
-            collision_groups: CollisionGroups,
-            inertia: f32
+        storage: &mut specs::WriteStorage<'a, PhysicsComponent>,
+        entity: specs::Entity,
+        shape: ShapeHandle<f32>,
+        default_position: Isometry2,
+        body_status: BodyStatus,
+        physics_world: &mut World<f32>,
+        bodies_map: &mut BodiesMap,
+        collision_groups: CollisionGroups,
+        inertia: f32,
     ) -> Self {
         let inertia = shape.inertia(inertia);
         let center_of_mass = shape.center_of_mass();
@@ -86,7 +86,7 @@ impl PhysicsComponent {
             (rigid_body.handle(), rigid_body.part_handle())
         };
 
-        let collider_desc =  ColliderDesc::new(shape);
+        let collider_desc = ColliderDesc::new(shape);
         let collider_handle = collider_desc
             .build_with_parent(body_part_handle, physics_world)
             .unwrap()
@@ -94,10 +94,7 @@ impl PhysicsComponent {
         let collision_world = physics_world.collider_world_mut();
         collision_world.set_collision_groups(collider_handle, collision_groups);
         let component = PhysicsComponent::new(body_handle, collider_handle);
-        storage.insert(
-            entity,
-            component.clone(),
-        ).unwrap(); // TODO RESULT
+        storage.insert(entity, component.clone()).unwrap(); // TODO RESULT
         bodies_map.insert(body_handle, entity);
         component
     }

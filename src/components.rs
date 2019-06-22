@@ -1,20 +1,18 @@
-use std::ops::{AddAssign};
+use std::ops::AddAssign;
 
+pub use crate::geometry::Polygon;
+pub use crate::physics::{BodiesMap, PhysicsComponent};
+use al::prelude::*;
+use astro_lib as al;
+use sdl2::mixer::Chunk;
 use specs::prelude::*;
 use specs_derive::Component;
-use astro_lib as al;
-use al::prelude::*;
-use sdl2::mixer::Chunk;
-pub use crate::physics::{PhysicsComponent, BodiesMap};
-pub use crate::geometry::Polygon;
 
 use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
-
-
 
 #[derive(Default, Debug)]
 pub struct Stat {
@@ -23,7 +21,7 @@ pub struct Stat {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub enum Geometry {
-    Circle { radius: f32  },
+    Circle { radius: f32 },
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -61,7 +59,6 @@ impl Id for Sound {
     }
 }
 
-
 impl Id for Particles {
     fn new(id: usize) -> Self {
         Particles(id)
@@ -72,7 +69,6 @@ impl Id for Particles {
     }
 }
 
-
 pub type Images = Collector<ImageData, Image>;
 pub type Sounds = Collector<Chunk, Sound>;
 
@@ -82,7 +78,7 @@ pub struct PreloadedImages {
     pub projectile: Image,
     pub asteroid: Image,
     pub enemy: Image,
-    pub background: Image
+    pub background: Image,
 }
 
 pub struct PreloadedParticles {
@@ -156,7 +152,7 @@ impl Lifetime {
     pub fn new(live_time: u8) -> Self {
         Lifetime {
             life_state: 0u8,
-            life_time: live_time
+            life_time: live_time,
         }
     }
 
@@ -198,7 +194,9 @@ impl Gun {
 
     pub fn shoot(&mut self) -> bool {
         let result = self.is_ready();
-        if result {self.recharge_state = 0u8};
+        if result {
+            self.recharge_state = 0u8
+        };
         result
     }
 }
@@ -240,7 +238,6 @@ impl AddAssign<&Velocity> for &mut Isometry {
 
 #[derive(Copy, Clone, Component, Debug)]
 pub struct Velocity(pub Vector2);
-
 
 impl AddAssign<Velocity> for &mut Velocity {
     fn add_assign(&mut self, other: Velocity) {

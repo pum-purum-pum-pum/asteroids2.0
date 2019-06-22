@@ -1,12 +1,11 @@
-use crate::nalgebra::Rotation2;
-use crate::geometry::*;
 use crate::components::*;
+use crate::geometry::*;
+use crate::nalgebra::Rotation2;
+use al::prelude::sdl2;
 use al::prelude::*;
 use astro_lib as al;
-use al::prelude::sdl2;
+use sdl2::mixer::{InitFlag, AUDIO_S16LSB, DEFAULT_CHANNELS};
 use std::path::Path;
-use sdl2::mixer::{InitFlag, DEFAULT_CHANNELS, AUDIO_S16LSB};
-
 
 #[test]
 fn rotation() {
@@ -17,23 +16,13 @@ fn rotation() {
 
 #[test]
 fn geom() {
-    let mut poly = LightningPolygon::new_rectangle(-10f32, -10f32, 10f32, 10f32, Point2::new(3f32, 0f32));
-    poly.clip_one(
-        Geometry::Circle {
-            radius: 1f32,
-        },
-        Point2::new(8.5f32, 0f32)
-    );
+    let mut poly =
+        LightningPolygon::new_rectangle(-10f32, -10f32, 10f32, 10f32, Point2::new(3f32, 0f32));
+    poly.clip_one(Geometry::Circle { radius: 1f32 }, Point2::new(8.5f32, 0f32));
     dbg!(&poly.points);
     dbg!(poly.points.len());
-    poly.clip_one(
-        Geometry::Circle {
-            radius: 1f32,
-        },
-        Point2::new(9.5f32, 0f32)
-    );
+    poly.clip_one(Geometry::Circle { radius: 1f32 }, Point2::new(9.5f32, 0f32));
     dbg!(poly.points.len());
-
 }
 
 #[test]
@@ -46,9 +35,8 @@ fn sound() -> Result<(), String> {
     let channels = DEFAULT_CHANNELS; // Stereo
     let chunk_size = 1_024;
     sdl2::mixer::open_audio(frequency, format, channels, chunk_size)?;
-    let _mixer_context = sdl2::mixer::init(
-        InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG
-    )?;
+    let _mixer_context =
+        sdl2::mixer::init(InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG)?;
     sdl2::mixer::allocate_channels(4);
     println!("query spec => {:?}", sdl2::mixer::query_spec());
     let sound_file_path = Path::new("assets/shot.wav");
