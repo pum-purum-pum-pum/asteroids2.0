@@ -22,7 +22,7 @@ use astro_lib::prelude::*;
 
 use components::*;
 use sound::{init_sound};
-use gfx::{Canvas, ImageData, ParticlesData};
+use gfx::{Canvas, ImageData, MovementParticles, Effect, ParticlesData};
 use gfx_backend::DisplayBuild;
 use systems::{ControlSystem, KinematicSystem, RenderingSystem, 
               GamePlaySystem, CollisionSystem, AISystem, SoundSystem,
@@ -53,14 +53,7 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(BodiesMap::new());
     let images: Collector<ImageData, Image> = Collector::new_empty();
     let mut images = ThreadPin::new(images);
-    let particles: Collector<ParticlesData, Particles> = Collector::new_empty();
     let size = 10f32;
-    let mut particles = ThreadPin::new(particles);
-    let movement_particles = particles.add_item(
-        "movement".to_string(), ParticlesData::new_quad(
-            &display, -size, -size, size, size, 100)
-    );
-    let preloaded_particles = PreloadedParticles{ movement: movement_particles };
     specs_world.register::<Isometry>();
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
@@ -80,6 +73,7 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<ShipMarker>();
     specs_world.register::<PhysicsComponent>();
     specs_world.register::<Polygon>();
+    specs_world.register::<ThreadPin<ParticlesData>>();
     let background_image_data = ImageData::new(&display, "back").unwrap();
     let background_image = images.add_item("back".to_string(), background_image_data);
     let character_image_data = ImageData::new(&display, "player").unwrap();
@@ -92,10 +86,36 @@ pub fn main() -> Result<(), String> {
     let light_image = images.add_item("light".to_string(), light_image_data);
     let projectile_image_data = ImageData::new(&display, "projectile").unwrap();
     let projectile_image = images.add_item("projectile".to_string(), projectile_image_data);
+    let enemy_image_data = ImageData::new(&display, "enemy").unwrap();
+    let enemy_image = images.add_item("enemy".to_string(), enemy_image_data);
+
     let preloaded_images = PreloadedImages{
         projectile: projectile_image,
         asteroid: asteroid_image,
+        enemy: enemy_image,
         background: background_image
+    };
+    let movement_particles = ThreadPin::new(
+        ParticlesData::MovementParticles(MovementParticles::new_quad(
+                &display, -size, -size, size, size, 100
+            )
+        )
+    );
+    // let explosion_particles = ThreadPin::new(
+    //     ParticlesData::Effect(Effect::new(
+    //         &display,
+    //         100,
+    //         Some(100),
+    //     )
+    // ));
+    // let explosion_particles_entity = specs_world.create_entity()
+    //     .with(explosion_particles)
+    //     .build();
+    let movement_particles_entity = specs_world.create_entity()
+        .with(movement_particles)
+        .build();
+    let preloaded_particles = PreloadedParticles {
+        movement: movement_particles_entity,
     };
     let char_size = 0.7f32;
     let character_shape = Geometry::Circle{
@@ -139,40 +159,6 @@ pub fn main() -> Result<(), String> {
         character_collision_groups,
         0.5f32
     );
-    let enemy_physics_shape = ncollide2d::shape::Ball::new(r);
-
-    let mut enemy_collision_groups = CollisionGroups::new();
-    enemy_collision_groups.set_membership(&[CollisionId::EnemyShip as usize]);
-    enemy_collision_groups.set_whitelist(&[
-        CollisionId::Asteroid as usize,
-        CollisionId::EnemyShip as usize,
-        CollisionId::PlayerShip as usize,
-        CollisionId::PlayerBullet as usize]);
-    enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
-
-    let enemy = specs_world
-        .create_entity()
-        .with(Isometry::new(3f32, 3f32, 0f32))
-        .with(Velocity::new(0f32, 0f32))
-        .with(EnemyMarker::default())
-        .with(ShipMarker::default())
-        .with(enemy_image)
-        .with(Gun::new(20u8))
-        .with(Spin::default())
-        .with(enemy_shape)
-        .with(Size(enemy_size))
-        .build();
-    PhysicsComponent::safe_insert(
-        &mut specs_world.write_storage(),
-        enemy,
-        ShapeHandle::new(enemy_physics_shape),
-        Isometry2::new(Vector2::new(0f32, 0f32), 0f32),
-        BodyStatus::Dynamic,
-        &mut specs_world.write_resource(),
-        &mut specs_world.write_resource(),
-        enemy_collision_groups,
-        0.5f32
-    );
     {
         let _light = specs_world
             .create_entity()
@@ -197,7 +183,6 @@ pub fn main() -> Result<(), String> {
     let sounds = ThreadPin::new(sounds);
     specs_world.add_resource(sounds);
     specs_world.add_resource(preloaded_sounds);
-    specs_world.add_resource(particles);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
     let mut dispatcher = DispatcherBuilder::new()
@@ -207,7 +192,7 @@ pub fn main() -> Result<(), String> {
         .with(ai_system, "ai_system", &[])
         .with(collision_system, "collision_system", &["ai_system"])
         .with(phyiscs_system, "physics_system", &["kinematic_system", "control_system", "gameplay_system", "collision_system"])
-        .with(insert_system, "insert_system", &["physics_system"])
+        .with_thread_local(insert_system)
         .with_thread_local(rendering_system)
         .with_thread_local(sound_system)
         .build();

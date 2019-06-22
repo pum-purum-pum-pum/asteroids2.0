@@ -21,7 +21,7 @@ use ncollide2d::world::CollisionObjectHandle;
 
 use crate::components::*;
 use crate::geometry::{LightningPolygon, EPS, TriangulateFromCenter, Polygon, generate_convex_polygon};
-use crate::gfx::{GeometryData, BACKGROUND_SIZE};
+use crate::gfx::{GeometryData, BACKGROUND_SIZE, ParticlesData, Effect};
 use crate::sound::{PreloadedSounds};
 use crate::physics::CollisionId;
 
@@ -38,7 +38,8 @@ const PLAYER_AREA: f32 = 15f32;
 const ACTIVE_AREA: f32 = 25f32;
 // we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
 
-const ASTEROIDS_NUMBER: usize = 50usize;
+const ASTEROIDS_MIN_NUMBER: usize = 50usize;
+const SHIPS_NUMBER: usize = 5usize;
 
 pub enum EntityType {
     Player,
@@ -52,12 +53,22 @@ pub enum InsertEvent {
         light_shape: Geometry,
         spin: f32,
     },
+    Ship {
+        iso: Point3,
+        light_shape: Geometry,
+        spin: f32
+    },
     Bullet {
         kind: EntityType, 
         iso: Point3,
         velocity: Point2,
         owner: specs::Entity,
     },
+    Effect {
+        position: Point2,
+        num: usize,
+        lifetime: usize,
+    }
 }
 
 pub fn spawn_position(char_pos: Point2) -> Point2 {
@@ -126,10 +137,10 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Polygon>,
+        WriteStorage<'a, ThreadPin<ParticlesData>>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, ThreadPin<Images>>,
-        WriteExpect<'a, ThreadPin<ParticlesSystems>>,
         ReadExpect<'a, PreloadedImages>,
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
@@ -150,10 +161,10 @@ impl<'a> System<'a> for RenderingSystem {
             geometries,
             sizes,
             polygons,
+            mut particles_datas,
             display, 
             mut canvas, 
             images,
-            mut particles_systems,
             preloaded_images,
             preloaded_particles,
             world,
@@ -202,6 +213,29 @@ impl<'a> System<'a> for RenderingSystem {
         }
         let triangulation = light_poly.triangulate();
         let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
+        for (entity, particles_data,) in (&entities, &mut particles_datas,).join() {
+            match **particles_data {
+                ParticlesData::Effect(ref mut particles) => {
+                    if particles.update() {
+                        canvas
+                            .render_particles(&display, &mut target, &particles.gfx, &Isometry3::new(Vector3::new(0f32, 0f32, 0f32), Vector3::new(0f32, 0f32, 0f32)), 1f32).unwrap();
+                    } else {
+                        entities.delete(entity);
+                    }
+                }
+                _ => ()
+            };
+    }
+        // for effect in preloaded_particles.effects.iter() {
+        //     match **particles_datas.get(*effect).unwrap() {
+        //         ParticlesData::Effect(ref mut particles) => {
+        //             particles.update();
+        //             canvas
+        //                 .render_particles(&display, &mut target, &particles.gfx, &Isometry3::new(Vector3::new(0f32, 0f32, 0f32), Vector3::new(0f32, 0f32, 0f32)), 1f32).unwrap();
+        //         }
+        //         _ => {panic!()}
+        //     };
+        // }
         for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
             let translation_vec =iso.0.translation.vector;
             let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
@@ -210,9 +244,14 @@ impl<'a> System<'a> for RenderingSystem {
             // canvas
             //     .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
             //     .unwrap();
-            particles_systems[preloaded_particles.movement].update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
-            canvas
-                .render_particles(&display, &mut target, &particles_systems[preloaded_particles.movement], &pure_isometry, vel.0.norm() / VELOCITY_MAX).unwrap();
+            match **particles_datas.get_mut(preloaded_particles.movement).unwrap() {
+                ParticlesData::MovementParticles(ref mut particles) => {
+                    particles.update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
+                    canvas
+                        .render_particles(&display, &mut target, &particles.gfx, &pure_isometry, vel.0.norm() / VELOCITY_MAX).unwrap();
+                }
+                _ => {panic!()}
+            };
             canvas
                 .render_geometry(&display, &mut target, &geom_data, &Isometry3::identity(), true)
                 .unwrap();
@@ -465,6 +504,7 @@ impl<'a> System<'a> for ControlSystem {
 }
 
 
+// thread local system
 pub struct InsertSystem {
     reader: ReaderId<InsertEvent>
 }
@@ -488,10 +528,14 @@ impl<'a> System<'a> for InsertSystem {
         WriteStorage<'a, Gun>,
         WriteStorage<'a, Lifetime>,
         WriteStorage<'a, AsteroidMarker>,
+        WriteStorage<'a, EnemyMarker>,
+        WriteStorage<'a, ShipMarker>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, Polygon>,
         WriteStorage<'a, Projectile>,
+        WriteStorage<'a, ThreadPin<ParticlesData>>,
+        WriteExpect<'a, SDLDisplay>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -510,10 +554,14 @@ impl<'a> System<'a> for InsertSystem {
             mut guns, 
             mut lifetimes,
             mut asteroid_markers,
+            mut enemies,
+            mut ships,
             mut images,
             mut sizes,
             mut polygons,
             mut  projectiles,
+            mut particles_datas,
+            mut display,
             mut stat,
             preloaded_images,
             mut world,
@@ -562,6 +610,50 @@ impl<'a> System<'a> for InsertSystem {
                         &mut bodies_map,
                         asteroid_collision_groups,
                         10f32,
+                    );
+                }
+                InsertEvent::Ship {
+                    iso,
+                    light_shape,
+                    spin
+                } => {
+                    let enemy_size = 0.7f32;
+                    let r = 1f32;
+                    let enemy_shape = Geometry::Circle{
+                        radius: enemy_size,
+                    };
+                    let enemy_physics_shape = ncollide2d::shape::Ball::new(r);
+                    let mut enemy_collision_groups = CollisionGroups::new();
+                    enemy_collision_groups.set_membership(&[CollisionId::EnemyShip as usize]);
+                    enemy_collision_groups.set_whitelist(&[
+                        CollisionId::Asteroid as usize,
+                        CollisionId::EnemyShip as usize,
+                        CollisionId::PlayerShip as usize,
+                        CollisionId::PlayerBullet as usize]);
+                    enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
+
+                    let enemy = entities
+                        .build_entity()
+                        .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
+                        .with(Velocity::new(0f32, 0f32), &mut velocities)
+                        .with(EnemyMarker::default(), &mut enemies)
+                        .with(ShipMarker::default(), &mut ships)
+                        .with(preloaded_images.enemy, &mut images)
+                        .with(Gun::new(50u8), &mut guns)
+                        .with(Spin::default(), &mut spins)
+                        .with(enemy_shape, &mut geometries)
+                        .with(Size(enemy_size), &mut sizes)
+                        .build();
+                    PhysicsComponent::safe_insert(
+                        &mut physics,
+                        enemy,
+                        ShapeHandle::new(enemy_physics_shape),
+                        Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
+                        BodyStatus::Dynamic,
+                        &mut world,
+                        &mut bodies_map,
+                        enemy_collision_groups,
+                        0.5f32
                     );
                 }
                 InsertEvent::Bullet {
@@ -618,6 +710,23 @@ impl<'a> System<'a> for InsertSystem {
                     *velocity_tmp.as_vector_mut() = Vector3::new(velocity.x, velocity.y, 0f32);
                     body.set_velocity(velocity_tmp);
                 }
+                InsertEvent::Effect {
+                    position,
+                    num,
+                    lifetime
+                } => {
+                    let explosion_particles = ThreadPin::new(
+                        ParticlesData::Effect(Effect::new(
+                            &display,
+                            *position,
+                            100,
+                            Some(100),
+                        ))
+                    );
+                    let explosion_particles_entity = entities.build_entity()
+                        .with(explosion_particles, &mut particles_datas)
+                        .build();
+                }
             }
         }
     }
@@ -638,6 +747,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteStorage<'a, Lifetime>,
         WriteStorage<'a, AsteroidMarker>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, Polygon>,
@@ -660,6 +770,7 @@ impl<'a> System<'a> for GamePlaySystem {
             mut lifetimes,
             mut asteroid_markers,
             character_markers,
+            ships,
             mut images,
             mut sizes,
             mut polygons,
@@ -682,8 +793,8 @@ impl<'a> System<'a> for GamePlaySystem {
             }
         }
         let cnt = asteroid_markers.count();
-        let add_cnt = if ASTEROIDS_NUMBER > cnt {ASTEROIDS_NUMBER - cnt} else {0}; 
-        for _ in 0..add_cnt {            
+        let add_cnt = if ASTEROIDS_MIN_NUMBER > cnt {ASTEROIDS_MIN_NUMBER - cnt} else {0}; 
+        for _ in 0..add_cnt {
             let mut rng = thread_rng();
             let size = rng.gen_range(0.4f32, 2f32);
             let r =  size;
@@ -702,6 +813,23 @@ impl<'a> System<'a> for GamePlaySystem {
                     spin: spin,
                 }
             );
+        }
+        let cnt = ships.count();
+        let add_cnt = if SHIPS_NUMBER > cnt {SHIPS_NUMBER - cnt} else {0};
+        let r =  1f32;
+        let ship_shape = Geometry::Circle{
+            radius: r,
+        };
+
+        for _ in 0..add_cnt {
+            let spawn_pos = spawn_position(character_position);
+            insert_channel.single_write(
+                InsertEvent::Ship {
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+                    light_shape: ship_shape,
+                    spin: 0f32
+                }
+            )
         }
         for (entity, isometry, _asteroid) in (&entities, &isometries, &asteroid_markers).join() {
             let pos3d = isometry.0.translation.vector;
@@ -802,6 +930,12 @@ impl<'a> System<'a> for CollisionSystem {
                     let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
                     let new_polygons = polygon.deconstruct();
+                    let effect = InsertEvent::Effect {
+                        position: Point2::new(position.x, position.y),
+                        num: 100usize,
+                        lifetime: 50usize
+                    };
+                    insert_channel.single_write(effect);
                     sounds_channel.single_write(preloaded_sounds.explosion);
                     if new_polygons.len() == 1 {
 
@@ -823,6 +957,18 @@ impl<'a> System<'a> for CollisionSystem {
                     }
 
                     entities.delete(asteroid).unwrap();
+                }
+            }
+            if ships.get(entity2).is_some() {
+                swap(&mut entity1, &mut entity2);
+            }
+            if ships.get(entity1).is_some() && projectiles.get(entity2).is_some(){
+                let ship = entity1;
+                let projectile = entity2;
+                if character_markers.get(ship).is_some() {
+
+                } else {
+                    entities.delete(ship).unwrap();
                 }
             }
         }

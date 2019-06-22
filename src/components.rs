@@ -8,11 +8,13 @@ use sdl2::mixer::Chunk;
 pub use crate::physics::{PhysicsComponent, BodiesMap};
 pub use crate::geometry::Polygon;
 
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData, ParticlesData};
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData, ParticlesData, MovementParticles};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
+
+
 
 #[derive(Default, Debug)]
 pub struct Stat {
@@ -73,18 +75,18 @@ impl Id for Particles {
 
 pub type Images = Collector<ImageData, Image>;
 pub type Sounds = Collector<Chunk, Sound>;
-pub type ParticlesSystems = Collector<ParticlesData, Particles>;
 
 /// contains preloaded images ids
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
     pub projectile: Image,
     pub asteroid: Image,
+    pub enemy: Image,
     pub background: Image
 }
 
 pub struct PreloadedParticles {
-    pub movement: Particles,
+    pub movement: specs::Entity,
 }
 
 #[derive(Default, Debug)]

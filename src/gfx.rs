@@ -3,6 +3,7 @@ use astro_lib as al;
 use std::fs::File;
 use std::io::{BufReader, Error as IOError};
 use rand::prelude::*;
+use rand::distributions::Bernoulli;
 
 use glium;
 use glium::draw_parameters::Blend;
@@ -22,18 +23,108 @@ const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const BACKGROUND_SIZE: f32 = 20f32;
 
 
-/// white star like particles
-pub struct ParticlesData {
+pub enum ParticlesData {
+    MovementParticles(MovementParticles),
+    Effect(Effect)
+}
+
+impl ParticlesData {
+    pub fn get_instancing_data(&self) -> &InstancingData {
+        match self {
+            ParticlesData::MovementParticles(particles) => {
+                &particles.gfx
+            }
+            ParticlesData::Effect(particles) => {
+                &particles.gfx
+            }
+        }
+    }
+}
+
+pub struct InstancingData {
     pub vertex_buffer: glium::VertexBuffer<GeometryVertex>,
     pub indices: glium::IndexBuffer<u16>,
     pub per_instance: glium::VertexBuffer<WorldVertex>,
+}
+
+/// white star like particles
+pub struct MovementParticles {
+    pub gfx: InstancingData,
     pub x_min: f32, 
     pub y_min: f32, 
     pub x_max:f32, 
     pub y_max:f32,
 }
 
-impl ParticlesData {
+pub struct Effect {
+    pub gfx: InstancingData,
+    pub velocities: Vec<Vector2>,
+    pub lifetime: Option<usize>,
+    time: usize
+}
+
+impl Effect {
+    pub fn new(
+        display: &SDL2Facade,
+        position: Point2,
+        num: usize,
+        lifetime: Option<usize>,
+    ) -> Self {
+        let scale = 0.07f32;
+        let positions = vec![[-scale, -scale], [-scale, scale], [scale, scale], [scale, -scale]];
+        let shape: Vec<GeometryVertex> = positions
+            .into_iter()
+            .map(|pos| GeometryVertex{ position: pos})
+            .collect();
+        let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
+        let indices = glium::IndexBuffer::new(
+            display,
+            PrimitiveType::TrianglesList,
+            &[0u16, 1, 2, 2, 3, 0],
+        ).unwrap();
+        let mut rng = thread_rng();
+        let mut quad_positions = vec![];
+        let mut velocities = vec![];
+        for _ in 0..num {
+            let x = position.x;
+            let y = position.y;
+            let depth = 1f32;
+            let z = rng.gen_range(-depth, depth);
+            quad_positions.push(WorldVertex{ world_position: [x, y, z] });
+            let d = Bernoulli::new(0.5);
+            let s1 = d.sample(&mut rand::thread_rng()) as u8 as f32 * 2.0 - 1.0;
+            let s2 = d.sample(&mut rand::thread_rng()) as u8 as f32 * 2.0 - 1.0;
+            let vel_x = 0.3 * s1 * rng.gen_range(0.1, 0.3);
+            let vel_y = 0.3 * s2 * rng.gen_range(0.1, 0.3);
+            velocities.push(Vector2::new(vel_x, vel_y));
+        }
+        let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
+        Effect {
+            gfx: InstancingData {
+                vertex_buffer: vertex_buffer,
+                indices: indices,
+                per_instance: per_instance,
+            },
+            velocities: velocities,
+            lifetime: lifetime,
+            time: 0
+        }
+    }
+
+    pub fn update(&mut self) -> bool {
+        self.time += 1;
+        for (particle, vel) in self.gfx.per_instance.map().iter_mut().zip(self.velocities.iter()) {
+            particle.world_position[0] += vel.x;
+            particle.world_position[1] += vel.y;
+        }
+        if self.lifetime.is_some() {
+            return self.time <= self.lifetime.unwrap();
+        };
+        true
+    }
+}
+
+impl MovementParticles {
     pub fn new_quad(
         display: &SDL2Facade,
         x_min: f32, 
@@ -41,7 +132,7 @@ impl ParticlesData {
         x_max:f32, 
         y_max:f32,
         num: usize,
-    ) -> ParticlesData {
+    ) -> Self {
         let scale = 0.03f32;
         let positions = vec![[-scale, -scale], [-scale, scale], [scale, scale], [scale, -scale]];
         let shape: Vec<GeometryVertex> = positions
@@ -64,16 +155,18 @@ impl ParticlesData {
             quad_positions.push(WorldVertex{ world_position: [x, y, z] });
         }
         let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
-        ParticlesData {
-            vertex_buffer: vertex_buffer,
-            indices: indices,
-            per_instance: per_instance,
+        MovementParticles {
+            gfx: InstancingData {
+                vertex_buffer: vertex_buffer,
+                indices: indices,
+                per_instance: per_instance,
+            },
             x_min, y_min, x_max, y_max,
         }
     }
 
     pub fn update(&mut self, vel: Vector2) {
-        for particle in self.per_instance.map().iter_mut() {
+        for particle in self.gfx.per_instance.map().iter_mut() {
             particle.world_position[0] += vel.x;
             particle.world_position[1] += vel.y;
             let cut_low = |x, min, max| if x < min {max - min + x} else {x};
@@ -86,18 +179,6 @@ impl ParticlesData {
                 cut_hight(particle.world_position[1], self.y_min, self.y_max), 
                 self.y_min, self.y_max
             );
-            // particle.world_position[0] = 
-            //     if particle.world_position[0] > self.x_max {
-            //         self.x_min + particle.world_position[0] - self.x_max
-            //     } else {
-            //         particle.world_position[0]
-            //     };
-            // particle.world_position[1] =  
-            //     if particle.world_position[1] > self.y_max {
-            //         self.y_min + particle.world_position[1] - self.y_max
-            //     } else {
-            //         particle.world_position[1]
-            //     };
         }
     }
 }
@@ -459,7 +540,7 @@ impl Canvas {
         &self,
         display: &SDL2Facade,
         target: &mut glium::Frame,
-        particles_data: &ParticlesData,
+        instancing_data: &InstancingData,
         model: &Isometry3,
         transparency: f32, // TODO make params structure
     ) -> Result<(), DrawError> {
@@ -473,8 +554,8 @@ impl Canvas {
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
-            (&particles_data.vertex_buffer, particles_data.per_instance.per_instance().unwrap()),
-            &particles_data.indices,
+            (&instancing_data.vertex_buffer, instancing_data.per_instance.per_instance().unwrap()),
+            &instancing_data.indices,
             &self.program_instancing,
             &uniform! {
                 model: model,

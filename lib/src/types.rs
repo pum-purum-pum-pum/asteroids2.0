@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use hibitset::BitSetLike;
 use specs_derive::{Component};
 use specs::prelude::*;
-use specs::storage::{MaskedStorage, TryDefault, UnprotectedStorage};
+use specs::storage::{MaskedStorage, TryDefault, UnprotectedStorage, DenseVecStorage};
 use specs::world::Index as SpecsIndex;
 
 pub use nalgebra::Rotation3;
@@ -37,6 +37,11 @@ pub struct ThreadPin<T> where T: 'static {
     owner: ThreadId,
     inner: T
 }
+
+// impl<T> Component for ThreadPin<T> where T: 'static {
+//     type Storage = DenseVecStorage<Self>;
+// }
+
 
 impl<T> ThreadPin<T> {
     pub fn new(value: T) -> Self {
