@@ -1,4 +1,6 @@
 cargo-features = ["profile-overrides"]
+[build]
+incremental = true
 [package]
 name = "new_asteroids"
 version = "0.1.0"
@@ -13,10 +15,16 @@ image = "0.21.1"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 
+[profile.dev]
+opt-level = 0
+debug = true
+
+
+[profile.dev.overrides.astro_lib]
+opt-level=0
+debug=true
 
 [profile.dev.overrides."*"]
 opt-level = 3
-debug=true
-
 # [profile.release]
 # lto = true

@@ -51,8 +51,6 @@ pub fn main() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     specs_world.add_resource(phys_world);
     specs_world.add_resource(BodiesMap::new());
-    let images: Collector<ImageData, Image> = Collector::new_empty();
-    let mut images = ThreadPin::new(images);
     let size = 10f32;
     specs_world.register::<Isometry>();
     specs_world.register::<Velocity>();
@@ -74,19 +72,51 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<PhysicsComponent>();
     specs_world.register::<Polygon>();
     specs_world.register::<ThreadPin<ParticlesData>>();
-    let background_image_data = ImageData::new(&display, "back").unwrap();
-    let background_image = images.add_item("back".to_string(), background_image_data);
-    let character_image_data = ImageData::new(&display, "player").unwrap();
-    let character_image = images.add_item("player".to_string(), character_image_data);
-    let asteroid_image_data = ImageData::new(&display, "asteroid").unwrap();
-    let asteroid_image = images.add_item("asteroid".to_string(), asteroid_image_data);
-    let light_image_data = ImageData::new(&display, "light").unwrap();
-    let light_image = images.add_item("light".to_string(), light_image_data);
-    let projectile_image_data = ImageData::new(&display, "projectile").unwrap();
-    let projectile_image = images.add_item("projectile".to_string(), projectile_image_data);
-    let enemy_image_data = ImageData::new(&display, "enemy").unwrap();
-    let enemy_image = images.add_item("enemy".to_string(), enemy_image_data);
-
+    specs_world.register::<ThreadPin<sdl2::mixer::Chunk>>();
+    specs_world.register::<ThreadPin<SoundData>>();
+    specs_world.register::<Image>();
+    let background_image_data = ThreadPin::new(
+        ImageData::new(&display, "back").unwrap()
+    );
+    let character_image_data = ThreadPin::new(
+        ImageData::new(&display, "player").unwrap()
+    );
+    let asteroid_image_data = ThreadPin::new(
+        ImageData::new(&display, "asteroid").unwrap()
+    );
+    let light_image_data = ThreadPin::new(
+        ImageData::new(&display, "light").unwrap()
+    );
+    let projectile_image_data = ThreadPin::new(
+        ImageData::new(&display, "projectile").unwrap()
+    );
+    let enemy_image_data = ThreadPin::new(
+        ImageData::new(&display, "enemy").unwrap()
+    );
+    let background_image = specs_world
+        .create_entity()
+        .with(background_image_data)
+        .build();
+    let character_image = specs_world
+        .create_entity()
+        .with(character_image_data)
+        .build();
+    let asteroid_image = specs_world
+        .create_entity()
+        .with(asteroid_image_data)
+        .build();
+    let light_image = specs_world
+        .create_entity()
+        .with(light_image_data)
+        .build();
+    let projectile_image = specs_world
+        .create_entity()
+        .with(projectile_image_data)
+        .build();
+    let enemy_image = specs_world
+        .create_entity()
+        .with(enemy_image_data)
+        .build();
     let preloaded_images = PreloadedImages {
         projectile: projectile_image,
         asteroid: asteroid_image,
@@ -96,16 +126,6 @@ pub fn main() -> Result<(), String> {
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&display, -size, -size, size, size, 100),
     ));
-    // let explosion_particles = ThreadPin::new(
-    //     ParticlesData::Effect(Effect::new(
-    //         &display,
-    //         100,
-    //         Some(100),
-    //     )
-    // ));
-    // let explosion_particles_entity = specs_world.create_entity()
-    //     .with(explosion_particles)
-    //     .build();
     let movement_particles_entity = specs_world.create_entity().with(movement_particles).build();
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
@@ -120,7 +140,7 @@ pub fn main() -> Result<(), String> {
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
         .with(ShipMarker::default())
-        .with(character_image)
+        .with(Image(character_image))
         .with(Gun::new(12u8))
         .with(Spin::default())
         .with(character_shape)
@@ -155,7 +175,7 @@ pub fn main() -> Result<(), String> {
             .with(Isometry::new(0f32, 0f32, 0f32))
             .with(AttachPosition(character))
             .with(Velocity::new(0f32, 0f32))
-            .with(light_image)
+            .with(Image(light_image))
             .with(Spin::default())
             .with(Size(15f32))
             .with(LightMarker)
@@ -169,9 +189,7 @@ pub fn main() -> Result<(), String> {
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
     let insert_system = InsertSystem::new(insert_channel.register_reader());
-    let (sounds, preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context)?;
-    let sounds = ThreadPin::new(sounds);
-    specs_world.add_resource(sounds);
+    let (preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
@@ -205,7 +223,6 @@ pub fn main() -> Result<(), String> {
         ..Mouse::default()
     });
     specs_world.add_resource(ThreadPin::new(canvas));
-    specs_world.add_resource(images);
     specs_world.add_resource(preloaded_images);
     specs_world.add_resource(Stat::default());
     // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
@@ -240,8 +257,6 @@ pub fn main() -> Result<(), String> {
                 dims.0,
                 dims.1,
             );
-            // dbg!((dims.0, dims.1));
-            // dbg!((mouse_state.x, mouse_state.y));
         }
         dispatcher.dispatch(&specs_world.res);
         safe_maintain(&mut specs_world);

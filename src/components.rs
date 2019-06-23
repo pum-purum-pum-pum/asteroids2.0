@@ -2,13 +2,15 @@ use std::ops::AddAssign;
 
 pub use crate::geometry::Polygon;
 pub use crate::physics::{BodiesMap, PhysicsComponent};
+pub use crate::gfx::{ImageData};
+pub use crate::sound::{SoundData};
 use al::prelude::*;
 use astro_lib as al;
 use sdl2::mixer::Chunk;
 use specs::prelude::*;
 use specs_derive::Component;
 
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas, ImageData};
+use crate::gfx::{unproject_with_z, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
@@ -29,56 +31,23 @@ pub struct Size(pub f32);
 
 /// Index of Images structure
 #[derive(Component, Clone, Copy)]
-pub struct Image(pub usize);
+pub struct Image(pub specs::Entity);
 
 #[derive(Component, Clone, Copy)]
-pub struct Sound(pub usize);
+pub struct Sound(pub specs::Entity);
 
 #[derive(Component, Clone, Copy)]
 pub struct Particles(pub usize);
 
-// TODO: make macro
-
-impl Id for Image {
-    fn new(id: usize) -> Self {
-        Image(id)
-    }
-
-    fn get(&self) -> usize {
-        self.0
-    }
-}
-
-impl Id for Sound {
-    fn new(id: usize) -> Self {
-        Sound(id)
-    }
-
-    fn get(&self) -> usize {
-        self.0
-    }
-}
-
-impl Id for Particles {
-    fn new(id: usize) -> Self {
-        Particles(id)
-    }
-
-    fn get(&self) -> usize {
-        self.0
-    }
-}
-
-pub type Images = Collector<ImageData, Image>;
-pub type Sounds = Collector<Chunk, Sound>;
+// pub type Images = Collector<ImageData, Image>;
 
 /// contains preloaded images ids
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
-    pub projectile: Image,
-    pub asteroid: Image,
-    pub enemy: Image,
-    pub background: Image,
+    pub projectile: specs::Entity,
+    pub asteroid: specs::Entity,
+    pub enemy: specs::Entity,
+    pub background: specs::Entity,
 }
 
 pub struct PreloadedParticles {

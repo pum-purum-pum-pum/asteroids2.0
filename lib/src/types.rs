@@ -89,61 +89,6 @@ impl<T> DerefMut for ThreadPinResource<T> {
     }
 }
 
-
-// COLLECTOR TYPE FOR STORING ASSETS DATA
-
-pub trait Id {
-    fn new(id: usize) -> Self;
-
-    fn get(&self) -> usize;
-}
-
-/// Meant to be used as resource
-pub struct Collector<T, I> where I: Id{
-    items: Vec<T>,
-    name_to_id: HashMap<String, usize>,
-    index_type: PhantomData<I>
-}
-
-impl<T, I> Collector<T, I> where I: Id {
-    pub fn new_empty() -> Self {
-        Collector {
-            items: vec![],
-            name_to_id: HashMap::new(),
-            index_type: PhantomData
-        }
-    }
-
-    /// save image by it's name and return acces index
-    pub fn add_item(&mut self, name: String, data: T) -> I {
-        self.items.push(data);
-        let id = self.items.len() - 1;
-        self.name_to_id.insert(name, id);
-        Id::new(id)
-    }
-
-    pub fn get_item(&self, id: I) -> Option<&T> {
-        if id.get() < self.items.len() {
-            Some(&self.items[id.get()])
-        } else {
-            None
-        }
-    }
-}
-
-impl<T, I> Index<I> for Collector<T, I>  where I: Id{
-    type Output = T;
-    fn index<'a>(&'a self, id: I) -> &'a T {
-        &self.items[id.get()]
-    }
-}
-
-impl<T, I> IndexMut<I> for Collector<T, I>  where I: Id{
-    fn index_mut<'a>(&'a mut self, id: I) -> &'a mut  T {
-        &mut self.items[id.get()]
-    }
-}
-
 // Retained storage
 
 pub trait Retained<C> {

@@ -23,7 +23,7 @@ use crate::components::*;
 use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter};
 use crate::gfx::{Effect, GeometryData, ParticlesData};
 use crate::physics::CollisionId;
-use crate::sound::PreloadedSounds;
+use crate::sound::{PreloadedSounds, SoundData};
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -133,6 +133,7 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, LightMarker>,
         ReadStorage<'a, Projectile>,
+        ReadStorage<'a, ThreadPin<ImageData>>,
         ReadStorage<'a, Image>,
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
@@ -140,7 +141,6 @@ impl<'a> System<'a> for RenderingSystem {
         WriteStorage<'a, ThreadPin<ParticlesData>>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas>,
-        ReadExpect<'a, ThreadPin<Images>>,
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
     );
@@ -156,6 +156,7 @@ impl<'a> System<'a> for RenderingSystem {
             asteroid_markers,
             light_markers,
             projectiles,
+            image_datas,
             image_ids,
             geometries,
             sizes,
@@ -163,7 +164,6 @@ impl<'a> System<'a> for RenderingSystem {
             mut particles_datas,
             display,
             mut canvas,
-            images,
             preloaded_particles,
             world,
         ) = data;
@@ -283,7 +283,7 @@ impl<'a> System<'a> for RenderingSystem {
                 .render(
                     &display,
                     &mut target,
-                    &images[*image],
+                    &image_datas.get(image.0).unwrap(),
                     &isometry,
                     size.0,
                     true,
@@ -317,7 +317,7 @@ impl<'a> System<'a> for RenderingSystem {
                 .position();
             let iso = iso2_iso3(iso2);
             canvas
-                .render(&display, &mut target, &images[*image], &iso, size.0, false)
+                .render(&display, &mut target, &image_datas.get(image.0).unwrap(), &iso, size.0, false)
                 .unwrap();
         }
         for (_entity, iso, image, size, _projectile) in
@@ -327,7 +327,7 @@ impl<'a> System<'a> for RenderingSystem {
                 .render(
                     &display,
                     &mut target,
-                    &images[*image],
+                    &image_datas.get(image.0).unwrap(),
                     &iso.0,
                     size.0,
                     false,
@@ -378,7 +378,8 @@ impl SoundSystem {
 
 impl<'a> System<'a> for SoundSystem {
     type SystemData = (
-        ReadExpect<'a, ThreadPin<Sounds>>,
+        ReadStorage<'a, ThreadPin<SoundData>>,
+        // ReadExpect<'a, ThreadPin<SoundData>>,
         WriteExpect<'a, ThreadPin<TimerSubsystem>>,
         Write<'a, EventChannel<Sound>>,
     );
@@ -386,7 +387,7 @@ impl<'a> System<'a> for SoundSystem {
     fn run(&mut self, data: Self::SystemData) {
         let (sounds, _timer, sounds_channel) = data;
         for s in sounds_channel.read(&mut self.reader) {
-            sdl2::mixer::Channel::all().play(&sounds[*s], 0).unwrap();
+            sdl2::mixer::Channel::all().play(&sounds.get(s.0).unwrap().0, 0).unwrap();
         }
         // eprintln!("SOUNDS");
     }
@@ -552,7 +553,7 @@ impl<'a> System<'a> for ControlSystem {
                     char_velocity.0.x + velocity_rel.x,
                     char_velocity.0.y + velocity_rel.y,
                 );
-                sounds_channel.single_write(preloaded_sounds.shot);
+                sounds_channel.single_write(Sound(preloaded_sounds.shot));
                 insert_channel.single_write(InsertEvent::Bullet {
                     kind: EntityType::Player,
                     iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
@@ -654,7 +655,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Velocity::new(0f32, 0f32), &mut velocities)
                         .with(polygon.clone(), &mut polygons)
                         .with(AsteroidMarker::default(), &mut asteroid_markers)
-                        .with(preloaded_images.asteroid, &mut images)
+                        .with(Image(preloaded_images.asteroid), &mut images)
                         .with(Spin(*spin), &mut spins)
                         .with(Size(1f32), &mut sizes)
                         .build();
@@ -705,7 +706,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Velocity::new(0f32, 0f32), &mut velocities)
                         .with(EnemyMarker::default(), &mut enemies)
                         .with(ShipMarker::default(), &mut ships)
-                        .with(preloaded_images.enemy, &mut images)
+                        .with(Image(preloaded_images.enemy), &mut images)
                         .with(Gun::new(50u8), &mut guns)
                         .with(Spin::default(), &mut spins)
                         .with(enemy_shape, &mut geometries)
@@ -733,7 +734,7 @@ impl<'a> System<'a> for InsertSystem {
                         .build_entity()
                         .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                        .with(preloaded_images.projectile, &mut images)
+                        .with(Image(preloaded_images.projectile), &mut images)
                         .with(Spin::default(), &mut spins)
                         .with(Projectile { owner: *owner }, &mut projectiles)
                         .with(Lifetime::new(100u8), &mut lifetimes)
@@ -1008,7 +1009,7 @@ impl<'a> System<'a> for CollisionSystem {
                         lifetime: 20usize,
                     };
                     insert_channel.single_write(effect);
-                    sounds_channel.single_write(preloaded_sounds.explosion);
+                    sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                     if new_polygons.len() == 1 {
 
                     } else {
