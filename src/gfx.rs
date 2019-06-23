@@ -20,17 +20,20 @@ const Z_FAR: f32 = 10f32;
 const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
+const ENGINE_FAR: f32 = 3f32;
 
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
-    Effect(Effect),
+    Explosion(Explosion),
+    Engine(Engine),
 }
 
 impl ParticlesData {
     pub fn _gfx(&self) -> &InstancingData {
         match self {
             ParticlesData::MovementParticles(particles) => &particles.gfx,
-            ParticlesData::Effect(particles) => &particles.gfx,
+            ParticlesData::Explosion(particles) => &particles.gfx,
+            ParticlesData::Engine(particles) => &particles.gfx
         }
     }
 }
@@ -50,14 +53,111 @@ pub struct MovementParticles {
     pub y_max: f32,
 }
 
-pub struct Effect {
+pub struct Engine {
+    pub gfx: InstancingData,
+    pub velocities: Vec<Vector2>,
+    pub start_moving: Vec<usize>,
+    pub lifetime: Option<usize>,
+    time: usize,
+}
+
+impl Engine {
+    pub fn new(
+        display: &SDL2Facade,
+        position: Point2,
+        num: usize,
+        lifetime: Option<usize>,
+    ) -> Self {
+        let scale = 0.07f32;
+        let positions = vec![
+            [-scale, -scale],
+            [-scale, scale],
+            [scale, scale],
+            [scale, -scale],
+        ];
+        let shape: Vec<GeometryVertex> = positions
+            .into_iter()
+            .map(|pos| GeometryVertex { position: pos })
+            .collect();
+        let vertex_buffer = glium::VertexBuffer::new(display, &shape).unwrap();
+        let indices = glium::IndexBuffer::new(
+            display,
+            PrimitiveType::TrianglesList,
+            &[0u16, 1, 2, 2, 3, 0],
+        )
+        .unwrap();
+        let mut rng = thread_rng();
+        let mut quad_positions = vec![];
+        let mut velocities = vec![];
+        let mut start_moving = vec![];
+        for _ in 0..num {
+            let x = position.x;
+            let y = position.y;
+            let depth = 1f32;
+            let z = rng.gen_range(-depth, depth);
+            quad_positions.push(WorldVertex {
+                world_position: [x, y, z],
+            });
+            let angle = rng.gen_range(0f32, 2.0 * std::f32::consts::PI);
+            let vel_x = rng.gen_range(0.05, 0.2) * f32::cos(angle);
+            let vel_y = rng.gen_range(0.05, 0.2) * f32::sin(angle);
+            velocities.push(Vector2::new(vel_x, vel_y));
+            start_moving.push(rng.gen_range(1usize, 10usize));
+        }
+        let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
+        Engine {
+            gfx: InstancingData {
+                vertex_buffer: vertex_buffer,
+                indices: indices,
+                per_instance: per_instance,
+            },
+            velocities: velocities,
+            start_moving: start_moving,
+            lifetime: lifetime,
+            time: 0,
+        }
+    }
+
+    pub fn update(
+        &mut self, 
+        ship_position: Vector2,
+        ship_velocity: Vector2,
+        ship_direction: Vector2,
+    ) -> bool {
+        self.time += 1;
+        for ((particle, vel), &start_time) in self
+            .gfx
+            .per_instance
+            .map()
+            .iter_mut()
+            .zip(self.velocities.iter())
+            .zip(self.start_moving.iter())
+        {
+            if self.time < start_time {continue};
+            let particle_position = Vector2::new(particle.world_position[0], particle.world_position[1]);
+            let distance = (particle_position - ship_position).norm();
+            if distance > ENGINE_FAR {
+                particle.world_position[0] = ship_position.x;
+                particle.world_position[1] = ship_position.y;
+            };
+            particle.world_position[0] += -ship_direction.x + 0.2 * vel.x;
+            particle.world_position[1] += -ship_direction.y + 0.2 * vel.y;
+        }
+        if self.lifetime.is_some() {
+            return self.time <= self.lifetime.unwrap();
+        };
+        true
+    }
+}
+
+pub struct Explosion {
     pub gfx: InstancingData,
     pub velocities: Vec<Vector2>,
     pub lifetime: Option<usize>,
     time: usize,
 }
 
-impl Effect {
+impl Explosion {
     pub fn new(
         display: &SDL2Facade,
         position: Point2,
@@ -99,7 +199,7 @@ impl Effect {
             velocities.push(Vector2::new(vel_x, vel_y));
         }
         let per_instance = glium::VertexBuffer::new(display, &quad_positions).unwrap();
-        Effect {
+        Explosion {
             gfx: InstancingData {
                 vertex_buffer: vertex_buffer,
                 indices: indices,

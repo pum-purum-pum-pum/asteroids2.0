@@ -21,7 +21,7 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter};
-use crate::gfx::{Effect, GeometryData, ParticlesData};
+use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData};
 
@@ -64,11 +64,16 @@ pub enum InsertEvent {
         velocity: Point2,
         owner: specs::Entity,
     },
-    Effect {
+    Explosion {
         position: Point2,
         num: usize,
         lifetime: usize,
     },
+    Engine {
+        position: Point2,
+        num: usize,
+        attached: AttachPosition
+    }
 }
 
 pub fn spawn_position(char_pos: Point2) -> Point2 {
@@ -170,16 +175,22 @@ impl<'a> System<'a> for RenderingSystem {
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         target.clear_stencil(0i32);
-        let char_pos = {
+        let (char_iso, char_pos, char_vel) = {
             let mut opt_iso = None;
+            let mut opt_vel = None;
             for (iso, vel, _) in (&isometries, &velocities, &character_markers).join() {
                 canvas.update_observer(
                     Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
                     vel.0.norm() / VELOCITY_MAX,
                 );
-                opt_iso = Some(iso)
+                opt_iso = Some(iso);
+                opt_vel = Some(vel);
             }
-            opt_iso.unwrap().0.translation.vector
+            (
+                opt_iso.unwrap().0,
+                opt_iso.unwrap().0.translation.vector,
+                opt_vel.unwrap().0
+            )
         };
         // @vlad TODO rewrite it with screen borders
         let rectangle = (
@@ -216,7 +227,7 @@ impl<'a> System<'a> for RenderingSystem {
         let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
         for (entity, particles_data) in (&entities, &mut particles_datas).join() {
             match **particles_data {
-                ParticlesData::Effect(ref mut particles) => {
+                ParticlesData::Explosion(ref mut particles) => {
                     if particles.update() {
                         canvas
                             .render_particles(
@@ -232,6 +243,29 @@ impl<'a> System<'a> for RenderingSystem {
                             .unwrap();
                     } else {
                         entities.delete(entity).unwrap();
+                    }
+                }
+                ParticlesData::Engine(ref mut particles) => {
+                    // dbg!("ENGINE PARTICLES HERE");
+                    let mut direction = Vector3::new(0f32, -1f32, 0f32);
+                    direction = 0.1 * (char_iso * direction);
+                    if particles.update(
+                        Vector2::new(char_pos.x, char_pos.y),
+                        Vector2::new(char_vel.x, char_vel.y),
+                        Vector2::new(direction.x, direction.y)
+                    ) {
+                        canvas
+                            .render_particles(
+                                &display,
+                                &mut target,
+                                &particles.gfx,
+                                &Isometry3::new(
+                                    Vector3::new(0f32, 0f32, 0f32),
+                                    Vector3::new(0f32, 0f32, 0f32),
+                                ),
+                                1f32,
+                            )
+                            .unwrap();
                     }
                 }
                 _ => (),
@@ -379,7 +413,6 @@ impl SoundSystem {
 impl<'a> System<'a> for SoundSystem {
     type SystemData = (
         ReadStorage<'a, ThreadPin<SoundData>>,
-        // ReadExpect<'a, ThreadPin<SoundData>>,
         WriteExpect<'a, ThreadPin<TimerSubsystem>>,
         Write<'a, EventChannel<Sound>>,
     );
@@ -786,12 +819,12 @@ impl<'a> System<'a> for InsertSystem {
                     *velocity_tmp.as_vector_mut() = Vector3::new(velocity.x, velocity.y, 0f32);
                     body.set_velocity(velocity_tmp);
                 }
-                InsertEvent::Effect {
+                InsertEvent::Explosion {
                     position,
                     num,
                     lifetime,
                 } => {
-                    let explosion_particles = ThreadPin::new(ParticlesData::Effect(Effect::new(
+                    let explosion_particles = ThreadPin::new(ParticlesData::Explosion(Explosion::new(
                         &display,
                         *position,
                         *num,
@@ -800,6 +833,22 @@ impl<'a> System<'a> for InsertSystem {
                     let _explosion_particles_entity = entities
                         .build_entity()
                         .with(explosion_particles, &mut particles_datas)
+                        .build();
+                }
+                InsertEvent::Engine {
+                    position,
+                    num,
+                    attached
+                } => {
+                    let engine_particles = ThreadPin::new(ParticlesData::Engine(Engine::new(
+                        &display,   
+                        *position,
+                        *num,
+                        None,
+                    )));
+                    let _explosion_particles_entity = entities
+                        .build_entity()
+                        .with(engine_particles, &mut particles_datas)
                         .build();
                 }
             }
@@ -1003,7 +1052,7 @@ impl<'a> System<'a> for CollisionSystem {
                     let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
                     let new_polygons = polygon.deconstruct();
-                    let effect = InsertEvent::Effect {
+                    let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
                         num: 6usize,
                         lifetime: 20usize,
@@ -1041,7 +1090,7 @@ impl<'a> System<'a> for CollisionSystem {
                 if character_markers.get(ship).is_some() {
                 } else {
                     entities.delete(ship).unwrap();
-                    let effect = InsertEvent::Effect {
+                    let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
                         num: 20usize,
                         lifetime: 50usize,

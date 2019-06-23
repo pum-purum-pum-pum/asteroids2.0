@@ -42,7 +42,6 @@ pub fn main() -> Result<(), String> {
         .position_centered()
         .build_glium()
         .unwrap();
-    // dbg!("hello");
     let canvas = Canvas::new(&display);
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
@@ -126,6 +125,9 @@ pub fn main() -> Result<(), String> {
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&display, -size, -size, size, size, 100),
     ));
+    // let engine_particles = ThreadPin::new(ParticlesData::Engine(
+    //     Engine::new(&display, )
+    // ))
     let movement_particles_entity = specs_world.create_entity().with(movement_particles).build();
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
@@ -169,6 +171,12 @@ pub fn main() -> Result<(), String> {
         character_collision_groups,
         0.5f32,
     );
+    let insert_system = InsertSystem::new(insert_channel.register_reader());
+    insert_channel.single_write(InsertEvent::Engine {
+        position: Point2::new(0f32, 0f32),
+        num: 15usize,
+        attached: AttachPosition(character)
+    });
     {
         let _light = specs_world
             .create_entity()
@@ -188,7 +196,6 @@ pub fn main() -> Result<(), String> {
     let gameplay_sytem = GamePlaySystem::default();
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
-    let insert_system = InsertSystem::new(insert_channel.register_reader());
     let (preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
