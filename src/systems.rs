@@ -38,8 +38,8 @@ const PLAYER_AREA: f32 = 15f32;
 const ACTIVE_AREA: f32 = 25f32;
 // we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
 
-const ASTEROIDS_MIN_NUMBER: usize = 50usize;
-const SHIPS_NUMBER: usize = 5usize;
+const ASTEROIDS_MIN_NUMBER: usize = 5usize;
+const SHIPS_NUMBER: usize = 1usize;
 
 pub enum EntityType {
     Player,
@@ -145,7 +145,7 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Polygon>,
         WriteStorage<'a, ThreadPin<ParticlesData>>,
         WriteExpect<'a, SDLDisplay>,
-        WriteExpect<'a, Canvas>,
+        WriteExpect<'a, Canvas<'static>>,
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
     );
@@ -248,7 +248,7 @@ impl<'a> System<'a> for RenderingSystem {
                 ParticlesData::Engine(ref mut particles) => {
                     // dbg!("ENGINE PARTICLES HERE");
                     let mut direction = Vector3::new(0f32, -1f32, 0f32);
-                    direction = 0.1 * (char_iso * direction);
+                    direction = (char_iso * direction);
                     if particles.update(
                         Vector2::new(char_pos.x, char_pos.y),
                         Vector2::new(char_vel.x, char_vel.y),
@@ -351,7 +351,7 @@ impl<'a> System<'a> for RenderingSystem {
                 .position();
             let iso = iso2_iso3(iso2);
             canvas
-                .render(&display, &mut target, &image_datas.get(image.0).unwrap(), &iso, size.0, false)
+                .render(&display, &mut target, &image_datas.get(image.0).unwrap(), &iso, size.0, true)
                 .unwrap();
         }
         for (_entity, iso, image, size, _projectile) in
@@ -960,6 +960,12 @@ impl<'a> System<'a> for GamePlaySystem {
             })
         }
         for (entity, isometry, _asteroid) in (&entities, &isometries, &asteroid_markers).join() {
+            let pos3d = isometry.0.translation.vector;
+            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y)) {
+                entities.delete(entity).unwrap();
+            }
+        }
+        for (entity, isometry, _ship) in (&entities, &isometries, &ships).join() {
             let pos3d = isometry.0.translation.vector;
             if !is_active(character_position, Point2::new(pos3d.x, pos3d.y)) {
                 entities.delete(entity).unwrap();

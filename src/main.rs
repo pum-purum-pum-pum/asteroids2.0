@@ -17,6 +17,7 @@ mod sound;
 mod systems;
 #[cfg(test)]
 mod test;
+mod gui;
 use astro_lib::prelude::*;
 
 use components::*;
@@ -74,6 +75,8 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<ThreadPin<sdl2::mixer::Chunk>>();
     specs_world.register::<ThreadPin<SoundData>>();
     specs_world.register::<Image>();
+    specs_world.register::<Lifes>();
+    specs_world.register::<Shields>();
     let background_image_data = ThreadPin::new(
         ImageData::new(&display, "back").unwrap()
     );
@@ -136,8 +139,12 @@ pub fn main() -> Result<(), String> {
     let character_shape = Geometry::Circle { radius: char_size };
     let enemy_size = 0.7f32;
     let _enemy_shape = Geometry::Circle { radius: enemy_size };
+    let lifes = Lifes(10usize);
+    let shields = Shields(10usize);
     let character = specs_world
         .create_entity()
+        .with(lifes)
+        .with(shields)
         .with(Isometry::new(0f32, 0f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())

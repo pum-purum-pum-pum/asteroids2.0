@@ -14,7 +14,7 @@ use crate::gfx::{unproject_with_z, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
-pub type Canvas = ThreadPin<SDLCanvas>;
+pub type Canvas<'a> = ThreadPin<SDLCanvas<'a>>;
 
 #[derive(Default, Debug)]
 pub struct Stat {
@@ -38,6 +38,12 @@ pub struct Sound(pub specs::Entity);
 
 #[derive(Component, Clone, Copy)]
 pub struct Particles(pub usize);
+
+#[derive(Component, Clone, Copy)]
+pub struct Lifes(pub usize);
+
+#[derive(Component, Clone, Copy)]
+pub struct Shields(pub usize);
 
 // pub type Images = Collector<ImageData, Image>;
 

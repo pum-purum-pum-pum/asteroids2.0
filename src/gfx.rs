@@ -140,8 +140,8 @@ impl Engine {
                 particle.world_position[0] = ship_position.x;
                 particle.world_position[1] = ship_position.y;
             };
-            particle.world_position[0] += -ship_direction.x + 0.2 * vel.x;
-            particle.world_position[1] += -ship_direction.y + 0.2 * vel.y;
+            particle.world_position[0] += -0.1 * ship_direction.x + 0.6 * vel.x;
+            particle.world_position[1] += -0.1 * ship_direction.y + 0.6 * vel.y;
         }
         if self.lifetime.is_some() {
             return self.time <= self.lifetime.unwrap();
@@ -425,14 +425,17 @@ impl ImageData {
 }
 
 /// 2D graphics on screen
-pub struct Canvas {
+pub struct Canvas<'a> {
     program: glium::Program,       // @vlad TODO: we want to use many programs
     program_light: glium::Program, // but for now simpler=better
     program_instancing: glium::Program,
     observer: Point3,
+    default_params: glium::DrawParameters<'a>,
+    stencil_check_params: glium::DrawParameters<'a>,
+    stencil_write_params: glium::DrawParameters<'a>,
 }
 
-impl Canvas {
+impl<'a> Canvas<'a> {
     pub fn new(display: &SDL2Facade) -> Self {
         let vertex_shader_src = r#"
             #version 130
@@ -516,6 +519,35 @@ impl Canvas {
                 color = vec4(1.0, 1.0, 1.0, 1.0);
             }
         "#;
+        let default_params = glium::DrawParameters {
+                blend: Blend::alpha_blending(),
+                ..Default::default()
+        };
+        let stencil_check_params = glium::DrawParameters {
+            stencil: glium::draw_parameters::Stencil {
+                test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
+                test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
+                reference_value_clockwise: 1,
+                reference_value_counter_clockwise: 1,
+                ..Default::default()
+            },
+            blend: Blend::alpha_blending(),
+            ..Default::default()
+        };
+        let stencil_write_params = glium::DrawParameters {
+            stencil: glium::draw_parameters::Stencil {
+                test_counter_clockwise: glium::StencilTest::AlwaysPass,
+                test_clockwise: glium::StencilTest::AlwaysPass,
+                depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
+                depth_pass_operation_clockwise: glium::StencilOperation::Replace,
+                // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
+                reference_value_clockwise: 1,
+                // reference_value_counter_clockwise: 1,
+                ..Default::default()
+            },
+            color_mask: (false, false, false, false),
+            ..Default::default()
+        };
 
         let program =
             glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None)
@@ -539,6 +571,9 @@ impl Canvas {
             program_light: program_light,
             program_instancing: program_instancing,
             observer: Point3::new(0f32, 0f32, Z_FAR),
+            default_params: default_params,
+            stencil_check_params: stencil_check_params,
+            stencil_write_params: stencil_write_params,
         }
     }
 
@@ -574,22 +609,9 @@ impl Canvas {
             .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
             .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
         let draw_params = if with_lights {
-            glium::DrawParameters {
-                stencil: glium::draw_parameters::Stencil {
-                    test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
-                    test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
-                    reference_value_clockwise: 1,
-                    reference_value_counter_clockwise: 1,
-                    ..Default::default()
-                },
-                blend: Blend::alpha_blending(),
-                ..Default::default()
-            }
+            &self.stencil_check_params
         } else {
-            glium::DrawParameters {
-                blend: Blend::alpha_blending(),
-                ..Default::default()
-            }
+            &self.default_params
         };
         let scales = image_data.dim_scales;
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
@@ -606,7 +628,7 @@ impl Canvas {
                 dim_scales: (scales.x, scales.y),
                 scale: scale,
             },
-            &draw_params,
+            draw_params,
         )
     }
 
@@ -614,39 +636,22 @@ impl Canvas {
         &self,
         display: &SDL2Facade,
         target: &mut glium::Frame,
-        image_data: &GeometryData,
+        geometry_data: &GeometryData,
         model: &Isometry3,
         stencil: bool,
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
-        // @vlad TODO move to field
         let draw_params = if stencil {
-            glium::DrawParameters {
-                stencil: glium::draw_parameters::Stencil {
-                    test_counter_clockwise: glium::StencilTest::AlwaysPass,
-                    test_clockwise: glium::StencilTest::AlwaysPass,
-                    depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
-                    depth_pass_operation_clockwise: glium::StencilOperation::Replace,
-                    // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
-                    reference_value_clockwise: 1,
-                    // reference_value_counter_clockwise: 1,
-                    ..Default::default()
-                },
-                color_mask: (false, false, false, false),
-                ..Default::default()
-            }
+            &self.stencil_write_params
         } else {
-            glium::DrawParameters {
-                blend: Blend::alpha_blending(),
-                ..Default::default()
-            }
+            &self.default_params
         };
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
-            &image_data.positions,
-            &image_data.indices,
+            &geometry_data.positions,
+            &geometry_data.indices,
             &self.program_light,
             &uniform! {
                 model: model,
@@ -667,11 +672,6 @@ impl Canvas {
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
-        // @vlad TODO move to field
-        let draw_params = glium::DrawParameters {
-            blend: Blend::alpha_blending(),
-            ..Default::default()
-        };
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         target.draw(
@@ -687,7 +687,7 @@ impl Canvas {
                 perspective: perspective,
                 transparency: transparency
             },
-            &draw_params,
+            &self.default_params,
         )
     }
 }
