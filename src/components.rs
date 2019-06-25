@@ -4,6 +4,7 @@ pub use crate::geometry::Polygon;
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
+pub use crate::gui::{Button};
 use al::prelude::*;
 use astro_lib as al;
 use sdl2::mixer::Chunk;
@@ -54,6 +55,7 @@ pub struct PreloadedImages {
     pub asteroid: specs::Entity,
     pub enemy: specs::Entity,
     pub background: specs::Entity,
+    pub nebulas: Vec<specs::Entity>
 }
 
 pub struct PreloadedParticles {
@@ -95,6 +97,10 @@ impl Mouse {
 #[derive(Default, Component)]
 #[storage(NullStorage)]
 pub struct CharacterMarker;
+
+#[derive(Default, Component, Clone, Copy)]
+#[storage(NullStorage)]
+pub struct NebulaMarker;
 
 #[derive(Default, Component)]
 #[storage(NullStorage)]
@@ -188,6 +194,13 @@ impl Isometry {
     pub fn new(x: f32, y: f32, angle: f32) -> Self {
         Isometry(Isometry3::new(
             Vector3::new(x, y, 0f32),
+            Vector3::new(0f32, 0f32, angle),
+        ))
+    }
+
+    pub fn new3d(x: f32, y: f32, z: f32, angle: f32) -> Self {
+        Isometry(Isometry3::new(
+            Vector3::new(x, y, z),
             Vector3::new(0f32, 0f32, angle),
         ))
     }

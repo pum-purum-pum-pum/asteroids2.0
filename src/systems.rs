@@ -34,12 +34,17 @@ const PLAYER_BULLET_SPEED: f32 = 0.5;
 const ENEMY_BULLET_SPEED: f32 = 0.3;
 
 const _SCREEN_AREA: f32 = 10f32;
+// it's a kludge -- TODO redo with camera and screen sizes
+// we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
 const PLAYER_AREA: f32 = 15f32;
 const ACTIVE_AREA: f32 = 25f32;
-// we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
+// the same for NEBULAS
+const NEBULA_PLAYER_AREA: f32 = 90f32;
+const NEBULA_ACTIVE_AREA: f32 = 110f32;
+const NEBULA_MIN_NUMBER: usize = 20;
 
-const ASTEROIDS_MIN_NUMBER: usize = 5usize;
-const SHIPS_NUMBER: usize = 1usize;
+const ASTEROIDS_MIN_NUMBER: usize = 5;
+const SHIPS_NUMBER: usize = 1 + 1; // character's ship counts
 
 pub enum EntityType {
     Player,
@@ -73,23 +78,27 @@ pub enum InsertEvent {
         position: Point2,
         num: usize,
         attached: AttachPosition
+    },
+    Nebula {
+        iso: Point3
     }
 }
 
-pub fn spawn_position(char_pos: Point2) -> Point2 {
+pub fn spawn_position(char_pos: Point2, forbidden: f32, active: f32) -> Point2 {
+    assert!(forbidden < active);
     let mut rng = thread_rng();
     loop {
-        let x = rng.gen_range(-ACTIVE_AREA, ACTIVE_AREA);
-        let y = rng.gen_range(-ACTIVE_AREA, ACTIVE_AREA);
-        if x.abs() >= PLAYER_AREA || y.abs() >= PLAYER_AREA {
+        let x = rng.gen_range(-active, active);
+        let y = rng.gen_range(-active, active);
+        if x.abs() >= forbidden || y.abs() >= forbidden {
             return Point2::new(char_pos.x + x, char_pos.y + y);
         }
     }
 }
 
-pub fn is_active(character_position: Point2, point: Point2) -> bool {
-    (point.x - character_position.x).abs() < ACTIVE_AREA
-        && (point.y - character_position.y).abs() < ACTIVE_AREA
+pub fn is_active(character_position: Point2, point: Point2, active_area: f32) -> bool {
+    (point.x - character_position.x).abs() < active_area
+        && (point.y - character_position.y).abs() < active_area
 }
 
 fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
@@ -137,6 +146,7 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, LightMarker>,
+        ReadStorage<'a, NebulaMarker>,
         ReadStorage<'a, Projectile>,
         ReadStorage<'a, ThreadPin<ImageData>>,
         ReadStorage<'a, Image>,
@@ -160,6 +170,7 @@ impl<'a> System<'a> for RenderingSystem {
             ship_markers,
             asteroid_markers,
             light_markers,
+            nebulas,
             projectiles,
             image_datas,
             image_ids,
@@ -192,6 +203,19 @@ impl<'a> System<'a> for RenderingSystem {
                 opt_vel.unwrap().0
             )
         };
+        for (_entity, iso, image, size, _nebula) in
+                (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+            canvas
+                .render(
+                    &display,
+                    &mut target,
+                    &image_datas.get(image.0).unwrap(),
+                    &iso.0,
+                    size.0,
+                    false,
+                )
+                .unwrap();
+        }
         // @vlad TODO rewrite it with screen borders
         let rectangle = (
             char_pos.x - LIGHT_RECTANGLE_SIZE,
@@ -370,6 +394,7 @@ impl<'a> System<'a> for RenderingSystem {
         }
         target.finish().unwrap();
     }
+
 }
 
 #[derive(Default)]
@@ -637,6 +662,7 @@ impl<'a> System<'a> for InsertSystem {
         WriteStorage<'a, Polygon>,
         WriteStorage<'a, Projectile>,
         WriteStorage<'a, ThreadPin<ParticlesData>>,
+        WriteStorage<'a, NebulaMarker>,
         WriteExpect<'a, SDLDisplay>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
@@ -663,6 +689,7 @@ impl<'a> System<'a> for InsertSystem {
             mut polygons,
             mut projectiles,
             mut particles_datas,
+            mut nebulas,
             display,
             _stat,
             preloaded_images,
@@ -851,11 +878,27 @@ impl<'a> System<'a> for InsertSystem {
                         .with(engine_particles, &mut particles_datas)
                         .build();
                 }
+                InsertEvent::Nebula {
+                    iso
+                } => {
+                    let mut rng = thread_rng();
+                    let z = rng.gen_range(-50f32, -40f32);
+                    let nebulas_num = preloaded_images.nebulas.len();
+                    let nebula_id = rng.gen_range(0, nebulas_num);
+                    let nebula = entities
+                        .build_entity()
+                        .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
+                        .with(Image(preloaded_images.nebulas[nebula_id]), &mut images)
+                        .with(NebulaMarker::default(), &mut nebulas)
+                        .with(Size(40f32), &mut sizes)
+                        .build();
+                }
             }
         }
     }
 }
 
+// TODO: probably move out proc gen 
 #[derive(Default)]
 pub struct GamePlaySystem;
 
@@ -875,6 +918,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteStorage<'a, Image>,
         WriteStorage<'a, Size>,
         WriteStorage<'a, Polygon>,
+        WriteStorage<'a, NebulaMarker>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -898,6 +942,7 @@ impl<'a> System<'a> for GamePlaySystem {
             _images,
             _sizes,
             _polygons,
+            nebulas,
             _stat,
             _preloaded_images,
             _world,
@@ -930,7 +975,7 @@ impl<'a> System<'a> for GamePlaySystem {
             let poly = generate_convex_polygon(10, r);
             let spin = rng.gen_range(-1E-2, 1E-2);
             // let ball = ncollide2d::shape::Ball::new(r);
-            let spawn_pos = spawn_position(character_position);
+            let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
             insert_channel.single_write(InsertEvent::Asteroid {
                 iso: Point3::new(
                     spawn_pos.x,
@@ -952,22 +997,40 @@ impl<'a> System<'a> for GamePlaySystem {
         let ship_shape = Geometry::Circle { radius: r };
 
         for _ in 0..add_cnt {
-            let spawn_pos = spawn_position(character_position);
+            let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
             insert_channel.single_write(InsertEvent::Ship {
                 iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
                 light_shape: ship_shape,
                 spin: 0f32,
             })
         }
+        let cnt = nebulas.count();
+        let add_cnt = if NEBULA_MIN_NUMBER > cnt {
+            NEBULA_MIN_NUMBER - cnt
+        } else {
+            0
+        };
+        for _ in 0..add_cnt {
+            let spawn_pos = spawn_position(character_position, NEBULA_PLAYER_AREA, NEBULA_ACTIVE_AREA);
+            insert_channel.single_write(InsertEvent::Nebula {
+                iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
+            })
+        }
         for (entity, isometry, _asteroid) in (&entities, &isometries, &asteroid_markers).join() {
             let pos3d = isometry.0.translation.vector;
-            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y)) {
+            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), ACTIVE_AREA) {
                 entities.delete(entity).unwrap();
             }
         }
         for (entity, isometry, _ship) in (&entities, &isometries, &ships).join() {
             let pos3d = isometry.0.translation.vector;
-            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y)) {
+            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), ACTIVE_AREA) {
+                entities.delete(entity).unwrap();
+            }
+        }
+        for (entity, isometry, _nebula) in (&entities, &isometries, &nebulas).join() {
+            let pos3d = isometry.0.translation.vector;
+            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), NEBULA_ACTIVE_AREA) {
                 entities.delete(entity).unwrap();
             }
         }

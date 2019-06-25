@@ -30,6 +30,8 @@ use systems::{
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem,
 };
 
+const NEBULAS_NUM: usize = 3usize;
+
 pub fn main() -> Result<(), String> {
     let mut phys_world: World<f32> = World::new();
     phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
@@ -77,6 +79,8 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Image>();
     specs_world.register::<Lifes>();
     specs_world.register::<Shields>();
+    specs_world.register::<Button>();
+    specs_world.register::<NebulaMarker>();
     let background_image_data = ThreadPin::new(
         ImageData::new(&display, "back").unwrap()
     );
@@ -95,6 +99,17 @@ pub fn main() -> Result<(), String> {
     let enemy_image_data = ThreadPin::new(
         ImageData::new(&display, "enemy").unwrap()
     );
+    let mut nebula_images = vec![];
+    for i in 1..=NEBULAS_NUM {
+        let nebula_image_data = ThreadPin::new(
+            ImageData::new(&display, &format!("nebula{}", i)).unwrap()
+        );
+        let nebula_image = specs_world
+            .create_entity()
+            .with(nebula_image_data)
+            .build();
+        nebula_images.push(nebula_image);
+    }
     let background_image = specs_world
         .create_entity()
         .with(background_image_data)
@@ -124,6 +139,7 @@ pub fn main() -> Result<(), String> {
         asteroid: asteroid_image,
         enemy: enemy_image,
         background: background_image,
+        nebulas: nebula_images
     };
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&display, -size, -size, size, size, 100),
