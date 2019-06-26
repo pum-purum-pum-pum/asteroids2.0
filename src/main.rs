@@ -27,8 +27,9 @@ use physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
 use sound::init_sound;
 use systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertEvent, InsertSystem,
-    KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem,
+    KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem
 };
+use gui::{IngameUI, Primitive};
 
 const NEBULAS_NUM: usize = 3usize;
 
@@ -49,6 +50,7 @@ pub fn main() -> Result<(), String> {
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
+    let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
     specs_world.add_resource(phys_world);
@@ -79,8 +81,11 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Image>();
     specs_world.register::<Lifes>();
     specs_world.register::<Shields>();
-    specs_world.register::<Button>();
     specs_world.register::<NebulaMarker>();
+    {
+        // Create menu widges
+        
+    }
     let background_image_data = ThreadPin::new(
         ImageData::new(&display, "back").unwrap()
     );
@@ -212,7 +217,11 @@ pub fn main() -> Result<(), String> {
             .with(LightMarker)
             .build();
     }
-    let rendering_system = RenderingSystem::default();
+    let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
+    let menu_rendering_system = MenuRenderingSystem::new(primitives_channel.register_reader());
+    let mut menu_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(menu_rendering_system)
+        .build();
     let phyiscs_system = PhysicsSystem::default();
     let sound_system = SoundSystem::new(sounds_channel.register_reader());
     let control_system = ControlSystem::new(keys_channel.register_reader());
@@ -255,6 +264,9 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(canvas));
     specs_world.add_resource(preloaded_images);
     specs_world.add_resource(Stat::default());
+    specs_world.add_resource(AppState::Menu);
+    specs_world.add_resource(IngameUI::default());
+    specs_world.add_resource(primitives_channel);
     // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
     // specs_world.add_resource(poly);
     // ------------------------------
@@ -288,7 +300,15 @@ pub fn main() -> Result<(), String> {
                 dims.1,
             );
         }
-        dispatcher.dispatch(&specs_world.res);
+        let app_state = *specs_world.read_resource::<AppState>();
+        match app_state {
+            AppState::Menu => {
+                menu_dispatcher.dispatch(&specs_world.res)
+            }
+            AppState::Play => {
+                dispatcher.dispatch(&specs_world.res);
+            }
+        }
         safe_maintain(&mut specs_world);
         for event in event_pump.poll_iter() {
             use sdl2::event::Event;

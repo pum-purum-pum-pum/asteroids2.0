@@ -3,6 +3,7 @@ use astro_lib as al;
 use rand::prelude::*;
 use std::fs::File;
 use std::io::{BufReader, Error as IOError};
+use nalgebra::geometry::Orthographic3;
 
 use glium;
 use glium::draw_parameters::Blend;
@@ -429,6 +430,7 @@ pub struct Canvas<'a> {
     program: glium::Program,       // @vlad TODO: we want to use many programs
     program_light: glium::Program, // but for now simpler=better
     program_instancing: glium::Program,
+    program_primitive: glium::Program,
     observer: Point3,
     default_params: glium::DrawParameters<'a>,
     stencil_check_params: glium::DrawParameters<'a>,
@@ -437,6 +439,26 @@ pub struct Canvas<'a> {
 
 impl<'a> Canvas<'a> {
     pub fn new(display: &SDL2Facade) -> Self {
+        let vertex_shader_primitive_src = r#"
+            #version 130
+            in vec2 position;
+            uniform mat4 orthographic;
+            
+            void main() {
+                gl_Position = orthographic * vec4(position, -1.0, 1.0);
+            }
+        "#;
+
+        let fragment_shader_primitive_src = r#"
+            #version 130
+            out vec4 color;
+            uniform vec3 fill_color;
+
+            void main() {
+                color = vec4(fill_color, 1.0);
+            }
+        "#;
+
         let vertex_shader_src = r#"
             #version 130
             in vec2 tex_coords;
@@ -552,6 +574,9 @@ impl<'a> Canvas<'a> {
         let program =
             glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None)
                 .unwrap();
+        let program_primitive = 
+            glium::Program::from_source(display, vertex_shader_primitive_src, fragment_shader_primitive_src, None)
+                .unwrap();
         let program_light = glium::Program::from_source(
             display,
             vertex_light_shader_src,
@@ -568,6 +593,7 @@ impl<'a> Canvas<'a> {
         .unwrap();
         Canvas {
             program: program,
+            program_primitive: program_primitive,
             program_light: program_light,
             program_instancing: program_instancing,
             observer: Point3::new(0f32, 0f32, Z_FAR),
@@ -629,6 +655,27 @@ impl<'a> Canvas<'a> {
                 scale: scale,
             },
             draw_params,
+        )
+    }
+
+    pub fn render_primitive(
+        &self,
+        display: &SDL2Facade,
+        target: &mut glium::Frame,
+        geometry_data: &GeometryData,
+        fill_color: Point3,
+    ) -> Result<(), DrawError> {
+        let dims = display.get_framebuffer_dimensions();
+        let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+        target.draw(
+            &geometry_data.positions,
+            &geometry_data.indices,
+            &self.program_primitive,
+            &uniform! {
+                orthographic: orthographic,
+                fill_color: [fill_color.x, fill_color.y, fill_color.z]
+            },
+            &self.default_params,
         )
     }
 
@@ -698,9 +745,21 @@ fn get_view(observer: Point3) -> Isometry3 {
     Isometry3::look_at_rh(&observer, &target, &Vector3::y())
 }
 
+// creates ortograohic projection left=bot=0 z_near=0.1 far=1.0
+pub fn orthographic(width: u32, height: u32) -> Orthographic3<f32>{
+    Orthographic3::new(0f32, width as f32, 0f32, height as f32, 0.1, 1f32)
+}
+
 pub fn perspective(width: u32, height: u32) -> Perspective3 {
     let aspect_ratio = width as f32 / height as f32;
     Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 1000.0)
+}
+
+pub fn ortho_unproject(width: u32, height: u32, point: Point2) -> Point2 {
+    let ortho: Matrix4 = orthographic(width, height).into();
+    let unortho = ortho.try_inverse().unwrap();
+    let res = unortho * Point4::new(point.x, point.y, 1f32, 1f32);
+    Point2::new(res.x, res.y)
 }
 
 pub fn unproject(

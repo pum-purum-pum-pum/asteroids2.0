@@ -24,6 +24,7 @@ use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, Triang
 use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData};
+use crate::gui::{Primitive, Button, IngameUI};
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -43,7 +44,7 @@ const NEBULA_PLAYER_AREA: f32 = 90f32;
 const NEBULA_ACTIVE_AREA: f32 = 110f32;
 const NEBULA_MIN_NUMBER: usize = 20;
 
-const ASTEROIDS_MIN_NUMBER: usize = 5;
+const ASTEROIDS_MIN_NUMBER: usize = 10;
 const SHIPS_NUMBER: usize = 1 + 1; // character's ship counts
 
 pub enum EntityType {
@@ -133,10 +134,20 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
     (angle_diff * 10.0 - speed * 55.0)
 }
 
-#[derive(Default)]
-pub struct RenderingSystem;
 
-impl<'a> System<'a> for RenderingSystem {
+pub struct MenuRenderingSystem {
+    reader: ReaderId<Primitive>,
+}
+
+impl MenuRenderingSystem {
+    pub fn new(reader: ReaderId<Primitive>) -> Self {
+        MenuRenderingSystem{
+            reader: reader
+        }
+    }
+}
+
+impl<'a> System<'a> for MenuRenderingSystem {
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, Isometry>,
@@ -158,6 +169,10 @@ impl<'a> System<'a> for RenderingSystem {
         WriteExpect<'a, Canvas<'static>>,
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
+        Write<'a, EventChannel<Primitive>>,
+        Write<'a, IngameUI>,
+        Read<'a, Mouse>,
+        Write<'a, AppState>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -182,6 +197,102 @@ impl<'a> System<'a> for RenderingSystem {
             mut canvas,
             preloaded_particles,
             world,
+            mut primitives_channel,
+            mut ui,
+            mouse,
+            mut app_state
+        ) = data;
+        let mut target = display.draw();
+        target.clear_color(0.0, 0.0, 0.0, 1.0);
+        target.clear_stencil(0i32);
+        let dims = display.get_framebuffer_dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        let (button_w, button_h) = (w/4f32, h/4f32);
+        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32));
+        if button.place_and_check(&mut ui, Point2::new(mouse.o_x, mouse.o_y)) && mouse.left {
+            dbg!("button activated");
+            *app_state = AppState::Play;
+        }
+        primitives_channel.iter_write(ui.primitives.drain(..));
+        for primitive in primitives_channel.read(&mut self.reader) {
+            match primitive {
+                Primitive::Rectangle(rectangle) => {
+                    let (points, indicies) = rectangle.get_geometry();
+                    let geom_data =
+                        GeometryData::new(&display, &points, &indicies);
+                    canvas
+                        .render_primitive(&display, &mut target, &geom_data, rectangle.color)
+                        .unwrap();
+                }
+                _ => ()
+            }
+        }
+        target.finish().unwrap();
+    }
+}
+
+pub struct RenderingSystem {
+    reader: ReaderId<Primitive>,
+}
+
+impl RenderingSystem {
+    pub fn new(reader: ReaderId<Primitive>) -> Self{
+        RenderingSystem {
+            reader: reader
+        }
+    }
+}
+
+impl<'a> System<'a> for RenderingSystem {
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Isometry>,
+        ReadStorage<'a, Velocity>,
+        ReadStorage<'a, PhysicsComponent>,
+        ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
+        ReadStorage<'a, AsteroidMarker>,
+        ReadStorage<'a, LightMarker>,
+        ReadStorage<'a, NebulaMarker>,
+        ReadStorage<'a, Projectile>,
+        ReadStorage<'a, ThreadPin<ImageData>>,
+        ReadStorage<'a, Image>,
+        ReadStorage<'a, Geometry>,
+        ReadStorage<'a, Size>,
+        ReadStorage<'a, Polygon>,
+        WriteStorage<'a, ThreadPin<ParticlesData>>,
+        WriteExpect<'a, SDLDisplay>,
+        WriteExpect<'a, Canvas<'static>>,
+        ReadExpect<'a, PreloadedParticles>,
+        Read<'a, World<f32>>,
+        Write<'a, EventChannel<Primitive>>,
+        Write<'a, IngameUI>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (
+            entities,
+            isometries,
+            velocities,
+            physics,
+            character_markers,
+            ship_markers,
+            asteroid_markers,
+            light_markers,
+            nebulas,
+            projectiles,
+            image_datas,
+            image_ids,
+            geometries,
+            sizes,
+            polygons,
+            mut particles_datas,
+            display,
+            mut canvas,
+            preloaded_particles,
+            world,
+            mut primitives_channel,
+            mut ingame_ui,
         ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -391,6 +502,47 @@ impl<'a> System<'a> for RenderingSystem {
                     false,
                 )
                 .unwrap();
+        }
+
+        // "UI" things
+        let dims = display.get_framebuffer_dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
+        let lifes_bar = Rectangle {
+            position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
+            width: lifebar_w,
+            height: lifebar_h,
+            color: Point3::new(0.0, 0.6, 0.1)
+        };
+        let shields_bar = Rectangle {
+            position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
+            width: lifebar_w,
+            height: lifebar_h,
+            color: Point3::new(0.0, 0.1, 0.6)
+        };
+        let border = 0f32;
+        let lifes_bar_back = Rectangle {
+            position: Point2::new(w/2.0 - lifebar_w / 2.0 - border, h/40.0 - border + h/40.0 - border),
+            width: lifebar_w + border * 2.0,
+            height: lifebar_h + border * 2.0,
+            color: Point3::new(1.0, 1.0, 1.0)
+        };
+        ingame_ui.primitives.push(Primitive::Rectangle(shields_bar));
+        ingame_ui.primitives.push(Primitive::Rectangle(lifes_bar_back));
+        ingame_ui.primitives.push(Primitive::Rectangle(lifes_bar));
+        primitives_channel.iter_write(ingame_ui.primitives.drain(..));
+        for primitive in primitives_channel.read(&mut self.reader) {
+            match primitive {
+                Primitive::Rectangle(rectangle) => {
+                    let (points, indicies) = rectangle.get_geometry();
+                    let geom_data =
+                        GeometryData::new(&display, &points, &indicies);
+                    canvas
+                        .render_primitive(&display, &mut target, &geom_data, rectangle.color)
+                        .unwrap();
+                }
+                _ => ()
+            }
         }
         target.finish().unwrap();
     }

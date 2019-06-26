@@ -4,18 +4,30 @@ pub use crate::geometry::Polygon;
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
-pub use crate::gui::{Button};
+pub use crate::gui::{Button, Rectangle};
 use al::prelude::*;
 use astro_lib as al;
 use sdl2::mixer::Chunk;
 use specs::prelude::*;
 use specs_derive::Component;
 
-use crate::gfx::{unproject_with_z, Canvas as SDLCanvas};
+use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
 
 pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas<'a> = ThreadPin<SDLCanvas<'a>>;
+
+#[derive(Debug, Clone, Copy)]
+pub enum AppState {
+    Menu,
+    Play
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        AppState::Menu
+    }
+}
 
 #[derive(Default, Debug)]
 pub struct Stat {
@@ -64,6 +76,8 @@ pub struct PreloadedParticles {
 
 #[derive(Default, Debug)]
 pub struct Mouse {
+    pub o_x: f32,
+    pub o_y: f32,
     pub x: f32,
     pub y: f32,
     pub left: bool,
@@ -80,6 +94,9 @@ impl Mouse {
         let (x, y) = (x as f32, y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
+        let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));
+        self.o_x = ortho_point.x;
+        self.o_y = ortho_point.y;
         let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u);
         self.x = point.x;
         self.y = point.y;
