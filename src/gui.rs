@@ -19,21 +19,28 @@ pub struct Button {
     position: Point2, // screen position
     width: f32,
     height: f32,
-    color: Point3
+    color: Point3,
+    with_projection: bool
 }
 
-pub enum Primitive {
+pub enum PrimitiveKind {
     Rectangle(Rectangle),
     Text(String)
 }
 
+pub struct Primitive {
+    pub kind: PrimitiveKind,
+    pub with_projection: bool,
+}
+
 impl Button {
-    pub fn new(position: Point2, width: f32, height: f32, color: Point3) -> Button {
+    pub fn new(position: Point2, width: f32, height: f32, color: Point3, with_projection: bool) -> Button {
         Button {
             position: position,
             width: width,
             height: height,
-            color: color
+            color: color,
+            with_projection: with_projection
         }
     }
 
@@ -54,12 +61,15 @@ impl Button {
     //     )
     // }
     pub fn get_geometry(&self) -> Primitive {
-        Primitive::Rectangle(Rectangle{
-            position: self.position, 
-            width: self.width, 
-            height: self.height,
-            color: self.color
-        })
+        Primitive {
+            kind: PrimitiveKind::Rectangle(Rectangle{
+                position: self.position, 
+                width: self.width, 
+                height: self.height,
+                color: self.color
+            }),
+            with_projection: self.with_projection
+        }
     }
 
     pub fn place_and_check(
@@ -80,13 +90,15 @@ pub struct Rectangle {
 }
 
 impl Rectangle {
-    pub fn get_geometry(&self) -> (Vec<Point2>, Vec<u16>) {
+    pub fn get_geometry(&self) -> (Isometry3, Vec<Point2>, Vec<u16>) {
+        let model = Isometry3::new(Vector3::new(self.position.x, self.position.y, 0f32), Vector3::new(0f32, 0f32 ,0f32));
         (
+            model,
             vec![
-                self.position,
-                Point2::new(self.position.x, self.position.y + self.height),
-                Point2::new(self.position.x + self.width, self.position.y + self.height), 
-                Point2::new(self.position.x + self.width, self.position.y)
+                Point2::new(0.0, 0.0),
+                Point2::new(0.0, self.height),
+                Point2::new(self.width, self.height), 
+                Point2::new(self.width, 0.0)
             ],
             vec![0u16, 1, 2, 2, 3, 0]
         )

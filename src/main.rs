@@ -80,8 +80,9 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<ThreadPin<SoundData>>();
     specs_world.register::<Image>();
     specs_world.register::<Lifes>();
-    specs_world.register::<Shields>();
+    specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
+    specs_world.register::<Damage>();
     {
         // Create menu widges
         
@@ -156,12 +157,12 @@ pub fn main() -> Result<(), String> {
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
     };
-    let char_size = 0.7f32;
+    let char_size = 0.4f32;
     let character_shape = Geometry::Circle { radius: char_size };
-    let enemy_size = 0.7f32;
+    let enemy_size = 0.4f32;
     let _enemy_shape = Geometry::Circle { radius: enemy_size };
-    let lifes = Lifes(10usize);
-    let shields = Shields(10usize);
+    let lifes = Lifes(MAX_LIFES);
+    let shields = Shield(MAX_SHIELDS);
     let character = specs_world
         .create_entity()
         .with(lifes)
@@ -171,7 +172,7 @@ pub fn main() -> Result<(), String> {
         .with(CharacterMarker::default())
         .with(ShipMarker::default())
         .with(Image(character_image))
-        .with(Gun::new(12u8))
+        .with(Gun::new(12usize, 10usize))
         .with(Spin::default())
         .with(character_shape)
         .with(Size(char_size))

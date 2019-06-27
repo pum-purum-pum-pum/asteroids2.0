@@ -442,10 +442,12 @@ impl<'a> Canvas<'a> {
         let vertex_shader_primitive_src = r#"
             #version 130
             in vec2 position;
-            uniform mat4 orthographic;
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
             
             void main() {
-                gl_Position = orthographic * vec4(position, -1.0, 1.0);
+                gl_Position = projection * view * model * vec4(position, -1.0, 1.0);
             }
         "#;
 
@@ -663,16 +665,29 @@ impl<'a> Canvas<'a> {
         display: &SDL2Facade,
         target: &mut glium::Frame,
         geometry_data: &GeometryData,
+        model: &Isometry3,
         fill_color: Point3,
+        with_projection: bool,
     ) -> Result<(), DrawError> {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
-        let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+        let (projection, view) = if with_projection {
+            let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+            (perspective, view)
+        } else {
+            let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = Matrix4::identity().into();
+            (orthographic, view)
+        };
         target.draw(
             &geometry_data.positions,
             &geometry_data.indices,
             &self.program_primitive,
             &uniform! {
-                orthographic: orthographic,
+                projection: projection,
+                view: view,
+                model: model,
                 fill_color: [fill_color.x, fill_color.y, fill_color.z]
             },
             &self.default_params,

@@ -11,6 +11,9 @@ use sdl2::mixer::Chunk;
 use specs::prelude::*;
 use specs_derive::Component;
 
+pub const MAX_LIFES: usize = 100usize;
+pub const MAX_SHIELDS: usize = 100usize;
+
 use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
 
@@ -31,7 +34,7 @@ impl Default for AppState {
 
 #[derive(Default, Debug)]
 pub struct Stat {
-    pub asteroids_number: u8,
+    pub asteroids_number: usize,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -56,7 +59,11 @@ pub struct Particles(pub usize);
 pub struct Lifes(pub usize);
 
 #[derive(Component, Clone, Copy)]
-pub struct Shields(pub usize);
+pub struct Shield(pub usize);
+
+/// damage on collision
+#[derive(Component, Clone, Copy)]
+pub struct Damage(pub usize);
 
 // pub type Images = Collector<ImageData, Image>;
 
@@ -142,20 +149,20 @@ pub struct Projectile {
 
 #[derive(Component)]
 pub struct Lifetime {
-    life_state: u8,
-    life_time: u8,
+    life_state: usize,
+    life_time: usize,
 }
 
 impl Lifetime {
-    pub fn new(live_time: u8) -> Self {
+    pub fn new(live_time: usize) -> Self {
         Lifetime {
-            life_state: 0u8,
+            life_state: 0usize,
             life_time: live_time,
         }
     }
 
     pub fn update(&mut self) {
-        self.life_state = u8::min(self.life_time, self.life_state + 1u8);
+        self.life_state = usize::min(self.life_time, self.life_state + 1usize);
     }
 
     pub fn delete(&self) -> bool {
@@ -170,20 +177,22 @@ pub struct AttachPosition(pub specs::Entity);
 /// gun reloading status and time
 #[derive(Component, Debug)]
 pub struct Gun {
-    recharge_state: u8,
-    recharge_time: u8,
+    recharge_state: usize,
+    recharge_time: usize,
+    pub bullets_damage: usize,
 }
 
 impl Gun {
-    pub fn new(recharge_time: u8) -> Self {
+    pub fn new(recharge_time: usize, bullets_damage: usize) -> Self {
         Gun {
-            recharge_state: 0u8,
+            recharge_state: 0usize,
             recharge_time: recharge_time,
+            bullets_damage: bullets_damage
         }
     }
 
     pub fn update(&mut self) {
-        self.recharge_state = u8::min(self.recharge_time, self.recharge_state + 1u8);
+        self.recharge_state = usize::min(self.recharge_time, self.recharge_state + 1usize);
     }
 
     pub fn is_ready(&self) -> bool {
@@ -193,7 +202,7 @@ impl Gun {
     pub fn shoot(&mut self) -> bool {
         let result = self.is_ready();
         if result {
-            self.recharge_state = 0u8
+            self.recharge_state = 0usize
         };
         result
     }

@@ -21,10 +21,10 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter};
-use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData};
+use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData, unproject_with_z, ortho_unproject};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData};
-use crate::gui::{Primitive, Button, IngameUI};
+use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI};
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -68,6 +68,7 @@ pub enum InsertEvent {
         kind: EntityType,
         iso: Point3,
         velocity: Point2,
+        damage: usize,
         owner: specs::Entity,
     },
     Explosion {
@@ -208,7 +209,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let dims = display.get_framebuffer_dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let (button_w, button_h) = (w/4f32, h/4f32);
-        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32));
+        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false);
         if button.place_and_check(&mut ui, Point2::new(mouse.o_x, mouse.o_y)) && mouse.left {
             dbg!("button activated");
             *app_state = AppState::Play;
@@ -216,12 +217,15 @@ impl<'a> System<'a> for MenuRenderingSystem {
         primitives_channel.iter_write(ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
             match primitive {
-                Primitive::Rectangle(rectangle) => {
-                    let (points, indicies) = rectangle.get_geometry();
+                Primitive{
+                    kind: PrimitiveKind::Rectangle(rectangle),
+                    with_projection
+                }  => {
+                    let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
                         GeometryData::new(&display, &points, &indicies);
                     canvas
-                        .render_primitive(&display, &mut target, &geom_data, rectangle.color)
+                        .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
                         .unwrap();
                 }
                 _ => ()
@@ -260,6 +264,8 @@ impl<'a> System<'a> for RenderingSystem {
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Polygon>,
+        ReadStorage<'a, Lifes>,
+        ReadStorage<'a, Shield>,
         WriteStorage<'a, ThreadPin<ParticlesData>>,
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas<'static>>,
@@ -286,6 +292,8 @@ impl<'a> System<'a> for RenderingSystem {
             geometries,
             sizes,
             polygons,
+            lifes,
+            shields,
             mut particles_datas,
             display,
             mut canvas,
@@ -314,19 +322,32 @@ impl<'a> System<'a> for RenderingSystem {
                 opt_vel.unwrap().0
             )
         };
-        for (_entity, iso, image, size, _nebula) in
-                (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
-            canvas
-                .render(
-                    &display,
-                    &mut target,
-                    &image_datas.get(image.0).unwrap(),
-                    &iso.0,
-                    size.0,
-                    false,
-                )
-                .unwrap();
-        }
+        // NEBULA UNCOMMENT. TODO -- OPTIMIZE!
+        // for (_entity, iso, image, size, _nebula) in
+        //         (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+        //     canvas
+        //         .render(
+        //             &display,
+        //             &mut target,
+        //             &image_datas.get(image.0).unwrap(),
+        //             &iso.0,
+        //             size.0,
+        //         (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+        //     canvas
+        //         .render(
+        //             &display,
+        //             &mut target,
+        //             &image_datas.get(image.0).unwrap(),
+        //             &iso.0,
+        //             size.0,
+        //             false,
+        //         )
+        //         .unwrap();
+        // }
+        //             false,
+        //         )
+        //         .unwrap();
+        // }
         // @vlad TODO rewrite it with screen borders
         let rectangle = (
             char_pos.x - LIGHT_RECTANGLE_SIZE,
@@ -506,39 +527,95 @@ impl<'a> System<'a> for RenderingSystem {
 
         // "UI" things
         let dims = display.get_framebuffer_dimensions();
+        let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
+        let shield_color = Point3::new(0.0, 0.1, 0.6); 
         let (w, h) = (dims.0 as f32, dims.1 as f32);
-        let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
-        let lifes_bar = Rectangle {
-            position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
-            width: lifebar_w,
-            height: lifebar_h,
-            color: Point3::new(0.0, 0.6, 0.1)
-        };
-        let shields_bar = Rectangle {
-            position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
-            width: lifebar_w,
-            height: lifebar_h,
-            color: Point3::new(0.0, 0.1, 0.6)
-        };
-        let border = 0f32;
-        let lifes_bar_back = Rectangle {
-            position: Point2::new(w/2.0 - lifebar_w / 2.0 - border, h/40.0 - border + h/40.0 - border),
-            width: lifebar_w + border * 2.0,
-            height: lifebar_h + border * 2.0,
-            color: Point3::new(1.0, 1.0, 1.0)
-        };
-        ingame_ui.primitives.push(Primitive::Rectangle(shields_bar));
-        ingame_ui.primitives.push(Primitive::Rectangle(lifes_bar_back));
-        ingame_ui.primitives.push(Primitive::Rectangle(lifes_bar));
+        for (isometry, life, shield, _ship) in (&isometries, &lifes, &shields, &ship_markers).join() {
+            let position = isometry.0.translation.vector;
+            // let position = unproject_with_z(
+            //     canvas.observer(), 
+            //     &Point2::new(position.x, position.y), 
+            //     1f32, dims.0, dims.1
+            // );
+            // let position = ortho_unproject(dims.0, dims.1, Point2::new(position.x, position.y));
+            let ship_lifes_bar = Rectangle {
+                position: Point2::new(position.x, position.y),
+                width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
+                height: 0.1,
+                color: life_color.clone()
+            };
+            let ship_shield_bar = Rectangle {
+                position: Point2::new(position.x, position.y - 1.0),
+                width: (shield.0 as f32/ MAX_SHIELDS as f32) * 1.5,
+                height: 0.1,
+                color: shield_color.clone()
+            };
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(ship_lifes_bar),
+                    with_projection: true
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(ship_shield_bar),
+                    with_projection: true
+                }
+            )
+        }
+
+        for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
+            let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
+            let lifes_bar = Rectangle {
+                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
+                width: (life.0 as f32 / MAX_LIFES as f32) * lifebar_w,
+                height: lifebar_h,
+                color: life_color.clone()
+            };
+            let shields_bar = Rectangle {
+                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
+                width: (shield.0 as f32 / MAX_SHIELDS as f32) * lifebar_w,
+                height: lifebar_h,
+                color: Point3::new(0.0, 0.1, 0.6)
+            };
+            let border = 0f32;
+            let lifes_bar_back = Rectangle {
+                position: Point2::new(w/2.0 - lifebar_w / 2.0 - border, h/40.0 - border + h/40.0 - border),
+                width: lifebar_w + border * 2.0,
+                height: lifebar_h + border * 2.0,
+                color: Point3::new(1.0, 1.0, 1.0)
+            };
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(shields_bar),
+                    with_projection: false
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(lifes_bar_back),
+                    with_projection: false
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(lifes_bar),
+                    with_projection: false
+                }
+            );
+        }
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
             match primitive {
-                Primitive::Rectangle(rectangle) => {
-                    let (points, indicies) = rectangle.get_geometry();
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(rectangle),
+                    with_projection 
+                } => {
+                    let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
                         GeometryData::new(&display, &points, &indicies);
                     canvas
-                        .render_primitive(&display, &mut target, &geom_data, rectangle.color)
+                        .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
                         .unwrap();
                 }
                 _ => ()
@@ -762,12 +839,13 @@ impl<'a> System<'a> for ControlSystem {
                 let projectile_velocity = Velocity::new(
                     char_velocity.0.x + velocity_rel.x,
                     char_velocity.0.y + velocity_rel.y,
-                );
+                ) ;
                 sounds_channel.single_write(Sound(preloaded_sounds.shot));
                 insert_channel.single_write(InsertEvent::Bullet {
                     kind: EntityType::Player,
                     iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                    damage: gun.bullets_damage,
                     owner: character,
                 });
             }
@@ -805,6 +883,9 @@ impl<'a> System<'a> for InsertSystem {
         WriteStorage<'a, Velocity>,
         WriteStorage<'a, Spin>,
         WriteStorage<'a, Gun>,
+        WriteStorage<'a, Damage>,
+        WriteStorage<'a, Lifes>,
+        WriteStorage<'a, Shield>,
         WriteStorage<'a, Lifetime>,
         WriteStorage<'a, AsteroidMarker>,
         WriteStorage<'a, EnemyMarker>,
@@ -832,6 +913,9 @@ impl<'a> System<'a> for InsertSystem {
             mut velocities,
             mut spins,
             mut guns,
+            mut damages,
+            mut lifes,
+            mut shields,
             mut lifetimes,
             mut asteroid_markers,
             mut enemies,
@@ -919,7 +1003,9 @@ impl<'a> System<'a> for InsertSystem {
                         .with(EnemyMarker::default(), &mut enemies)
                         .with(ShipMarker::default(), &mut ships)
                         .with(Image(preloaded_images.enemy), &mut images)
-                        .with(Gun::new(50u8), &mut guns)
+                        .with(Lifes(MAX_LIFES), &mut lifes)
+                        .with(Shield(MAX_SHIELDS), &mut shields)
+                        .with(Gun::new(50usize, 10usize), &mut guns)
                         .with(Spin::default(), &mut spins)
                         .with(enemy_shape, &mut geometries)
                         .with(Size(enemy_size), &mut sizes)
@@ -940,16 +1026,18 @@ impl<'a> System<'a> for InsertSystem {
                     kind,
                     iso,
                     velocity,
+                    damage,
                     owner,
                 } => {
                     let bullet = entities
                         .build_entity()
+                        .with(Damage(*damage), &mut damages)
                         .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
                         .with(Image(preloaded_images.projectile), &mut images)
                         .with(Spin::default(), &mut spins)
                         .with(Projectile { owner: *owner }, &mut projectiles)
-                        .with(Lifetime::new(100u8), &mut lifetimes)
+                        .with(Lifetime::new(100usize), &mut lifetimes)
                         .with(Size(0.1), &mut sizes)
                         .build();
                     let player_bullet_collision_groups = match kind {
@@ -1208,6 +1296,9 @@ impl<'a> System<'a> for CollisionSystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, Projectile>,
+        WriteStorage<'a, Lifes>,
+        WriteStorage<'a, Shield>,
+        ReadStorage<'a, Damage>,
         WriteStorage<'a, Polygon>,
         Write<'a, World<f32>>,
         Read<'a, BodiesMap>,
@@ -1225,6 +1316,9 @@ impl<'a> System<'a> for CollisionSystem {
             character_markers,
             ships,
             projectiles,
+            mut lifes,
+            mut shields,
+            damages,
             polygons,
             mut world,
             bodies_map,
@@ -1305,10 +1399,18 @@ impl<'a> System<'a> for CollisionSystem {
             }
             if ships.get(entity1).is_some() && projectiles.get(entity2).is_some() {
                 let ship = entity1;
-                let _projectile = entity2;
+                let projectile = entity2;
+                let projectile_damage = damages.get(projectile).unwrap().0;
                 let isometry = isometries.get(ship).unwrap().0;
                 let position = isometry.translation.vector;
                 if character_markers.get(ship).is_some() {
+                    let shield = shields.get_mut(ship).unwrap();
+                    let lifes = lifes.get_mut(ship).unwrap();
+                    if shield.0 > 0 {
+                        shield.0 -= projectile_damage
+                    } else {
+                        lifes.0 -= projectile_damage
+                    }
                 } else {
                     entities.delete(ship).unwrap();
                     let effect = InsertEvent::Explosion {
@@ -1318,6 +1420,7 @@ impl<'a> System<'a> for CollisionSystem {
                     };
                     insert_channel.single_write(effect);
                 }
+                entities.delete(projectile).unwrap();
             }
         }
     }
@@ -1406,6 +1509,7 @@ impl<'a> System<'a> for AISystem {
                     kind: EntityType::Enemy,
                     iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                    damage: gun.bullets_damage,
                     owner: entity,
                 });
             }
