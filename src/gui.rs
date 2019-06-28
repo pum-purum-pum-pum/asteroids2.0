@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::{BufReader, Error as IOError};
 use specs::prelude::*;
 use specs_derive::Component;
+use crate::components::Image;
 
 fn check_in(x:f32, a: f32, b: f32) -> bool {
     x > a && x < b
@@ -20,7 +21,8 @@ pub struct Button {
     width: f32,
     height: f32,
     color: Point3,
-    with_projection: bool
+    with_projection: bool,
+    pub image: Option<Image>,
 }
 
 pub enum PrimitiveKind {
@@ -31,16 +33,18 @@ pub enum PrimitiveKind {
 pub struct Primitive {
     pub kind: PrimitiveKind,
     pub with_projection: bool,
+    pub image: Option<Image>,
 }
 
 impl Button {
-    pub fn new(position: Point2, width: f32, height: f32, color: Point3, with_projection: bool) -> Button {
+    pub fn new(position: Point2, width: f32, height: f32, color: Point3, with_projection: bool, image: Option<Image>) -> Button {
         Button {
             position: position,
             width: width,
             height: height,
             color: color,
-            with_projection: with_projection
+            with_projection: with_projection,
+            image: image
         }
     }
 
@@ -49,17 +53,6 @@ impl Button {
         check_in(mouse.y, self.position.y, self.position.y + self.height)
     }
 
-    // pub fn get_geometry(&self) -> (Vec<Point2>, Vec<u16>) {
-    //     (
-    //         vec![
-    //             Point2::new(0f32, 0f32), 
-    //             Point2::new(0f32, self.height),
-    //             Point2::new(self.width, self.height), 
-    //             Point2::new(self.width, 0f32)
-    //         ],
-    //         vec![0u16, 1, 2, 2, 3, 0]
-    //     )
-    // }
     pub fn get_geometry(&self) -> Primitive {
         Primitive {
             kind: PrimitiveKind::Rectangle(Rectangle{
@@ -68,7 +61,8 @@ impl Button {
                 height: self.height,
                 color: self.color
             }),
-            with_projection: self.with_projection
+            with_projection: self.with_projection,
+            image: self.image
         }
     }
 

@@ -209,7 +209,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let dims = display.get_framebuffer_dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let (button_w, button_h) = (w/4f32, h/4f32);
-        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false);
+        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false, None);
         if button.place_and_check(&mut ui, Point2::new(mouse.o_x, mouse.o_y)) && mouse.left {
             dbg!("button activated");
             *app_state = AppState::Play(PlayState::Action);
@@ -219,14 +219,30 @@ impl<'a> System<'a> for MenuRenderingSystem {
             match primitive {
                 Primitive{
                     kind: PrimitiveKind::Rectangle(rectangle),
-                    with_projection
+                    with_projection,
+                    image
                 }  => {
                     let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
                         GeometryData::new(&display, &points, &indicies);
-                    canvas
-                        .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
-                        .unwrap();
+                    match image {
+                        Some(image) => {
+                            canvas
+                                .render_primitive_texture(
+                                    &display, 
+                                    &mut target, 
+                                    image_datas.get(image.0).unwrap(),
+                                    &model, 
+                                    *with_projection,
+                                    rectangle.width
+                                ).unwrap();
+                        }
+                        None => {
+                            canvas
+                                .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
+                                .unwrap();
+                        }
+                    }
                 }
                 _ => ()
             }
@@ -258,7 +274,8 @@ impl<'a> System<'a> for GUISystem {
         Read<'a, Progress>,
         Write<'a, AppState>,
         Read<'a, Mouse>,
-        Write<'a, PlayerStats>
+        Write<'a, PlayerStats>,
+        WriteExpect<'a, PreloadedImages>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -282,6 +299,7 @@ impl<'a> System<'a> for GUISystem {
             mut app_state,
             mouse,
             mut player_stats,
+            mut preloaded_images
         ) = data;
         let (character, _) = (&entities, &character_markers).join().next().unwrap();
         // "UI" things
@@ -310,13 +328,15 @@ impl<'a> System<'a> for GUISystem {
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Rectangle(experience_bar_back),
-                with_projection: false
+                with_projection: false,
+                image: None
             }
         );
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Rectangle(experience_bar),
-                with_projection: false
+                with_projection: false,
+                image: None
             }
         );
         // let ship_lifes_bar = Rectangle {
@@ -337,21 +357,24 @@ impl<'a> System<'a> for GUISystem {
                     current_point,
                     upgrade_button_w, upgrade_button_h, 
                     white_color.clone(), 
-                    false
+                    false,
+                    Some(Image(preloaded_images.attack_speed_upgrade))
                 );
                 current_point.x += shift + upgrade_button_w;
                 let upgrade_button2 = Button::new(
                     current_point,
                     upgrade_button_w, upgrade_button_h, 
                     white_color.clone(), 
-                    false
+                    false,
+                    Some(Image(preloaded_images.bullet_speed_upgrade))
                 );
                 current_point.x += shift + upgrade_button_w;
                 let upgrade_button3 = Button::new(
                     current_point,
                     upgrade_button_w, upgrade_button_h, 
                     white_color.clone(), 
-                    false
+                    false,
+                    Some(Image(preloaded_images.ship_speed_upgrade))
                 );
                 let upgrades = vec![Upgrade::AttackSpeed, Upgrade::BulletSpeed, Upgrade::ShipSpeed];
                 if upgrade_button1.place_and_check(
@@ -426,13 +449,15 @@ impl<'a> System<'a> for GUISystem {
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(ship_lifes_bar),
-                    with_projection: true
+                    with_projection: true,
+                    image: None
                 }
             );
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(ship_shield_bar),
-                    with_projection: true
+                    with_projection: true,
+                    image: None
                 }
             )
         }
@@ -461,19 +486,22 @@ impl<'a> System<'a> for GUISystem {
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(shields_bar),
-                    with_projection: false
+                    with_projection: false,
+                    image: None
                 }
             );
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(lifes_bar_back),
-                    with_projection: false
+                    with_projection: false,
+                    image: None
                 }
             );
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(lifes_bar),
-                    with_projection: false
+                    with_projection: false,
+                    image: None
                 }
             );
         }
@@ -787,14 +815,31 @@ impl<'a> System<'a> for RenderingSystem {
             match primitive {
                 Primitive {
                     kind: PrimitiveKind::Rectangle(rectangle),
-                    with_projection 
+                    with_projection,
+                    image
                 } => {
                     let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
                         GeometryData::new(&display, &points, &indicies);
-                    canvas
-                        .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
-                        .unwrap();
+                    match image {
+                        Some(image) => {
+                            canvas
+                                .render_primitive_texture(
+                                    &display, 
+                                    &mut target, 
+                                    image_datas.get(image.0).unwrap(),
+                                    &model, 
+                                    *with_projection, 
+                                    rectangle.width
+                                ).unwrap();
+                        }
+                        None => {
+                            canvas
+                                .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
+                                .unwrap();
+
+                        }
+                    }
                 }
                 _ => ()
             }
@@ -1350,6 +1395,8 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
+        Write<'a, Progress>,
+        Write<'a, AppState>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1374,7 +1421,13 @@ impl<'a> System<'a> for GamePlaySystem {
             _world,
             _bodies_map,
             mut insert_channel,
+            mut progress,
+            mut app_state
         ) = data;
+        if progress.experience > progress.current_max_experience() {
+            progress.level_up();
+            *app_state = AppState::Play(PlayState::Upgrade);
+        }
         let (char_isometry, _char) = (&isometries, &character_markers).join().next().unwrap();
         let pos3d = char_isometry.0.translation.vector;
         let character_position = Point2::new(pos3d.x, pos3d.y);
@@ -1609,7 +1662,7 @@ impl<'a> System<'a> for CollisionSystem {
                             if life.0 > projectile_damage {
                                 life.0 -= projectile_damage
                             } else {
-                                progress.experience += 10usize;
+                                progress.experience += 50usize;
                                 entities.delete(ship).unwrap();
                             }
                         }

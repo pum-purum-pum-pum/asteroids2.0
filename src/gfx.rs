@@ -431,6 +431,7 @@ pub struct Canvas<'a> {
     program_light: glium::Program, // but for now simpler=better
     program_instancing: glium::Program,
     program_primitive: glium::Program,
+    program_primitive_texture: glium::Program,
     observer: Point3,
     default_params: glium::DrawParameters<'a>,
     stencil_check_params: glium::DrawParameters<'a>,
@@ -439,6 +440,34 @@ pub struct Canvas<'a> {
 
 impl<'a> Canvas<'a> {
     pub fn new(display: &SDL2Facade) -> Self {
+        let vertex_shader_primitive_texture_src = r#"
+            #version 130
+            in vec2 position;
+            in vec2 tex_coords;
+            uniform mat4 projection;
+            uniform mat4 view;
+            uniform mat4 model;
+            uniform float size;
+            out vec2 v_tex_coords;
+
+            void main() {
+                v_tex_coords = tex_coords;
+                gl_Position = projection * view * model * vec4(size * (position + 1.0) / 2.0, -1.0, 1.0);
+            }
+        "#;
+ 
+        let fragment_shader_primitive_texture_src = r#"
+            #version 130
+            out vec4 color;
+            uniform sampler2D tex;
+            in vec2 v_tex_coords;
+
+            void main() {
+                vec4 texture_colors = vec4(texture(tex, v_tex_coords));
+                color = texture_colors;
+            }
+        "#;
+        
         let vertex_shader_primitive_src = r#"
             #version 130
             in vec2 position;
@@ -579,6 +608,9 @@ impl<'a> Canvas<'a> {
         let program_primitive = 
             glium::Program::from_source(display, vertex_shader_primitive_src, fragment_shader_primitive_src, None)
                 .unwrap();
+        let program_primitive_texture = 
+            glium::Program::from_source(display, vertex_shader_primitive_texture_src, fragment_shader_primitive_texture_src, None)
+                .unwrap();
         let program_light = glium::Program::from_source(
             display,
             vertex_light_shader_src,
@@ -596,6 +628,7 @@ impl<'a> Canvas<'a> {
         Canvas {
             program: program,
             program_primitive: program_primitive,
+            program_primitive_texture: program_primitive_texture,
             program_light: program_light,
             program_instancing: program_instancing,
             observer: Point3::new(0f32, 0f32, Z_FAR),
@@ -659,6 +692,47 @@ impl<'a> Canvas<'a> {
             draw_params,
         )
     }
+
+    pub fn render_primitive_texture(
+        &self,
+        display: &SDL2Facade,
+        target: &mut glium::Frame,
+        image_data: &ImageData,
+        model: &Isometry3,
+        with_projection: bool,
+        size: f32,
+    ) -> Result<(), DrawError> {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = display.get_framebuffer_dimensions();
+        let (projection, view) = if with_projection {
+            let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+            (perspective, view)
+        } else {
+            let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = Matrix4::identity().into();
+            (orthographic, view)
+        };
+        let texture = image_data
+            .texture
+            .sampled()
+            .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+            .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
+        target.draw(
+            &image_data.positions,
+            &image_data.indices,
+            &self.program_primitive_texture,
+            &uniform! {
+                tex: texture,
+                projection: projection,
+                view: view,
+                model: model,
+                size: size
+            },
+            &self.default_params,
+        )
+    }
+
 
     pub fn render_primitive(
         &self,

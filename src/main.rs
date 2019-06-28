@@ -106,6 +106,15 @@ pub fn main() -> Result<(), String> {
     let enemy_image_data = ThreadPin::new(
         ImageData::new(&display, "enemy").unwrap()
     );
+    let bullet_speed_image_data = ThreadPin::new(
+        ImageData::new(&display, "bullet_speed").unwrap()
+    );
+    let ship_speed_image_data = ThreadPin::new(
+        ImageData::new(&display, "ship_speed").unwrap()
+    );
+    let attack_speed_image_data = ThreadPin::new(
+        ImageData::new(&display, "attack_speed").unwrap()
+    );
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
         let nebula_image_data = ThreadPin::new(
@@ -141,12 +150,27 @@ pub fn main() -> Result<(), String> {
         .create_entity()
         .with(enemy_image_data)
         .build();
+    let ship_speed_image = specs_world
+        .create_entity()
+        .with(ship_speed_image_data)
+        .build();
+    let bullet_speed_image = specs_world
+        .create_entity()
+        .with(bullet_speed_image_data)
+        .build();
+    let attack_speed_image = specs_world
+        .create_entity()
+        .with(attack_speed_image_data)
+        .build();
     let preloaded_images = PreloadedImages {
         projectile: projectile_image,
         asteroid: asteroid_image,
         enemy: enemy_image,
         background: background_image,
-        nebulas: nebula_images
+        nebulas: nebula_images,
+        ship_speed_upgrade: ship_speed_image,
+        bullet_speed_upgrade: bullet_speed_image,
+        attack_speed_upgrade: attack_speed_image
     };
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&display, -size, -size, size, size, 100),

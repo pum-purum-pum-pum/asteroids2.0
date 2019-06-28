@@ -111,6 +111,11 @@ impl Progress {
     pub fn current_max_experience(&self) -> usize {
         100usize * 2usize.pow(self.level as u32)
     }
+
+    pub fn level_up(&mut self) {
+        self.experience = 0usize;
+        self.level = 0usize;
+    }
 }
 
 // pub type Images = Collector<ImageData, Image>;
@@ -122,7 +127,10 @@ pub struct PreloadedImages {
     pub asteroid: specs::Entity,
     pub enemy: specs::Entity,
     pub background: specs::Entity,
-    pub nebulas: Vec<specs::Entity>
+    pub nebulas: Vec<specs::Entity>,
+    pub ship_speed_upgrade: specs::Entity,
+    pub bullet_speed_upgrade: specs::Entity,
+    pub attack_speed_upgrade: specs::Entity
 }
 
 pub struct PreloadedParticles {
