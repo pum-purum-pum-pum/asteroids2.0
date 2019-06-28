@@ -212,7 +212,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false);
         if button.place_and_check(&mut ui, Point2::new(mouse.o_x, mouse.o_y)) && mouse.left {
             dbg!("button activated");
-            *app_state = AppState::Play;
+            *app_state = AppState::Play(PlayState::Action);
         }
         primitives_channel.iter_write(ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
@@ -235,6 +235,251 @@ impl<'a> System<'a> for MenuRenderingSystem {
     }
 }
 
+#[derive(Default)]
+pub struct GUISystem;
+
+impl<'a> System<'a> for GUISystem {
+    type SystemData = (
+        Entities<'a>,
+        ReadStorage<'a, Isometry>,
+        ReadStorage<'a, Velocity>,
+        ReadStorage<'a, PhysicsComponent>,
+        ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
+        ReadStorage<'a, Lifes>,
+        ReadStorage<'a, Shield>,
+        WriteStorage<'a, Gun>,
+        WriteExpect<'a, SDLDisplay>,
+        WriteExpect<'a, Canvas<'static>>,
+        ReadExpect<'a, PreloadedParticles>,
+        Read<'a, World<f32>>,
+        Write<'a, EventChannel<Primitive>>,
+        Write<'a, IngameUI>,
+        Read<'a, Progress>,
+        Write<'a, AppState>,
+        Read<'a, Mouse>,
+        Write<'a, PlayerStats>
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+          let (
+            entities,
+            isometries,
+            velocities,
+            physics,
+            character_markers,
+            ship_markers,
+            lifes,
+            shields,
+            mut guns,
+            display,
+            mut canvas,
+            preloaded_particles,
+            world,
+            mut primitives_channel,
+            mut ingame_ui,
+            progress,
+            mut app_state,
+            mouse,
+            mut player_stats,
+        ) = data;
+        let (character, _) = (&entities, &character_markers).join().next().unwrap();
+        // "UI" things
+        // experience and level bars
+        let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
+        let shield_color = Point3::new(0.0, 0.1, 0.6); 
+        let experience_color = Point3::new(0.8, 0.8, 0.8);
+        let white_color = Point3::new(1.0, 1.0, 1.0);
+        let dims = display.get_framebuffer_dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        let experiencebar_w = w / 5.0;
+        let experiencebar_h = h / 100.0;
+        let experience_position = Point2::new(w/2.0 - experiencebar_w / 2.0, h - h / 20.0);
+        let experience_bar = Rectangle {
+            position: experience_position,
+            width: (progress.experience as f32 / progress.current_max_experience() as f32) * experiencebar_w,
+            height: experiencebar_h,
+            color: experience_color.clone()
+        };
+        let experience_bar_back = Rectangle {
+            position: experience_position,
+            width: experiencebar_w,
+            height: experiencebar_h,
+            color: white_color.clone()
+        };
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Rectangle(experience_bar_back),
+                with_projection: false
+            }
+        );
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Rectangle(experience_bar),
+                with_projection: false
+            }
+        );
+        // let ship_lifes_bar = Rectangle {
+        //     position: Point2::new(position.x, position.y),
+        //     width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
+        //     height: 0.1,
+        //     color: white_color
+        // };
+
+        // upgrade UI
+        let mut choosed_upgrade = None;
+        match *app_state {
+            AppState::Play(PlayState::Upgrade) => {
+                let (upgrade_button_w, upgrade_button_h) = ((w/4f32).min(h/2f32), (w/4f32).min(h/2f32));
+                let shift = upgrade_button_h / 10f32;
+                let mut current_point = Point2::new(shift, h - upgrade_button_h - shift);
+                let upgrade_button1 = Button::new(
+                    current_point,
+                    upgrade_button_w, upgrade_button_h, 
+                    white_color.clone(), 
+                    false
+                );
+                current_point.x += shift + upgrade_button_w;
+                let upgrade_button2 = Button::new(
+                    current_point,
+                    upgrade_button_w, upgrade_button_h, 
+                    white_color.clone(), 
+                    false
+                );
+                current_point.x += shift + upgrade_button_w;
+                let upgrade_button3 = Button::new(
+                    current_point,
+                    upgrade_button_w, upgrade_button_h, 
+                    white_color.clone(), 
+                    false
+                );
+                let upgrades = vec![Upgrade::AttackSpeed, Upgrade::BulletSpeed, Upgrade::ShipSpeed];
+                if upgrade_button1.place_and_check(
+                    &mut ingame_ui, 
+                    Point2::new(mouse.o_x, mouse.o_y)
+                ) && mouse.left {
+                    dbg!("upgrade activated");
+                    choosed_upgrade = Some(upgrades[0]);
+                    *app_state = AppState::Play(PlayState::Action);
+                }
+                if upgrade_button2.place_and_check(
+                    &mut ingame_ui, 
+                    Point2::new(mouse.o_x, mouse.o_y)
+                ) && mouse.left {
+                    dbg!("upgrade activated");
+                    choosed_upgrade = Some(upgrades[1]);
+                    *app_state = AppState::Play(PlayState::Action);
+                }
+                if upgrade_button3.place_and_check(
+                    &mut ingame_ui, 
+                    Point2::new(mouse.o_x, mouse.o_y)
+                ) && mouse.left {
+                    dbg!("upgrade activated");
+                    choosed_upgrade = Some(upgrades[2]);
+                    *app_state = AppState::Play(PlayState::Action);
+                }
+            }
+            _ => ()
+        }
+        match choosed_upgrade {
+            Some(choosed_upgrade) => {
+                match choosed_upgrade {
+                    Upgrade::AttackSpeed => {
+                        let gun = guns.get_mut(character).unwrap();
+                        gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
+                    }
+                    Upgrade::ShipSpeed => {
+                        player_stats.thrust_force *= 1.1;
+                    }
+                    Upgrade::ShipRotationSpeed => {
+                        player_stats.ship_rotation_speed *= 1.1;
+                    }
+                    Upgrade::BulletSpeed => {
+                        player_stats.bullet_speed *= 1.1;
+                    }
+                }
+            }
+            None => ()
+        }
+
+        // lifes and shields bars
+        for (isometry, life, shield, _ship) in (&isometries, &lifes, &shields, &ship_markers).join() {
+            let position = isometry.0.translation.vector;
+            // let position = unproject_with_z(
+            //     canvas.observer(), 
+            //     &Point2::new(position.x, position.y), 
+            //     1f32, dims.0, dims.1
+            // );
+            // let position = ortho_unproject(dims.0, dims.1, Point2::new(position.x, position.y));
+            let ship_lifes_bar = Rectangle {
+                position: Point2::new(position.x, position.y),
+                width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
+                height: 0.1,
+                color: life_color.clone()
+            };
+            let ship_shield_bar = Rectangle {
+                position: Point2::new(position.x, position.y - 1.0),
+                width: (shield.0 as f32/ MAX_SHIELDS as f32) * 1.5,
+                height: 0.1,
+                color: shield_color.clone()
+            };
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(ship_lifes_bar),
+                    with_projection: true
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(ship_shield_bar),
+                    with_projection: true
+                }
+            )
+        }
+
+        for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
+            let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
+            let lifes_bar = Rectangle {
+                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
+                width: (life.0 as f32 / MAX_LIFES as f32) * lifebar_w,
+                height: lifebar_h,
+                color: life_color.clone()
+            };
+            let shields_bar = Rectangle {
+                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
+                width: (shield.0 as f32 / MAX_SHIELDS as f32) * lifebar_w,
+                height: lifebar_h,
+                color: Point3::new(0.0, 0.1, 0.6)
+            };
+            let border = 0f32;
+            let lifes_bar_back = Rectangle {
+                position: Point2::new(w/2.0 - lifebar_w / 2.0 - border, h/40.0 - border + h/40.0 - border),
+                width: lifebar_w + border * 2.0,
+                height: lifebar_h + border * 2.0,
+                color: Point3::new(1.0, 1.0, 1.0)
+            };
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(shields_bar),
+                    with_projection: false
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(lifes_bar_back),
+                    with_projection: false
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(lifes_bar),
+                    with_projection: false
+                }
+            );
+        }
+    }
+}
+
 pub struct RenderingSystem {
     reader: ReaderId<Primitive>,
 }
@@ -249,58 +494,68 @@ impl RenderingSystem {
 
 impl<'a> System<'a> for RenderingSystem {
     type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, Isometry>,
-        ReadStorage<'a, Velocity>,
-        ReadStorage<'a, PhysicsComponent>,
-        ReadStorage<'a, CharacterMarker>,
-        ReadStorage<'a, ShipMarker>,
-        ReadStorage<'a, AsteroidMarker>,
-        ReadStorage<'a, LightMarker>,
-        ReadStorage<'a, NebulaMarker>,
-        ReadStorage<'a, Projectile>,
-        ReadStorage<'a, ThreadPin<ImageData>>,
-        ReadStorage<'a, Image>,
-        ReadStorage<'a, Geometry>,
-        ReadStorage<'a, Size>,
-        ReadStorage<'a, Polygon>,
-        ReadStorage<'a, Lifes>,
-        ReadStorage<'a, Shield>,
-        WriteStorage<'a, ThreadPin<ParticlesData>>,
+        (
+            Entities<'a>,
+            ReadStorage<'a, Isometry>,
+            ReadStorage<'a, Velocity>,
+            ReadStorage<'a, PhysicsComponent>,
+            ReadStorage<'a, CharacterMarker>,
+            ReadStorage<'a, ShipMarker>,
+            ReadStorage<'a, AsteroidMarker>,
+            ReadStorage<'a, LightMarker>,
+            ReadStorage<'a, NebulaMarker>,
+            ReadStorage<'a, Projectile>,
+            ReadStorage<'a, ThreadPin<ImageData>>,
+            ReadStorage<'a, Image>,
+            ReadStorage<'a, Geometry>,
+            ReadStorage<'a, Size>,
+            ReadStorage<'a, Polygon>,
+            ReadStorage<'a, Lifes>,
+            ReadStorage<'a, Shield>,
+            WriteStorage<'a, ThreadPin<ParticlesData>>,
+        ),
         WriteExpect<'a, SDLDisplay>,
         WriteExpect<'a, Canvas<'static>>,
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
+        Read<'a, Progress>,
+        Write<'a, AppState>,
+        Read<'a, Mouse>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            entities,
-            isometries,
-            velocities,
-            physics,
-            character_markers,
-            ship_markers,
-            asteroid_markers,
-            light_markers,
-            nebulas,
-            projectiles,
-            image_datas,
-            image_ids,
-            geometries,
-            sizes,
-            polygons,
-            lifes,
-            shields,
-            mut particles_datas,
+            (
+                entities,
+                isometries,
+                velocities,
+                physics,
+                character_markers,
+                ship_markers,
+                asteroid_markers,
+                light_markers,
+                nebulas,
+                projectiles,
+                image_datas,
+                image_ids,
+                geometries,
+                sizes,
+                polygons,
+                lifes,
+                shields,
+                mut particles_datas,
+            ),
             display,
             mut canvas,
             preloaded_particles,
             world,
             mut primitives_channel,
             mut ingame_ui,
+            progress,
+            mut app_state,
+            mouse
         ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -323,15 +578,18 @@ impl<'a> System<'a> for RenderingSystem {
             )
         };
         // NEBULA UNCOMMENT. TODO -- OPTIMIZE!
-        // for (_entity, iso, image, size, _nebula) in
-        //         (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
-        //     canvas
-        //         .render(
-        //             &display,
-        //             &mut target,
-        //             &image_datas.get(image.0).unwrap(),
-        //             &iso.0,
-        //             size.0,
+        for (_entity, iso, image, size, _nebula) in
+                (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+            canvas
+                .render(
+                    &display,
+                    &mut target,
+                    &image_datas.get(image.0).unwrap(),
+                    &iso.0,
+                    size.0,
+                    false
+                ).unwrap();
+        };
         //         (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
         //     canvas
         //         .render(
@@ -524,86 +782,6 @@ impl<'a> System<'a> for RenderingSystem {
                 )
                 .unwrap();
         }
-
-        // "UI" things
-        let dims = display.get_framebuffer_dimensions();
-        let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
-        let shield_color = Point3::new(0.0, 0.1, 0.6); 
-        let (w, h) = (dims.0 as f32, dims.1 as f32);
-        for (isometry, life, shield, _ship) in (&isometries, &lifes, &shields, &ship_markers).join() {
-            let position = isometry.0.translation.vector;
-            // let position = unproject_with_z(
-            //     canvas.observer(), 
-            //     &Point2::new(position.x, position.y), 
-            //     1f32, dims.0, dims.1
-            // );
-            // let position = ortho_unproject(dims.0, dims.1, Point2::new(position.x, position.y));
-            let ship_lifes_bar = Rectangle {
-                position: Point2::new(position.x, position.y),
-                width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
-                height: 0.1,
-                color: life_color.clone()
-            };
-            let ship_shield_bar = Rectangle {
-                position: Point2::new(position.x, position.y - 1.0),
-                width: (shield.0 as f32/ MAX_SHIELDS as f32) * 1.5,
-                height: 0.1,
-                color: shield_color.clone()
-            };
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(ship_lifes_bar),
-                    with_projection: true
-                }
-            );
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(ship_shield_bar),
-                    with_projection: true
-                }
-            )
-        }
-
-        for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
-            let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
-            let lifes_bar = Rectangle {
-                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
-                width: (life.0 as f32 / MAX_LIFES as f32) * lifebar_w,
-                height: lifebar_h,
-                color: life_color.clone()
-            };
-            let shields_bar = Rectangle {
-                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
-                width: (shield.0 as f32 / MAX_SHIELDS as f32) * lifebar_w,
-                height: lifebar_h,
-                color: Point3::new(0.0, 0.1, 0.6)
-            };
-            let border = 0f32;
-            let lifes_bar_back = Rectangle {
-                position: Point2::new(w/2.0 - lifebar_w / 2.0 - border, h/40.0 - border + h/40.0 - border),
-                width: lifebar_w + border * 2.0,
-                height: lifebar_h + border * 2.0,
-                color: Point3::new(1.0, 1.0, 1.0)
-            };
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(shields_bar),
-                    with_projection: false
-                }
-            );
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(lifes_bar_back),
-                    with_projection: false
-                }
-            );
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(lifes_bar),
-                    with_projection: false
-                }
-            );
-        }
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
             match primitive {
@@ -636,10 +814,11 @@ impl<'a> System<'a> for PhysicsSystem {
         ReadStorage<'a, PhysicsComponent>,
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
+        Read<'a, AppState>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (mut isometries, mut velocities, physics, mut world, _bodies_map) = data;
+        let (mut isometries, mut velocities, physics, mut world, _bodies_map, app_state) = data;
         for (isometry, velocity, physics_component) in
             (&mut isometries, &mut velocities, &physics).join()
         {
@@ -650,7 +829,12 @@ impl<'a> System<'a> for PhysicsSystem {
             isometry.0 = iso2_iso3(physics_isometry);
             velocity.0 = physics_velocity;
         }
-        world.step();
+        match *app_state {
+            AppState::Play(PlayState::Upgrade) => (),
+            _ => {
+                world.step();
+            }
+        }
     }
 }
 
@@ -774,6 +958,7 @@ impl<'a> System<'a> for ControlSystem {
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
+        Read<'a, PlayerStats>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -798,6 +983,7 @@ impl<'a> System<'a> for ControlSystem {
             mut world,
             _bodies_map,
             mut insert_channel,
+            player_stats
         ) = data;
         // TODO add dt in params
         let dt = 1f32 / 60f32;
@@ -834,7 +1020,7 @@ impl<'a> System<'a> for ControlSystem {
                 let isometry = *isometries.get(character).unwrap();
                 let position = isometry.0.translation.vector;
                 let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                let velocity_rel = PLAYER_BULLET_SPEED * direction;
+                let velocity_rel = player_stats.bullet_speed * direction;
                 let char_velocity = velocities.get(character).unwrap();
                 let projectile_velocity = Velocity::new(
                     char_velocity.0.x + velocity_rel.x,
@@ -853,7 +1039,7 @@ impl<'a> System<'a> for ControlSystem {
         if mouse_state.right {
             let rotation = isometries.get(character).unwrap().0.rotation;
             let _vel = velocities.get_mut(character).unwrap();
-            let thrust = THRUST_FORCE * (rotation * Vector3::new(0.0, -1.0, 0.0));
+            let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
             *character_velocity.as_vector_mut() += thrust;
         }
         let character_body = world
@@ -1003,8 +1189,8 @@ impl<'a> System<'a> for InsertSystem {
                         .with(EnemyMarker::default(), &mut enemies)
                         .with(ShipMarker::default(), &mut ships)
                         .with(Image(preloaded_images.enemy), &mut images)
-                        .with(Lifes(MAX_LIFES), &mut lifes)
-                        .with(Shield(MAX_SHIELDS), &mut shields)
+                        .with(Lifes(ENEMY_MAX_LIFES), &mut lifes)
+                        .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
                         .with(Gun::new(50usize, 10usize), &mut guns)
                         .with(Spin::default(), &mut spins)
                         .with(enemy_shape, &mut geometries)
@@ -1305,6 +1491,7 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
+        Write<'a, Progress>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1325,6 +1512,7 @@ impl<'a> System<'a> for CollisionSystem {
             mut insert_channel,
             mut sounds_channel,
             preloaded_sounds,
+            mut progress
         ) = data;
         self.colliding_start_events.clear();
         self.colliding_end_events.clear();
@@ -1412,7 +1600,20 @@ impl<'a> System<'a> for CollisionSystem {
                         lifes.0 -= projectile_damage
                     }
                 } else {
-                    entities.delete(ship).unwrap();
+                    let life = lifes.get_mut(ship).unwrap();
+                    match shields.get_mut(ship) {
+                        Some(ref mut shield) if shield.0 > 0usize => {
+                            shield.0 -= projectile_damage
+                        }
+                        _ => {
+                            if life.0 > projectile_damage {
+                                life.0 -= projectile_damage
+                            } else {
+                                progress.experience += 10usize;
+                                entities.delete(ship).unwrap();
+                            }
+                        }
+                    };
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
                         num: 20usize,

@@ -27,7 +27,8 @@ use physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
 use sound::init_sound;
 use systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertEvent, InsertSystem,
-    KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem
+    KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
+    GUISystem,
 };
 use gui::{IngameUI, Primitive};
 
@@ -229,6 +230,7 @@ pub fn main() -> Result<(), String> {
     let gameplay_sytem = GamePlaySystem::default();
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
+    let gui_system = GUISystem::default();
     let (preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
@@ -249,6 +251,7 @@ pub fn main() -> Result<(), String> {
                 "collision_system",
             ],
         )
+        .with_thread_local(gui_system)
         .with_thread_local(insert_system)
         .with_thread_local(rendering_system)
         .with_thread_local(sound_system)
@@ -265,9 +268,11 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(canvas));
     specs_world.add_resource(preloaded_images);
     specs_world.add_resource(Stat::default());
-    specs_world.add_resource(AppState::Menu);
+    specs_world.add_resource(AppState::Play(PlayState::Upgrade));
     specs_world.add_resource(IngameUI::default());
     specs_world.add_resource(primitives_channel);
+    specs_world.add_resource(Progress::default());
+    specs_world.add_resource(PlayerStats::default());
     // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
     // specs_world.add_resource(poly);
     // ------------------------------
@@ -306,7 +311,7 @@ pub fn main() -> Result<(), String> {
             AppState::Menu => {
                 menu_dispatcher.dispatch(&specs_world.res)
             }
-            AppState::Play => {
+            AppState::Play(_) => {
                 dispatcher.dispatch(&specs_world.res);
             }
         }

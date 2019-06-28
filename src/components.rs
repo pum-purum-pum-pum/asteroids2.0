@@ -13,6 +13,8 @@ use specs_derive::Component;
 
 pub const MAX_LIFES: usize = 100usize;
 pub const MAX_SHIELDS: usize = 100usize;
+pub const ENEMY_MAX_LIFES: usize = 20usize;
+pub const ENEMY_MAX_SHIELDS: usize = 20usize;
 
 use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
@@ -21,9 +23,43 @@ pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas<'a> = ThreadPin<SDLCanvas<'a>>;
 
 #[derive(Debug, Clone, Copy)]
+pub enum Upgrade {
+    AttackSpeed,
+    BulletSpeed,
+    ShipSpeed,
+    ShipRotationSpeed,
+}
+
+
+#[derive(Debug, Clone, Copy)]
+pub struct PlayerStats {
+    // pub attack_speed: f32,
+    pub bullet_speed: f32,
+    pub thrust_force: f32,
+    pub ship_rotation_speed: f32
+}
+
+impl Default for PlayerStats {
+    fn default() -> Self {
+        PlayerStats {
+            // attack_speed: 1f32,
+            bullet_speed: 0.5f32,
+            thrust_force: 0.01f32,
+            ship_rotation_speed: 1f32
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum PlayState {
+    Action,
+    Upgrade
+}
+
+#[derive(Debug, Clone, Copy)]
 pub enum AppState {
     Menu,
-    Play
+    Play(PlayState),
 }
 
 impl Default for AppState {
@@ -64,6 +100,18 @@ pub struct Shield(pub usize);
 /// damage on collision
 #[derive(Component, Clone, Copy)]
 pub struct Damage(pub usize);
+
+#[derive(Default, Clone, Copy)]
+pub struct Progress {
+    pub experience: usize,
+    pub level: usize
+}
+
+impl Progress {
+    pub fn current_max_experience(&self) -> usize {
+        100usize * 2usize.pow(self.level as u32)
+    }
+}
 
 // pub type Images = Collector<ImageData, Image>;
 
@@ -178,7 +226,7 @@ pub struct AttachPosition(pub specs::Entity);
 #[derive(Component, Debug)]
 pub struct Gun {
     recharge_state: usize,
-    recharge_time: usize,
+    pub recharge_time: usize,
     pub bullets_damage: usize,
 }
 
