@@ -30,6 +30,11 @@ pub enum Upgrade {
     ShipRotationSpeed,
 }
 
+#[derive(Component, Debug, Clone, Copy)]
+pub enum AIType {
+    ShootAndFollow,
+    Kamikadze
+}
 
 #[derive(Debug, Clone, Copy)]
 pub struct PlayerStats {
@@ -126,6 +131,7 @@ pub struct PreloadedImages {
     pub projectile: specs::Entity,
     pub asteroid: specs::Entity,
     pub enemy: specs::Entity,
+    pub enemy2: specs::Entity,
     pub background: specs::Entity,
     pub nebulas: Vec<specs::Entity>,
     pub ship_speed_upgrade: specs::Entity,

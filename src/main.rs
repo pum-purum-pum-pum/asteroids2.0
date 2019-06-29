@@ -84,6 +84,7 @@ pub fn main() -> Result<(), String> {
     specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
     specs_world.register::<Damage>();
+    specs_world.register::<AIType>();
     {
         // Create menu widges
         
@@ -92,7 +93,7 @@ pub fn main() -> Result<(), String> {
         ImageData::new(&display, "back").unwrap()
     );
     let character_image_data = ThreadPin::new(
-        ImageData::new(&display, "player").unwrap()
+        ImageData::new(&display, "player_new").unwrap()
     );
     let asteroid_image_data = ThreadPin::new(
         ImageData::new(&display, "asteroid").unwrap()
@@ -104,7 +105,10 @@ pub fn main() -> Result<(), String> {
         ImageData::new(&display, "projectile").unwrap()
     );
     let enemy_image_data = ThreadPin::new(
-        ImageData::new(&display, "enemy").unwrap()
+        ImageData::new(&display, "enemy_new").unwrap()
+    );
+    let enemy2_image_data = ThreadPin::new(
+        ImageData::new(&display, "enemy2").unwrap()
     );
     let bullet_speed_image_data = ThreadPin::new(
         ImageData::new(&display, "bullet_speed").unwrap()
@@ -162,10 +166,15 @@ pub fn main() -> Result<(), String> {
         .create_entity()
         .with(attack_speed_image_data)
         .build();
+    let enemy2_image = specs_world
+        .create_entity()
+        .with(enemy2_image_data)
+        .build();
     let preloaded_images = PreloadedImages {
         projectile: projectile_image,
         asteroid: asteroid_image,
         enemy: enemy_image,
+        enemy2: enemy2_image,
         background: background_image,
         nebulas: nebula_images,
         ship_speed_upgrade: ship_speed_image,
@@ -202,8 +211,7 @@ pub fn main() -> Result<(), String> {
         .with(character_shape)
         .with(Size(char_size))
         .build();
-    let r = 1f32;
-    let character_physics_shape = ncollide2d::shape::Ball::new(r);
+    let character_physics_shape = ncollide2d::shape::Ball::new(char_size);
 
     let mut character_collision_groups = CollisionGroups::new();
     character_collision_groups.set_membership(&[CollisionId::PlayerShip as usize]);
