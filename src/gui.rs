@@ -5,7 +5,7 @@ use std::fs::File;
 use std::io::{BufReader, Error as IOError};
 use specs::prelude::*;
 use specs_derive::Component;
-use crate::components::Image;
+use crate::components::{*};
 
 fn check_in(x:f32, a: f32, b: f32) -> bool {
     x > a && x < b
@@ -13,6 +13,8 @@ fn check_in(x:f32, a: f32, b: f32) -> bool {
 
 #[derive(Default)]
 pub struct IngameUI {
+    hover_id: Option<usize>,
+    pressed_id: Option<usize>,
     pub primitives: Vec<Primitive>
 }
 
@@ -48,9 +50,11 @@ impl Button {
         }
     }
 
-    pub fn check(&self, mouse: Point2) -> bool {
-        check_in(mouse.x, self.position.x, self.position.x + self.width) &&
-        check_in(mouse.y, self.position.y, self.position.y + self.height)
+    pub fn check(&self, mouse: &Mouse) -> bool {
+        let mouse_position = Point2::new(mouse.o_x, mouse.o_y);
+        mouse.left_released &&
+        check_in(mouse_position.x, self.position.x, self.position.x + self.width) &&
+        check_in(mouse_position.y, self.position.y, self.position.y + self.height)
     }
 
     pub fn get_geometry(&self) -> Primitive {
@@ -69,10 +73,10 @@ impl Button {
     pub fn place_and_check(
         &self, 
         ingame_ui: &mut IngameUI,
-        mouse_screen_position: Point2, 
+        mouse: &Mouse, 
     ) -> bool {
         ingame_ui.primitives.push(self.get_geometry());
-        self.check(mouse_screen_position)
+        self.check(mouse)
     }
 }
 

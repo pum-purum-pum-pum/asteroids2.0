@@ -101,6 +101,9 @@ pub fn main() -> Result<(), String> {
     let light_image_data = ThreadPin::new(
         ImageData::new(&display, "light").unwrap()
     );
+    let light_sea_image_data = ThreadPin::new(
+        ImageData::new(&display, "light_sea").unwrap()
+    );
     let projectile_image_data = ThreadPin::new(
         ImageData::new(&display, "projectile").unwrap()
     );
@@ -146,6 +149,10 @@ pub fn main() -> Result<(), String> {
         .create_entity()
         .with(light_image_data)
         .build();
+    let light_sea_image = specs_world
+        .create_entity()
+        .with(light_sea_image_data)
+        .build();
     let projectile_image = specs_world
         .create_entity()
         .with(projectile_image_data)
@@ -179,7 +186,9 @@ pub fn main() -> Result<(), String> {
         nebulas: nebula_images,
         ship_speed_upgrade: ship_speed_image,
         bullet_speed_upgrade: bullet_speed_image,
-        attack_speed_upgrade: attack_speed_image
+        attack_speed_upgrade: attack_speed_image,
+        light_white: light_image,
+        light_sea: light_sea_image,
     };
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&display, -size, -size, size, size, 100),
@@ -268,7 +277,6 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
     let mut dispatcher = DispatcherBuilder::new()
-        .with(KinematicSystem {}, "kinematic_system", &[])
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
         .with(ai_system, "ai_system", &[])
@@ -277,12 +285,13 @@ pub fn main() -> Result<(), String> {
             phyiscs_system,
             "physics_system",
             &[
-                "kinematic_system",
+                // "kinematic_system",
                 "control_system",
                 "gameplay_system",
                 "collision_system",
             ],
         )
+        .with(KinematicSystem {}, "kinematic_system", &["physics_system"])
         .with_thread_local(gui_system)
         .with_thread_local(insert_system)
         .with_thread_local(rendering_system)
@@ -324,6 +333,7 @@ pub fn main() -> Result<(), String> {
         {
             let state = event_pump.mouse_state();
             let buttons: Vec<_> = state.pressed_mouse_buttons().collect();
+            // let realeasd_buttons: Vec<_> = state.released_mouse_buttons().collect();
             let mut mouse_state = specs_world.write_resource::<Mouse>();
             mouse_state.set_left(buttons.contains(&MouseButton::Left));
             mouse_state.set_right(buttons.contains(&MouseButton::Right));

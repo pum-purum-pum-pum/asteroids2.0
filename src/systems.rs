@@ -212,7 +212,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let (button_w, button_h) = (w/4f32, h/4f32);
         let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false, None);
-        if button.place_and_check(&mut ui, Point2::new(mouse.o_x, mouse.o_y)) && mouse.left {
+        if button.place_and_check(&mut ui, &*mouse) {
             dbg!("button activated");
             *app_state = AppState::Play(PlayState::Action);
         }
@@ -379,27 +379,15 @@ impl<'a> System<'a> for GUISystem {
                     Some(Image(preloaded_images.ship_speed_upgrade))
                 );
                 let upgrades = vec![Upgrade::AttackSpeed, Upgrade::BulletSpeed, Upgrade::ShipSpeed];
-                if upgrade_button1.place_and_check(
-                    &mut ingame_ui, 
-                    Point2::new(mouse.o_x, mouse.o_y)
-                ) && mouse.left {
-                    dbg!("upgrade activated");
+                if upgrade_button1.place_and_check(&mut ingame_ui, &*mouse) {
                     choosed_upgrade = Some(upgrades[0]);
                     *app_state = AppState::Play(PlayState::Action);
                 }
-                if upgrade_button2.place_and_check(
-                    &mut ingame_ui, 
-                    Point2::new(mouse.o_x, mouse.o_y)
-                ) && mouse.left {
-                    dbg!("upgrade activated");
+                if upgrade_button2.place_and_check(&mut ingame_ui, &*mouse) {
                     choosed_upgrade = Some(upgrades[1]);
                     *app_state = AppState::Play(PlayState::Action);
                 }
-                if upgrade_button3.place_and_check(
-                    &mut ingame_ui, 
-                    Point2::new(mouse.o_x, mouse.o_y)
-                ) && mouse.left {
-                    dbg!("upgrade activated");
+                if upgrade_button3.place_and_check(&mut ingame_ui, &*mouse) {
                     choosed_upgrade = Some(upgrades[2]);
                     *app_state = AppState::Play(PlayState::Action);
                 }
@@ -755,7 +743,7 @@ impl<'a> System<'a> for RenderingSystem {
             (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
         {
             let mut translation_vec = iso.0.translation.vector;
-            translation_vec.z = canvas.get_z_shift();
+            // translation_vec.z = canvas.get_z_shift();
             let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             canvas
                 .render(
@@ -967,8 +955,15 @@ impl<'a> System<'a> for KinematicSystem {
         for (entity, attach) in attach_pairs.iter() {
             // let physics_component = physics.get(*attach).unwrap();
             // let iso2 = world.rigid_body(physics_component.body_handle).position();
-            let iso = isometries.get(*attach).unwrap();
-            isometries.get_mut(*entity).unwrap().0 = iso.0;
+            match  isometries.get(*attach) {
+                Some(isometry) => {
+                    let iso = isometry;
+                    isometries.get_mut(*entity).unwrap().0 = iso.0;
+                }
+                None => {
+                    entities.delete(*entity).unwrap();
+                }
+            }
         }
     }
 }
@@ -1131,7 +1126,8 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Projectile>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
             WriteStorage<'a, NebulaMarker>,
-
+            WriteStorage<'a, AttachPosition>,
+            WriteStorage<'a, LightMarker>,
         ),
         WriteExpect<'a, SDLDisplay>,
         Write<'a, Stat>,
@@ -1165,6 +1161,8 @@ impl<'a> System<'a> for InsertSystem {
                 mut projectiles,
                 mut particles_datas,
                 mut nebulas,
+                mut attach_positions,
+                mut lights
             ),
             display,
             _stat,
@@ -1263,6 +1261,19 @@ impl<'a> System<'a> for InsertSystem {
                         enemy_collision_groups,
                         0.5f32,
                     );
+                    // with light
+                        {
+                    let _light = entities
+                        .build_entity()
+                        .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
+                        .with(Velocity::new(0f32, 0f32), &mut velocities)
+                        .with(Spin::default(), &mut spins)
+                        .with(AttachPosition(enemy), &mut attach_positions)
+                        .with(Image(preloaded_images.light_sea), &mut images)
+                        .with(Size(1f32), &mut sizes)
+                        .with(LightMarker, &mut lights)
+                        .build();
+                    }
                 }
                 InsertEvent::Bullet {
                     kind,

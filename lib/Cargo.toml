@@ -1,10 +1,13 @@
-# cargo-features = ["profile-overrides"]
+cargo-features = ["profile-overrides"]
 [package]
 name = "astro_lib"
 version = "0.1.0"
 authors = ["vlad <vladzhukovtirko@gmail.com>"]
 edition = "2018"
 # publish = false
+
+[profile.dev.overrides."*"]
+opt-level = 3
 
 [dependencies]
 specs = {version="0.14.3", features=["nightly"]}

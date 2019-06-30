@@ -136,7 +136,9 @@ pub struct PreloadedImages {
     pub nebulas: Vec<specs::Entity>,
     pub ship_speed_upgrade: specs::Entity,
     pub bullet_speed_upgrade: specs::Entity,
-    pub attack_speed_upgrade: specs::Entity
+    pub attack_speed_upgrade: specs::Entity,
+    pub light_white: specs::Entity,
+    pub light_sea: specs::Entity,
 }
 
 pub struct PreloadedParticles {
@@ -149,6 +151,8 @@ pub struct Mouse {
     pub o_y: f32,
     pub x: f32,
     pub y: f32,
+    pub left_released: bool,
+    pub right_released: bool,
     pub left: bool,
     pub right: bool,
     pub wdpi: f32,
@@ -172,10 +176,12 @@ impl Mouse {
     }
 
     pub fn set_left(&mut self, is_left: bool) {
+        self.left_released = self.left && !is_left;
         self.left = is_left;
     }
 
     pub fn set_right(&mut self, is_right: bool) {
+        self.right_released = self.right && !is_right;
         self.right = is_right;
     }
 }
