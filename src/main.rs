@@ -21,7 +21,7 @@ mod gui;
 use astro_lib::prelude::*;
 
 use components::*;
-use gfx::{Canvas, ImageData, MovementParticles, ParticlesData};
+use gfx::{Canvas, ImageData, MovementParticles, ParticlesData, TextData};
 use gfx_backend::DisplayBuild;
 use physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
 use sound::init_sound;
@@ -107,6 +107,9 @@ pub fn main() -> Result<(), String> {
     let projectile_image_data = ThreadPin::new(
         ImageData::new(&display, "projectile").unwrap()
     );
+    let enemy_projectile_image_data = ThreadPin::new(
+        ImageData::new(&display, "enemy_projectile").unwrap()
+    );
     let enemy_image_data = ThreadPin::new(
         ImageData::new(&display, "enemy_new").unwrap()
     );
@@ -121,6 +124,9 @@ pub fn main() -> Result<(), String> {
     );
     let attack_speed_image_data = ThreadPin::new(
         ImageData::new(&display, "attack_speed").unwrap()
+    );
+    let direction_image_data = ThreadPin::new(
+        ImageData::new(&display, "direction").unwrap()
     );
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
@@ -153,6 +159,14 @@ pub fn main() -> Result<(), String> {
         .create_entity()
         .with(light_sea_image_data)
         .build();
+    let direction_image = specs_world
+        .create_entity()
+        .with(direction_image_data)
+        .build();
+    let enemy_projectile_image = specs_world
+        .create_entity()
+        .with(enemy_projectile_image_data)
+        .build();
     let projectile_image = specs_world
         .create_entity()
         .with(projectile_image_data)
@@ -179,6 +193,7 @@ pub fn main() -> Result<(), String> {
         .build();
     let preloaded_images = PreloadedImages {
         projectile: projectile_image,
+        enemy_projectile: enemy_projectile_image,
         asteroid: asteroid_image,
         enemy: enemy_image,
         enemy2: enemy2_image,
@@ -189,6 +204,7 @@ pub fn main() -> Result<(), String> {
         attack_speed_upgrade: attack_speed_image,
         light_white: light_image,
         light_sea: light_sea_image,
+        direction: direction_image
     };
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&display, -size, -size, size, size, 100),
@@ -259,6 +275,16 @@ pub fn main() -> Result<(), String> {
             .with(Size(15f32))
             .with(LightMarker)
             .build();
+        // let _direction = specs_world
+        //     .create_entity()
+        //     .with(Isometry::new(0f32, 0f32, 0f32))
+        //     .with(AttachPosition(character))
+        //     .with(Velocity::new(0f32, 0f32))
+        //     .with(Image(direction_image))
+        //     .with(Spin::default())
+        //     .with(Size(1f32))
+        //     .with(LightMarker)
+        //     .build();
     }
     let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
     let menu_rendering_system = MenuRenderingSystem::new(primitives_channel.register_reader());
@@ -276,6 +302,14 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
+    let font_path_str = &format!("{}/assets/{}.ttf", env!("CARGO_MANIFEST_DIR"), "trench100free");
+    let font_file = std::fs::File::open(&std::path::Path::new(font_path_str)).unwrap();
+    let font = glium_text::FontTexture::new(&display, font_file, 50).unwrap();
+    specs_world.add_resource(
+        ThreadPin::new(
+            TextData::new(&display, font) 
+        )
+    );
     let mut dispatcher = DispatcherBuilder::new()
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])

@@ -10,5 +10,6 @@ pub use derive_deref;
 pub use nalgebra;
 pub use nphysics2d;
 pub use ncollide2d;
+pub use glium_text;
 
 pub use crate::types::{*};

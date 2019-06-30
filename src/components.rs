@@ -5,6 +5,7 @@ pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
 pub use crate::gui::{Button, Rectangle};
+use glium::backend::{Facade};
 use al::prelude::*;
 use astro_lib as al;
 use sdl2::mixer::Chunk;
@@ -15,6 +16,11 @@ pub const MAX_LIFES: usize = 100usize;
 pub const MAX_SHIELDS: usize = 100usize;
 pub const ENEMY_MAX_LIFES: usize = 20usize;
 pub const ENEMY_MAX_SHIELDS: usize = 20usize;
+
+
+pub const BULLET_SPEED_INIT: f32 = 0.5;
+pub const THRUST_FORCE_INIT: f32 = 0.01;
+pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 
 use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 use crate::gfx_backend::SDL2Facade;
@@ -118,8 +124,8 @@ impl Progress {
     }
 
     pub fn level_up(&mut self) {
-        self.experience = 0usize;
-        self.level = 0usize;
+        self.experience %= self.current_max_experience();
+        self.level += 1usize;
     }
 }
 
@@ -129,6 +135,7 @@ impl Progress {
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
     pub projectile: specs::Entity,
+    pub enemy_projectile: specs::Entity,
     pub asteroid: specs::Entity,
     pub enemy: specs::Entity,
     pub enemy2: specs::Entity,
@@ -139,6 +146,7 @@ pub struct PreloadedImages {
     pub attack_speed_upgrade: specs::Entity,
     pub light_white: specs::Entity,
     pub light_sea: specs::Entity,
+    pub direction: specs::Entity,
 }
 
 pub struct PreloadedParticles {

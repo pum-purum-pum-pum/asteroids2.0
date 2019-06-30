@@ -29,7 +29,7 @@ pub struct Button {
 
 pub enum PrimitiveKind {
     Rectangle(Rectangle),
-    Text(String)
+    Text(Text)
 }
 
 pub struct Primitive {
@@ -78,6 +78,11 @@ impl Button {
         ingame_ui.primitives.push(self.get_geometry());
         self.check(mouse)
     }
+}
+
+pub struct Text {
+    pub position: Point2,
+    pub text: String
 }
 
 pub struct Rectangle {

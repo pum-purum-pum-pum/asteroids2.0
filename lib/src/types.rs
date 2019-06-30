@@ -20,6 +20,7 @@ pub type Point4 = nalgebra::Point4<f32>;
 pub type Matrix4 = nalgebra::Matrix4<f32>;
 pub type Vector2 = nalgebra::Vector2<f32>;
 pub type Vector3 = nalgebra::Vector3<f32>;
+pub type Vector4 = nalgebra::Vector4<f32>;
 pub type Isometry3 = nalgebra::Isometry3<f32>;
 pub type Isometry2 = nalgebra::Isometry2<f32>;
 

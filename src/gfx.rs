@@ -23,6 +23,20 @@ const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
 const ENGINE_FAR: f32 = 3f32;
 
+pub struct TextData {
+    pub text_system: glium_text::TextSystem,
+    pub font: glium_text::FontTexture
+}
+
+impl TextData {
+    pub fn new(display: &SDL2Facade, font: glium_text::FontTexture) -> TextData {
+        TextData {
+            text_system: glium_text::TextSystem::new(display),
+            font: font
+        }
+    }
+}
+
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
     Explosion(Explosion),
@@ -828,11 +842,15 @@ impl<'a> Canvas<'a> {
     }
 }
 
-fn get_view(observer: Point3) -> Isometry3 {
+pub fn get_view(observer: Point3) -> Isometry3 {
     let mut target = observer.clone();
     target.z = Z_CANVAS;
     Isometry3::look_at_rh(&observer, &target, &Vector3::y())
 }
+
+pub fn orthographic_from_zero(width: u32, height: u32) -> Orthographic3<f32> {
+    Orthographic3::new(0f32, width as f32, 0f32, height as f32, -0.9, 0.0)
+} 
 
 // creates ortograohic projection left=bot=0 z_near=0.1 far=1.0
 pub fn orthographic(width: u32, height: u32) -> Orthographic3<f32>{

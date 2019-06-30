@@ -3,28 +3,32 @@ use std::mem::swap;
 
 use al::prelude::*;
 use astro_lib as al;
+use al::types::{*};
 use rand::prelude::*;
 
 use glium;
 use glium::Surface;
 use sdl2::keyboard::Keycode;
 use sdl2::TimerSubsystem;
+use rand::distributions::{Bernoulli, Distribution};
 
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
 use ncollide2d::world::CollisionObjectHandle;
 use nphysics2d::object::{Body, BodyStatus};
 use nphysics2d::world::World;
+use nalgebra::geometry::Translation;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter};
-use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData, unproject_with_z, ortho_unproject};
+use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData, 
+                unproject_with_z, ortho_unproject, TextData, orthographic, orthographic_from_zero, get_view};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData};
-use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI};
+use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const THRUST_FORCE: f32 = 0.01f32;
@@ -303,6 +307,19 @@ impl<'a> System<'a> for GUISystem {
             mut player_stats,
             mut preloaded_images
         ) = data;
+        let dims = display.get_framebuffer_dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w/4.0, h/4.0), 
+                    text: "Hello guys".to_string()
+                }),
+                with_projection: false,
+                image: None
+            }
+        );
+
         let (character, _) = (&entities, &character_markers).join().next().unwrap();
         // "UI" things
         // experience and level bars
@@ -310,8 +327,6 @@ impl<'a> System<'a> for GUISystem {
         let shield_color = Point3::new(0.0, 0.1, 0.6); 
         let experience_color = Point3::new(0.8, 0.8, 0.8);
         let white_color = Point3::new(1.0, 1.0, 1.0);
-        let dims = display.get_framebuffer_dimensions();
-        let (w, h) = (dims.0 as f32, dims.1 as f32);
         let experiencebar_w = w / 5.0;
         let experiencebar_h = h / 100.0;
         let experience_position = Point2::new(w/2.0 - experiencebar_w / 2.0, h - h / 20.0);
@@ -402,13 +417,13 @@ impl<'a> System<'a> for GUISystem {
                         gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
                     }
                     Upgrade::ShipSpeed => {
-                        player_stats.thrust_force *= 1.1;
+                        player_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
                     }
                     Upgrade::ShipRotationSpeed => {
-                        player_stats.ship_rotation_speed *= 1.1;
+                        player_stats.ship_rotation_speed += 0.1 * SHIP_ROTATION_SPEED_INIT;
                     }
                     Upgrade::BulletSpeed => {
-                        player_stats.bullet_speed *= 1.1;
+                        player_stats.bullet_speed += 0.1 * BULLET_SPEED_INIT;
                     }
                 }
             }
@@ -541,6 +556,7 @@ impl<'a> System<'a> for RenderingSystem {
         Read<'a, Progress>,
         Write<'a, AppState>,
         Read<'a, Mouse>,
+        ReadExpect<'a, ThreadPin<TextData>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -573,8 +589,10 @@ impl<'a> System<'a> for RenderingSystem {
             mut ingame_ui,
             progress,
             mut app_state,
-            mouse
+            mouse,
+            text_data
         ) = data;
+        let dims = display.get_framebuffer_dimensions();
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
         target.clear_stencil(0i32);
@@ -830,6 +848,27 @@ impl<'a> System<'a> for RenderingSystem {
 
                         }
                     }
+                }
+                Primitive {
+                    kind: PrimitiveKind::Text(text),
+                    with_projection: _,
+                    image: _
+                } => {
+                    let scale = 123f32;
+                    let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
+                    let view = get_view(canvas.observer()).to_homogeneous();
+                    let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
+                        .to_homogeneous();
+                    let mut scaler = scale * Matrix4::identity();
+                    let scale_len = scaler.len();
+                    scaler[scale_len - 1] = 1.0;
+                    dbg!(model * Vector4::new(0.0, 0.0, 0.0, 1.0));
+                    let matrix = orthographic * model * scaler;
+                    dbg!( matrix * Vector4::new(0.0, 0.0, 0.0, 1.0));
+                    // let  matrix: [[f32; 4]; 4] = matrix.into();
+                    dbg!(matrix);
+                    let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
+                    glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }
                 _ => ()
             }
@@ -1282,16 +1321,21 @@ impl<'a> System<'a> for InsertSystem {
                     damage,
                     owner,
                 } => {
+                    let r = 0.1;
+                    let image = match kind {
+                        EntityType::Player => preloaded_images.projectile,
+                        EntityType::Enemy => preloaded_images.enemy_projectile
+                    };
                     let bullet = entities
                         .build_entity()
                         .with(Damage(*damage), &mut damages)
                         .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                        .with(Image(preloaded_images.projectile), &mut images)
+                        .with(Image(image), &mut images)
                         .with(Spin::default(), &mut spins)
                         .with(Projectile { owner: *owner }, &mut projectiles)
                         .with(Lifetime::new(100usize), &mut lifetimes)
-                        .with(Size(0.1), &mut sizes)
+                        .with(Size(r), &mut sizes)
                         .build();
                     let player_bullet_collision_groups = match kind {
                         EntityType::Player => {
@@ -1319,7 +1363,6 @@ impl<'a> System<'a> for InsertSystem {
                             player_bullet_collision_groups
                         }
                     };
-                    let r = 1f32;
                     let ball = ncollide2d::shape::Ball::new(r);
                     let bullet_physics_component = PhysicsComponent::safe_insert(
                         &mut physics,
@@ -1498,13 +1541,25 @@ impl<'a> System<'a> for GamePlaySystem {
         let ship_shape = Geometry::Circle { radius: r };
         for _ in 0..add_cnt {
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
-            insert_channel.single_write(InsertEvent::Ship {
-                iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-                light_shape: ship_shape,
-                spin: 0f32,
-                kind: AIType::Kamikadze,
-                image: Image(preloaded_images.enemy2)
-            })
+            let d = Bernoulli::new(0.5);
+            let v = d.sample(&mut rand::thread_rng());
+            if v {
+                insert_channel.single_write(InsertEvent::Ship {
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+                    light_shape: ship_shape,
+                    spin: 0f32,
+                    kind: AIType::Kamikadze,
+                    image: Image(preloaded_images.enemy2)
+                })
+            } else {
+                insert_channel.single_write(InsertEvent::Ship {
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+                    light_shape: ship_shape,
+                    spin: 0f32,
+                    kind: AIType::ShootAndFollow,
+                    image: Image(preloaded_images.enemy)
+                })
+            }
         };
         // for _ in 0..add_cnt {
         //     let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
