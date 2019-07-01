@@ -343,7 +343,8 @@ pub fn main() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(canvas));
     specs_world.add_resource(preloaded_images);
     specs_world.add_resource(Stat::default());
-    specs_world.add_resource(AppState::Play(PlayState::Upgrade));
+    specs_world.add_resource(AppState::Menu);
+    // specs_world.add_resource(AppState::Play(PlayState::Upgrade));
     specs_world.add_resource(IngameUI::default());
     specs_world.add_resource(primitives_channel);
     specs_world.add_resource(Progress::default());

@@ -180,6 +180,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Write<'a, IngameUI>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
+        ReadExpect<'a, ThreadPin<TextData>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -207,7 +208,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mut primitives_channel,
             mut ui,
             mouse,
-            mut app_state
+            mut app_state,
+            text_data
         ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -215,7 +217,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let dims = display.get_framebuffer_dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let (button_w, button_h) = (w/4f32, h/4f32);
-        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false, None);
+        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false, None, "Play".to_string());
         if button.place_and_check(&mut ui, &*mouse) {
             dbg!("button activated");
             *app_state = AppState::Play(PlayState::Action);
@@ -223,11 +225,11 @@ impl<'a> System<'a> for MenuRenderingSystem {
         primitives_channel.iter_write(ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
             match primitive {
-                Primitive{
+                Primitive {
                     kind: PrimitiveKind::Rectangle(rectangle),
                     with_projection,
                     image
-                }  => {
+                } => {
                     let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
                         GeometryData::new(&display, &points, &indicies);
@@ -239,7 +241,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                                     &mut target, 
                                     image_datas.get(image.0).unwrap(),
                                     &model, 
-                                    *with_projection,
+                                    *with_projection, 
                                     rectangle.width
                                 ).unwrap();
                         }
@@ -247,8 +249,29 @@ impl<'a> System<'a> for MenuRenderingSystem {
                             canvas
                                 .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
                                 .unwrap();
+
                         }
                     }
+                }
+                Primitive {
+                    kind: PrimitiveKind::Text(text),
+                    with_projection: _,
+                    image: _
+                } => {
+                    let scale = 30f32;
+                    let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
+                    let view = get_view(canvas.observer()).to_homogeneous();
+                    let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
+                        .to_homogeneous();
+                    let mut scaler = scale * Matrix4::identity();
+                    let scale_len = scaler.len();
+                    scaler[scale_len - 1] = 1.0;
+                    dbg!(model * Vector4::new(0.0, 0.0, 0.0, 1.0));
+                    let matrix = orthographic * model * scaler;
+                    dbg!( matrix * Vector4::new(0.0, 0.0, 0.0, 1.0));
+                    dbg!(matrix);
+                    let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
+                    glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }
                 _ => ()
             }
@@ -312,8 +335,12 @@ impl<'a> System<'a> for GUISystem {
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
-                    position: Point2::new(w/4.0, h/4.0), 
-                    text: "Hello guys".to_string()
+                    position: Point2::new(w/20.0, h - h / 20.0), 
+                    text: format!(
+                        "Experience: {} %, \n Level {}",
+                        100 * progress.experience / progress.current_max_experience() as usize, 
+                        progress.level
+                    ).to_string()
                 }),
                 with_projection: false,
                 image: None
@@ -375,7 +402,8 @@ impl<'a> System<'a> for GUISystem {
                     upgrade_button_w, upgrade_button_h, 
                     white_color.clone(), 
                     false,
-                    Some(Image(preloaded_images.attack_speed_upgrade))
+                    Some(Image(preloaded_images.attack_speed_upgrade)),
+                    "Attack speed".to_string()
                 );
                 current_point.x += shift + upgrade_button_w;
                 let upgrade_button2 = Button::new(
@@ -383,7 +411,8 @@ impl<'a> System<'a> for GUISystem {
                     upgrade_button_w, upgrade_button_h, 
                     white_color.clone(), 
                     false,
-                    Some(Image(preloaded_images.bullet_speed_upgrade))
+                    Some(Image(preloaded_images.bullet_speed_upgrade)),
+                    "Bullets speed".to_string()
                 );
                 current_point.x += shift + upgrade_button_w;
                 let upgrade_button3 = Button::new(
@@ -391,7 +420,8 @@ impl<'a> System<'a> for GUISystem {
                     upgrade_button_w, upgrade_button_h, 
                     white_color.clone(), 
                     false,
-                    Some(Image(preloaded_images.ship_speed_upgrade))
+                    Some(Image(preloaded_images.ship_speed_upgrade)),
+                    "Ship speed".to_string()
                 );
                 let upgrades = vec![Upgrade::AttackSpeed, Upgrade::BulletSpeed, Upgrade::ShipSpeed];
                 if upgrade_button1.place_and_check(&mut ingame_ui, &*mouse) {
@@ -854,7 +884,7 @@ impl<'a> System<'a> for RenderingSystem {
                     with_projection: _,
                     image: _
                 } => {
-                    let scale = 123f32;
+                    let scale = 30f32;
                     let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
                     let view = get_view(canvas.observer()).to_homogeneous();
                     let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
@@ -865,7 +895,6 @@ impl<'a> System<'a> for RenderingSystem {
                     dbg!(model * Vector4::new(0.0, 0.0, 0.0, 1.0));
                     let matrix = orthographic * model * scaler;
                     dbg!( matrix * Vector4::new(0.0, 0.0, 0.0, 1.0));
-                    // let  matrix: [[f32; 4]; 4] = matrix.into();
                     dbg!(matrix);
                     let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
                     glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));

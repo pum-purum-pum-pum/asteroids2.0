@@ -25,6 +25,7 @@ pub struct Button {
     color: Point3,
     with_projection: bool,
     pub image: Option<Image>,
+    text: String
 }
 
 pub enum PrimitiveKind {
@@ -39,14 +40,15 @@ pub struct Primitive {
 }
 
 impl Button {
-    pub fn new(position: Point2, width: f32, height: f32, color: Point3, with_projection: bool, image: Option<Image>) -> Button {
+    pub fn new(position: Point2, width: f32, height: f32, color: Point3, with_projection: bool, image: Option<Image>, text: String) -> Button {
         Button {
             position: position,
             width: width,
             height: height,
             color: color,
             with_projection: with_projection,
-            image: image
+            image: image,
+            text: text
         }
     }
 
@@ -70,12 +72,26 @@ impl Button {
         }
     }
 
+    pub fn get_text_box(&self) -> Primitive {
+        Primitive{
+            kind: PrimitiveKind::Text(
+                Text{
+                    position: self.position,
+                    text: self.text.clone(),
+                },
+            ),
+            with_projection: self.with_projection,
+            image: None
+        }
+    }
+
     pub fn place_and_check(
         &self, 
         ingame_ui: &mut IngameUI,
         mouse: &Mouse, 
     ) -> bool {
         ingame_ui.primitives.push(self.get_geometry());
+        ingame_ui.primitives.push(self.get_text_box());
         self.check(mouse)
     }
 }
