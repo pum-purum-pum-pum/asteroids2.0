@@ -1,9 +1,8 @@
 use crate::components::*;
 use crate::geometry::*;
 use crate::nalgebra::Rotation2;
-use al::prelude::sdl2;
-use al::prelude::*;
-use astro_lib as al;
+use crate::prelude::{*};
+use crate::types::{*};
 use sdl2::mixer::{InitFlag, AUDIO_S16LSB, DEFAULT_CHANNELS};
 use std::path::Path;
 

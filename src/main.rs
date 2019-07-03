@@ -18,7 +18,23 @@ mod systems;
 #[cfg(test)]
 mod test;
 mod gui;
-use astro_lib::prelude::*;
+mod prelude;
+mod types;
+
+#[macro_use]
+pub use specs_derive;
+pub use specs;
+pub use sdl2;
+pub use shrev;
+pub use glium;  
+pub use rand;
+pub use fnv;
+pub use derive_deref;
+pub use nalgebra;
+pub use nphysics2d;
+pub use ncollide2d;
+pub use glium_text;
+use crate::types::{*};
 
 use components::*;
 use gfx::{Canvas, ImageData, MovementParticles, ParticlesData, TextData};
@@ -33,6 +49,13 @@ use systems::{
 use gui::{IngameUI, Primitive};
 
 const NEBULAS_NUM: usize = 3usize;
+
+// int SDL_main(int argc, char *argv[])
+#[no_mangle]
+pub extern fn SDL_main(_argc: libc::c_int, _argv: *const *const libc::c_char) -> libc::c_int {
+  main();
+  return 0;
+}
 
 pub fn main() -> Result<(), String> {
     let mut phys_world: World<f32> = World::new();

@@ -5,8 +5,7 @@ use std::mem;
 use std::ops::Deref;
 use std::os::raw::c_void;
 use std::rc::Rc;
-
-use astro_lib::prelude::*;
+use crate::types::{*};
 use sdl2::video::{Window, WindowBuildError};
 use sdl2::VideoSubsystem;
 

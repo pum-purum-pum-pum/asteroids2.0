@@ -1,5 +1,4 @@
-use al::prelude::*;
-use astro_lib as al;
+use crate::types::{*};
 use rand::prelude::*;
 use std::fs::File;
 use std::io::{BufReader, Error as IOError};

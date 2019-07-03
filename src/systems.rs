@@ -1,9 +1,7 @@
 use std::cmp::Ordering::Equal;
 use std::mem::swap;
 
-use al::prelude::*;
-use astro_lib as al;
-use al::types::{*};
+use crate::types::{*};
 use rand::prelude::*;
 
 use glium;
@@ -219,7 +217,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (button_w, button_h) = (w/4f32, h/4f32);
         let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false, None, "Play".to_string());
         if button.place_and_check(&mut ui, &*mouse) {
-            dbg!("button activated");
             *app_state = AppState::Play(PlayState::Action);
         }
         primitives_channel.iter_write(ui.primitives.drain(..));
@@ -266,10 +263,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     let mut scaler = scale * Matrix4::identity();
                     let scale_len = scaler.len();
                     scaler[scale_len - 1] = 1.0;
-                    dbg!(model * Vector4::new(0.0, 0.0, 0.0, 1.0));
                     let matrix = orthographic * model * scaler;
-                    dbg!( matrix * Vector4::new(0.0, 0.0, 0.0, 1.0));
-                    dbg!(matrix);
                     let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
                     glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }
@@ -726,7 +720,6 @@ impl<'a> System<'a> for RenderingSystem {
                     }
                 }
                 ParticlesData::Engine(ref mut particles) => {
-                    // dbg!("ENGINE PARTICLES HERE");
                     let mut direction = Vector3::new(0f32, -1f32, 0f32);
                     direction = (char_iso * direction);
                     if particles.update(
@@ -892,10 +885,7 @@ impl<'a> System<'a> for RenderingSystem {
                     let mut scaler = scale * Matrix4::identity();
                     let scale_len = scaler.len();
                     scaler[scale_len - 1] = 1.0;
-                    dbg!(model * Vector4::new(0.0, 0.0, 0.0, 1.0));
                     let matrix = orthographic * model * scaler;
-                    dbg!( matrix * Vector4::new(0.0, 0.0, 0.0, 1.0));
-                    dbg!(matrix);
                     let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
                     glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }

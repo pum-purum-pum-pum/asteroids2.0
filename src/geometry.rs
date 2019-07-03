@@ -1,6 +1,5 @@
 use crate::components::Geometry;
-use al::prelude::*;
-use astro_lib as al;
+use crate::types::{*};
 use ncollide2d::transformation::convex_hull_idx;
 use rand::prelude::*;
 use specs::prelude::*;

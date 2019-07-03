@@ -1,5 +1,4 @@
-use al::prelude::*;
-use astro_lib as al;
+use crate::types::{*};
 use derive_deref::{Deref, DerefMut};
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
