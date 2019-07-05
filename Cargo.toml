@@ -13,9 +13,11 @@ crate-type = ["cdylib"]
 [profile.dev.overrides."*"]
 opt-level = 3
 
-[dependencies]
+[target.'cfg(target_os="android")'.dependencies]
 android_log = "*"
 log = "*"
+
+[dependencies]
 libc = "*"
 image = "0.21.1"
 specs = {version="0.14.3", features=["nightly"]}
@@ -24,8 +26,8 @@ nalgebra = "0.18.0"
 nphysics2d = "0.11.1"
 gl = "0.10.0"
 shrev = "1.1.1"
-glium = "*"
-glium_text = "0.14.0"
+glium = "0.22"
+glium_text_rusttype = "0.3.2"
 ncollide2d = "0.19.1"
 rand = "0.6.5"
 hibitset = "0.5.0"

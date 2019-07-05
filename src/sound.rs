@@ -37,13 +37,22 @@ pub fn init_sound<'a>(
     sdl2::mixer::open_audio(frequency, format, channels, chunk_size)?;
     let mixer_context =
         sdl2::mixer::init(InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG)?;
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad sound allocation");
     sdl2::mixer::allocate_channels(100);
-    let sound_file_path = Path::new("assets/shot.wav");
-    let explosion_file_path = Path::new("assets/explosion.wav");
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad end of sound allocation");
+    let shot = "assets/shot.wav";
+    let explosion = "assets/explosion.wav";
+    let shot_file_path = Path::new(&shot);
+    let explosion_file_path = Path::new(&explosion);
     let shot_sound_chunk = ThreadPin::new(SoundData(
-        sdl2::mixer::Chunk::from_file(sound_file_path)
+        sdl2::mixer::Chunk::from_file(shot_file_path)
             .map_err(|e| format!("Cannot load sound file: {:?}", e))?
     ));
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad created chunk");
+
     let explosion_sound_chunk = ThreadPin::new(SoundData(
         sdl2::mixer::Chunk::from_file(explosion_file_path)
             .map_err(|e| format!("Cannot load sound file: {:?}", e))?

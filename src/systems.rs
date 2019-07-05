@@ -178,7 +178,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Write<'a, IngameUI>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
-        ReadExpect<'a, ThreadPin<TextData>>,
+        // ReadExpect<'a, ThreadPin<TextData>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -207,7 +207,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mut ui,
             mouse,
             mut app_state,
-            text_data
+            // text_data
         ) = data;
         let mut target = display.draw();
         target.clear_color(0.0, 0.0, 0.0, 1.0);
@@ -264,8 +264,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     let scale_len = scaler.len();
                     scaler[scale_len - 1] = 1.0;
                     let matrix = orthographic * model * scaler;
-                    let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
-                    glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
+                    // let text = glium_text_rusttype::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
+                    // glium_text_rusttype::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }
                 _ => ()
             }
@@ -580,7 +580,7 @@ impl<'a> System<'a> for RenderingSystem {
         Read<'a, Progress>,
         Write<'a, AppState>,
         Read<'a, Mouse>,
-        ReadExpect<'a, ThreadPin<TextData>>,
+        // ReadExpect<'a, ThreadPin<TextData>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -614,7 +614,7 @@ impl<'a> System<'a> for RenderingSystem {
             progress,
             mut app_state,
             mouse,
-            text_data
+            // text_data
         ) = data;
         let dims = display.get_framebuffer_dimensions();
         let mut target = display.draw();
@@ -886,8 +886,8 @@ impl<'a> System<'a> for RenderingSystem {
                     let scale_len = scaler.len();
                     scaler[scale_len - 1] = 1.0;
                     let matrix = orthographic * model * scaler;
-                    let text = glium_text::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
-                    glium_text::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
+                    // let text = glium_text_rusttype::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
+                    // glium_text_rusttype::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }
                 _ => ()
             }

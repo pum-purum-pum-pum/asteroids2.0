@@ -1,3 +1,7 @@
+#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+#[macro_use] extern crate log;
+#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+extern crate android_log;
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
 use nphysics2d::object::BodyStatus;
@@ -7,6 +11,9 @@ use sdl2::mouse::MouseButton;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
+use sdl2::rwops::RWops;
+use std::path::Path;
+use std::panic;
 
 mod components;
 mod geometry;
@@ -33,7 +40,7 @@ pub use derive_deref;
 pub use nalgebra;
 pub use nphysics2d;
 pub use ncollide2d;
-pub use glium_text;
+pub use glium_text_rusttype;
 use crate::types::{*};
 
 use components::*;
@@ -53,12 +60,30 @@ const NEBULAS_NUM: usize = 3usize;
 // int SDL_main(int argc, char *argv[])
 #[no_mangle]
 pub extern fn SDL_main(_argc: libc::c_int, _argv: *const *const libc::c_char) -> libc::c_int {
-  main();
-  return 0;
+  match main() {
+      Ok(_) => {
+          0
+      }
+      Err(_) => {
+          1
+      }
+  }
 }
 
 pub fn main() -> Result<(), String> {
+    panic::set_hook(Box::new(|panic_info| {
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        trace!("AAA PANIC");
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        trace!("{}", panic_info);
+    }));
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    android_log::init("MyApp").unwrap();
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad start");
     let mut phys_world: World<f32> = World::new();
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad physics initialized");
     phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
@@ -71,12 +96,16 @@ pub fn main() -> Result<(), String> {
         .build_glium()
         .unwrap();
     let canvas = Canvas::new(&display);
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad display initialized");
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
     let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad specs world initialized");
     specs_world.add_resource(phys_world);
     specs_world.add_resource(BodiesMap::new());
     let size = 10f32;
@@ -151,6 +180,9 @@ pub fn main() -> Result<(), String> {
     let direction_image_data = ThreadPin::new(
         ImageData::new(&display, "direction").unwrap()
     );
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad create some entities");
+
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
         let nebula_image_data = ThreadPin::new(
@@ -270,6 +302,8 @@ pub fn main() -> Result<(), String> {
     ]);
     character_collision_groups.set_blacklist(&[CollisionId::PlayerBullet as usize]);
 
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad safe insert");
     PhysicsComponent::safe_insert(
         &mut specs_world.write_storage(),
         character,
@@ -321,18 +355,50 @@ pub fn main() -> Result<(), String> {
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad start sound");
     let (preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad created sound");
+
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
-    let font_path_str = &format!("{}/assets/{}.ttf", env!("CARGO_MANIFEST_DIR"), "trench100free");
-    let font_file = std::fs::File::open(&std::path::Path::new(font_path_str)).unwrap();
-    let font = glium_text::FontTexture::new(&display, font_file, 50).unwrap();
-    specs_world.add_resource(
-        ThreadPin::new(
-            TextData::new(&display, font) 
-        )
-    );
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("staring load font");
+    let font_path_str = format!("assets/{}.ttf", "trench100free");
+    let font_file = match RWops::from_file(Path::new(&font_path_str), "r") {
+        Ok(value) => {
+            #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+            trace!("file loaded");
+            value
+        }
+        Err(err) => {
+            #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+            trace!("{:?}", err);
+            panic!();
+        }
+    };
+    // let font = match glium_text_rusttype::FontTexture::new(&display, font_file, 50, glium_text_rusttype::FontTexture::ascii_character_list()) {
+    //     Ok(value) => {
+    //         #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    //         trace!("font loaded");
+    //         value
+    //     }
+    //     Err(err) => {
+    //         #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    //         trace!("{:?}", err);
+    //         panic!();
+    //     }
+    // };
+    // specs_world.add_resource(
+    //     ThreadPin::new(
+    //         TextData::new(&display, font) 
+    //     )
+    // );
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad start dispatch builder");
+
     let mut dispatcher = DispatcherBuilder::new()
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
@@ -375,6 +441,8 @@ pub fn main() -> Result<(), String> {
     // let poly = LightningPolygon::new_rectangle(0f32, 0f32, 1f32, 1f32);
     // specs_world.add_resource(poly);
     // ------------------------------
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("vlad dispatched");
 
     let mut event_pump = sdl_context.event_pump().unwrap();
     safe_maintain(&mut specs_world);

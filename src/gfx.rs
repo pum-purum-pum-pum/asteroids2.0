@@ -1,7 +1,9 @@
 use crate::types::{*};
 use rand::prelude::*;
 use std::fs::File;
-use std::io::{BufReader, Error as IOError};
+use std::io::{BufReader, Error as IOError, Read};
+use std::str::FromStr;
+use std::collections::HashMap;
 use nalgebra::geometry::Orthographic3;
 
 use glium;
@@ -10,8 +12,11 @@ use glium::index::PrimitiveType;
 use glium::texture::{SrgbTexture2d, TextureCreationError};
 use glium::Surface;
 use glium::{implement_vertex, uniform, DrawError};
+use glium::uniforms::AsUniformValue;
 use image;
 use image::ImageError;
+use sdl2::rwops::RWops;
+use std::path::Path;
 
 use crate::gfx_backend::SDL2Facade;
 
@@ -23,14 +28,14 @@ pub const _BACKGROUND_SIZE: f32 = 20f32;
 const ENGINE_FAR: f32 = 3f32;
 
 pub struct TextData {
-    pub text_system: glium_text::TextSystem,
-    pub font: glium_text::FontTexture
+    pub text_system: glium_text_rusttype::TextSystem,
+    pub font: glium_text_rusttype::FontTexture
 }
 
 impl TextData {
-    pub fn new(display: &SDL2Facade, font: glium_text::FontTexture) -> TextData {
+    pub fn new(display: &SDL2Facade, font: glium_text_rusttype::FontTexture) -> TextData {
         TextData {
-            text_system: glium_text::TextSystem::new(display),
+            text_system: glium_text_rusttype::TextSystem::new(display),
             font: font
         }
     }
@@ -363,8 +368,8 @@ impl From<TextureCreationError> for LoadTextureError {
 type LoadTextureResult = Result<SrgbTexture2d, LoadTextureError>;
 
 pub fn load_texture(display: &SDL2Facade, name: &str) -> LoadTextureResult {
-    let path_str = &format!("{}/assets/{}.png", env!("CARGO_MANIFEST_DIR"), name);
-    let texture_file = File::open(path_str)?;
+    let path_str = format!("assets/{}.png", name);
+    let texture_file = RWops::from_file(Path::new(&path_str), "r").unwrap();
     let reader = BufReader::new(texture_file);
     let image = image::load(reader, image::PNG)?.to_rgba();
     let image_dimensions = image.dimensions();
@@ -438,6 +443,163 @@ impl ImageData {
     }
 }
 
+
+
+fn is_precision(word: &str) -> bool {
+    let precision = vec![
+        "vec2",
+        "vec4",
+        "vec3",
+        "mat2",
+        "mat3",
+        "mat4",
+        "mat5",
+        "float",
+    ];
+    for p in precision.iter() {
+        if word == *p {
+            return true;
+        }
+    }
+    false
+}
+
+#[derive(PartialEq)]
+pub enum ShaderType {
+    Vertex,
+    Fragment
+}
+
+pub enum Version {
+    V300,
+    V100,
+}
+
+pub fn glesit(src: &str, shader_type: ShaderType, to_version: Version) -> String {
+    let lines: Vec<_> = src.split("\n").collect();
+    let mut find_and_replace = match to_version {
+        Version::V300 => {
+            match shader_type {
+                ShaderType::Vertex => {
+                    vec![("#version 130", "#version 300 es")]
+                }
+                ShaderType::Fragment => {
+                    vec![
+                        ("#version 130", "#version 300 es\nout mediump vec4  astro_FragColor;"),
+                        ("gl_FragColor", "astro_FragColor")
+                    ]
+                }
+            }
+        }
+        Version::V100 => {
+            let mut res = vec![("#version 130", "#version 100")];
+            match shader_type {
+                ShaderType::Fragment => {
+                    res.push(("texture(", "texture2D("));
+                }
+                ShaderType::Vertex => ()
+            };
+            res
+        }
+    };
+    let mut subst = HashMap::new();
+    match to_version {
+        Version::V100 => {
+            match shader_type {
+                ShaderType::Vertex => {
+                    subst.insert("in", "attribute");
+                }
+                ShaderType::Fragment => {
+                    subst.insert("in", "varying");
+                }
+            }
+            subst.insert("out", "varying");
+        }
+        Version::V300 => {}
+    };
+    let mut new_lines = vec!();
+    for line in lines.iter() {
+        let words: Vec<_> = line.split(" ").collect();
+        let mut new_words = vec![];
+        let mut last_word = String::new();
+        for w in words.iter() {
+            if is_precision(w) && (last_word != "in".to_string() || shader_type == ShaderType::Fragment) {
+                new_words.push("mediump".to_string());
+                eprintln!("{}", &last_word);
+            }
+            match subst.get(w) {
+                Some(&new_word) => {
+                    new_words.push(String::from_str(new_word).unwrap())
+                }
+                None => {
+                    new_words.push(String::from_str(w).unwrap())
+                }
+            }
+            last_word = String::from_str(w).unwrap();
+        }
+        let mut new_line = new_words.join(" ");
+        for (f, r) in find_and_replace.iter() {
+            new_line = new_line.replace(f, r);
+        }
+        new_lines.push(new_line)
+    }
+    new_lines.join("\n")
+}
+
+pub fn read_file(filename: &str) -> Result<String, IOError> {
+    let mut result_str = String::new();
+    let mut rw = RWops::from_file(Path::new(filename), "r").unwrap();
+    rw.read_to_string(&mut result_str)?;
+    Ok(result_str)
+}
+
+pub fn create_shader_program(name: String, display: &SDL2Facade) -> glium::Program {
+    let vertex = format!("gl/v_{}.glsl", name);
+    let fragment = format!("gl/f_{}.glsl", name);
+    let (mut vertex_shader, mut fragment_shader) = (
+        read_file(&vertex).unwrap(),
+        read_file(&fragment).unwrap()
+    );
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    {
+        trace!("vladik on androgen");
+        trace!("{}", vertex);
+        trace!("{}", fragment);
+        use std::fs::{self, DirEntry};
+        use std::path::Path;
+        for entry in fs::read_dir(Path::new(".")) {
+            trace!("{:?}", entry);
+        };
+        // trace!("enemy {:?}", File::open(Path::new("assets/enemy.png")));
+        // trace!("{:?}", Path::new("gl/v_.png"));
+        trace!("{:?}", read_file(&vertex));
+        trace!("{:?}", read_file(&fragment));
+        vertex_shader = glesit(&read_file(&vertex).unwrap(), ShaderType::Vertex, Version::V100);
+        fragment_shader = glesit(&read_file(&fragment).unwrap(), ShaderType::Fragment, Version::V100);
+        trace!("{}", vertex_shader);
+        trace!("{}", fragment_shader);
+    }
+    
+    let program = glium::Program::from_source(display, &vertex_shader, &fragment_shader, None);
+    match program {
+        Err(err) => {
+            #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+            {
+                trace!("{:?}", err);
+            }
+            panic!();
+        }
+        Ok(program) => {
+            #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+            {
+                trace!("{:?} is ok", name);
+            }
+            return program
+        }
+    }
+}
+
+
 /// 2D graphics on screen
 pub struct Canvas<'a> {
     program: glium::Program,       // @vlad TODO: we want to use many programs
@@ -453,191 +615,40 @@ pub struct Canvas<'a> {
 
 impl<'a> Canvas<'a> {
     pub fn new(display: &SDL2Facade) -> Self {
-        let vertex_shader_primitive_texture_src = r#"
-            #version 130
-            in vec2 position;
-            in vec2 tex_coords;
-            uniform mat4 projection;
-            uniform mat4 view;
-            uniform mat4 model;
-            uniform float size;
-            out vec2 v_tex_coords;
-
-            void main() {
-                v_tex_coords = tex_coords;
-                gl_Position = projection * view * model * vec4(size * (position + 1.0) / 2.0, -1.0, 1.0);
-            }
-        "#;
- 
-        let fragment_shader_primitive_texture_src = r#"
-            #version 130
-            out vec4 color;
-            uniform sampler2D tex;
-            in vec2 v_tex_coords;
-
-            void main() {
-                vec4 texture_colors = vec4(texture(tex, v_tex_coords));
-                color = texture_colors;
-            }
-        "#;
-        
-        let vertex_shader_primitive_src = r#"
-            #version 130
-            in vec2 position;
-            uniform mat4 projection;
-            uniform mat4 view;
-            uniform mat4 model;
-            
-            void main() {
-                gl_Position = projection * view * model * vec4(position, -1.0, 1.0);
-            }
-        "#;
-
-        let fragment_shader_primitive_src = r#"
-            #version 130
-            out vec4 color;
-            uniform vec3 fill_color;
-
-            void main() {
-                color = vec4(fill_color, 1.0);
-            }
-        "#;
-
-        let vertex_shader_src = r#"
-            #version 130
-            in vec2 tex_coords;
-            in vec2 position;
-            out vec2 v_tex_coords;
-
-            uniform mat4 perspective;
-            uniform mat4 view;
-            uniform mat4 model;
-            uniform float scale;
-            uniform vec2 dim_scales;
-            
-            vec2 position_scaled;
-
-            void main() {
-                v_tex_coords = tex_coords;
-                position_scaled = scale * dim_scales * position;
-                gl_Position = perspective * view * model * vec4(position_scaled, 0.0, 1.0);
-            }
-        "#;
-
-        let fragment_shader_src = r#"
-            #version 130
-            in vec2 v_tex_coords;
-            out vec4 color;
-
-            uniform sampler2D tex;
-            void main() {
-                vec4 texture_colors = vec4(texture(tex, v_tex_coords));
-                color = texture_colors;
-            }
-        "#;
-
-        let vertex_shader_instancing = r#"
-            #version 130
-            in vec2 position;
-            in vec3 world_position;
-
-            uniform mat4 perspective;
-            uniform mat4 view;
-            uniform mat4 model;
-            
-            vec3 position_moved;
-
-            void main() {
-                position_moved = world_position + vec3(position, 0.0);
-                gl_Position = perspective * view * model * vec4(position_moved, 1.0);
-            }
-        "#;
-
-        let fragment_shader_instancing = r#"
-            #version 130
-            out vec4 color;
-            uniform float transparency;
-            float alpha = 0.5;
-
-            void main() {
-                color =  vec4(1.0, 1.0, 1.0, alpha + (1.0 - alpha) * transparency);
-            }
-        "#;
-
-        let vertex_light_shader_src = r#"
-            #version 130
-            in vec2 position;
-
-            uniform mat4 perspective;
-            uniform mat4 view;
-            uniform mat4 model;
-
-            void main() {
-                gl_Position = perspective * view * model * vec4(position, 0.0, 1.0);
-            }
-        "#;
-
-        let fragment_light_shader_src = r#"
-            #version 130
-            out vec4 color;
-
-            void main() {
-                color = vec4(1.0, 1.0, 1.0, 1.0);
-            }
-        "#;
         let default_params = glium::DrawParameters {
                 blend: Blend::alpha_blending(),
                 ..Default::default()
         };
         let stencil_check_params = glium::DrawParameters {
-            stencil: glium::draw_parameters::Stencil {
-                test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
-                test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
-                reference_value_clockwise: 1,
-                reference_value_counter_clockwise: 1,
-                ..Default::default()
-            },
+            // stencil: glium::draw_parameters::Stencil {
+            //     test_clockwise: glium::StencilTest::IfEqual { mask: 0xFF }, // mask which has 1 in all it's bits. u32::max_value()?
+            //     test_counter_clockwise: glium::StencilTest::IfEqual { mask: 0xFF },
+            //     reference_value_clockwise: 1,
+            //     reference_value_counter_clockwise: 1,
+            //     ..Default::default()
+            // },
             blend: Blend::alpha_blending(),
             ..Default::default()
         };
         let stencil_write_params = glium::DrawParameters {
-            stencil: glium::draw_parameters::Stencil {
-                test_counter_clockwise: glium::StencilTest::AlwaysPass,
-                test_clockwise: glium::StencilTest::AlwaysPass,
-                depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
-                depth_pass_operation_clockwise: glium::StencilOperation::Replace,
-                // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
-                reference_value_clockwise: 1,
-                // reference_value_counter_clockwise: 1,
-                ..Default::default()
-            },
+            // stencil: glium::draw_parameters::Stencil {
+            //     test_counter_clockwise: glium::StencilTest::AlwaysPass,
+            //     test_clockwise: glium::StencilTest::AlwaysPass,
+            //     depth_pass_operation_counter_clockwise: glium::StencilOperation::Replace,
+            //     depth_pass_operation_clockwise: glium::StencilOperation::Replace,
+            //     // pass_depth_fail_operation_clockwise: glium::StencilOperation::Replace,
+            //     reference_value_clockwise: 1,
+            //     // reference_value_counter_clockwise: 1,
+            //     ..Default::default()
+            // },
             color_mask: (false, false, false, false),
             ..Default::default()
         };
-
-        let program =
-            glium::Program::from_source(display, vertex_shader_src, fragment_shader_src, None)
-                .unwrap();
-        let program_primitive = 
-            glium::Program::from_source(display, vertex_shader_primitive_src, fragment_shader_primitive_src, None)
-                .unwrap();
-        let program_primitive_texture = 
-            glium::Program::from_source(display, vertex_shader_primitive_texture_src, fragment_shader_primitive_texture_src, None)
-                .unwrap();
-        let program_light = glium::Program::from_source(
-            display,
-            vertex_light_shader_src,
-            fragment_light_shader_src,
-            None,
-        )
-        .unwrap();
-        let program_instancing = glium::Program::from_source(
-            display,
-            vertex_shader_instancing,
-            fragment_shader_instancing,
-            None,
-        )
-        .unwrap();
+        let program = create_shader_program("".to_string(), display);
+        let program_primitive = create_shader_program("primitive".to_string(), display);
+        let program_primitive_texture = create_shader_program("primitive_texture".to_string(), display);
+        let program_light = create_shader_program("light".to_string(), display);
+        let program_instancing = create_shader_program("instancing".to_string(), display);
         Canvas {
             program: program,
             program_primitive: program_primitive,
@@ -677,11 +688,10 @@ impl<'a> Canvas<'a> {
     ) -> Result<(), DrawError> {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = display.get_framebuffer_dimensions();
-        let processed_texture = image_data
-            .texture
-            .sampled()
-            .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
-            .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
+        let processed_texture = &image_data.texture;
+            // .sampled()
+            // .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+            // .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
         let draw_params = if with_lights {
             &self.stencil_check_params
         } else {
@@ -728,9 +738,9 @@ impl<'a> Canvas<'a> {
         };
         let texture = image_data
             .texture
-            .sampled()
-            .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
-            .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
+            .sampled();
+            // .magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest)
+            // .minify_filter(glium::uniforms::MinifySamplerFilter::Linear);
         target.draw(
             &image_data.positions,
             &image_data.indices,
