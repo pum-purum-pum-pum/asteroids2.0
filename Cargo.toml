@@ -34,6 +34,7 @@ hibitset = "0.5.0"
 fnv = "1.0.6"
 derive_deref = "1.1.0"
 num_enum = "0.1.1"
+red = {path = "red"}
 
 [dependencies.sdl2]
 version = "0.32.2"

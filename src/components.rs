@@ -22,10 +22,9 @@ pub const THRUST_FORCE_INIT: f32 = 0.01;
 pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 
 use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
-use crate::gfx_backend::SDL2Facade;
 
-pub type SDLDisplay = ThreadPin<SDL2Facade>;
-pub type Canvas<'a> = ThreadPin<SDLCanvas<'a>>;
+// pub type SDLDisplay = ThreadPin<SDL2Facade>;
+pub type Canvas = ThreadPin<SDLCanvas>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Upgrade {
