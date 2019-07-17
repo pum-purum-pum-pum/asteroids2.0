@@ -4,8 +4,6 @@ use std::mem::swap;
 use crate::types::{*};
 use rand::prelude::*;
 
-use glium;
-use glium::Surface;
 use sdl2::keyboard::Keycode;
 use sdl2::TimerSubsystem;
 use rand::distributions::{Bernoulli, Distribution};
@@ -22,8 +20,8 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter};
-use crate::gfx::{Explosion, Engine, GeometryData, ParticlesData, 
-                unproject_with_z, ortho_unproject, TextData, orthographic, orthographic_from_zero, get_view};
+use crate::gfx::{GeometryData, Engine, ParticlesData, Explosion,
+                unproject_with_z, ortho_unproject, orthographic, orthographic_from_zero, get_view};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData};
 use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};
@@ -169,16 +167,14 @@ impl<'a> System<'a> for MenuRenderingSystem {
         ReadStorage<'a, Geometry>,
         ReadStorage<'a, Size>,
         ReadStorage<'a, Polygon>,
-        WriteStorage<'a, ThreadPin<ParticlesData>>,
-        WriteExpect<'a, SDLDisplay>,
-        WriteExpect<'a, Canvas<'static>>,
-        ReadExpect<'a, PreloadedParticles>,
+        ReadExpect<'a, ThreadPin<red::GL>>,
+        WriteExpect<'a, Canvas>,
         Read<'a, World<f32>>,
+        ReadExpect<'a, red::Viewport>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
-        // ReadExpect<'a, ThreadPin<TextData>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -198,24 +194,45 @@ impl<'a> System<'a> for MenuRenderingSystem {
             geometries,
             sizes,
             polygons,
-            mut particles_datas,
-            display,
+            gl,
             mut canvas,
-            preloaded_particles,
             world,
+            viewport,
             mut primitives_channel,
             mut ui,
             mouse,
             mut app_state,
             // text_data
         ) = data;
-        let mut target = display.draw();
-        target.clear_color(0.0, 0.0, 0.0, 1.0);
-        target.clear_stencil(0i32);
-        let dims = display.get_framebuffer_dimensions();
+        let vao = red::buffer::VertexArray::new(&*gl).unwrap();
+        let mut frame = red::Frame::new(&gl);
+        frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
+        frame.clear_color();
+        let dims = viewport.dimensions();
+        // canvas.render_geometry(
+            // gl: &red::GL,
+            // viewport: &red::Viewport,
+            // frame: &mut red::Frame,
+            // vao: &red::buffer::VertexArray,
+            // geometry_data: &GeometryData,
+            // model: &Isometry3,
+        // );
+    //     let mut target = display.draw();
+    //     target.clear_color(0.0, 0.0, 0.0, 1.0);
+    //     target.clear_stencil(0i32);
+    //     let dims = display.get_framebuffer_dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let (button_w, button_h) = (w/4f32, h/4f32);
-        let button = Button::new(Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), button_w, button_h, Point3::new(0.1f32, 0.4f32, 1f32), false, None, "Play".to_string());
+        let button = Button::new(
+            Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), 
+            // Point2::new(0f32, 0f32),
+            button_w, 
+            button_h, 
+            Point3::new(0.1f32, 0.4f32, 1f32), 
+            false, 
+            None, 
+            "Play".to_string()
+        );
         if button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::Play(PlayState::Action);
         }
@@ -229,23 +246,34 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 } => {
                     let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
-                        GeometryData::new(&display, &points, &indicies);
+                        GeometryData::new(&gl, &points, &indicies).unwrap();
                     match image {
                         Some(image) => {
-                            canvas
-                                .render_primitive_texture(
-                                    &display, 
-                                    &mut target, 
-                                    image_datas.get(image.0).unwrap(),
-                                    &model, 
-                                    *with_projection, 
-                                    rectangle.width
-                                ).unwrap();
+                            // unimplemented!();
+                            // canvas
+                            //     .render_primitive_texture(
+                            //         &display, 
+                            //         &mut target, 
+                            //         image_datas.get(image.0).unwrap(),
+                            //         &model, 
+                            //         *with_projection, 
+                            //         rectangle.width
+                            //     ).unwrap();
                         }
                         None => {
-                            canvas
-                                .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
-                                .unwrap();
+                            let fill_color = rectangle.color;
+                            canvas.render_primitive(
+                                &gl,
+                                &viewport,
+                                &mut frame,
+                                &geom_data,
+                                &model,
+                                (fill_color.x, fill_color.y, fill_color.z),
+                                *with_projection
+                            );
+                            // canvas
+                            //     .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
+                            //     .unwrap();
 
                         }
                     }
@@ -255,22 +283,23 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     with_projection: _,
                     image: _
                 } => {
-                    let scale = 30f32;
-                    let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
-                    let view = get_view(canvas.observer()).to_homogeneous();
-                    let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
-                        .to_homogeneous();
-                    let mut scaler = scale * Matrix4::identity();
-                    let scale_len = scaler.len();
-                    scaler[scale_len - 1] = 1.0;
-                    let matrix = orthographic * model * scaler;
-                    // let text = glium_text_rusttype::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
-                    // glium_text_rusttype::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
+                    // unimplemented!();
+                    // let scale = 30f32;
+                    // let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
+                    // let view = get_view(canvas.observer()).to_homogeneous();
+                    // let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
+                    //     .to_homogeneous();
+                    // let mut scaler = scale * Matrix4::identity();
+                    // let scale_len = scaler.len();
+                    // scaler[scale_len - 1] = 1.0;
+                    // let matrix = orthographic * model * scaler;
+                    // // let text = glium_text_rusttype::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
+                    // // glium_text_rusttype::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
                 }
                 _ => ()
             }
         }
-        target.finish().unwrap();
+        // target.finish().unwrap();
     }
 }
 
@@ -288,9 +317,9 @@ impl<'a> System<'a> for GUISystem {
         ReadStorage<'a, Lifes>,
         ReadStorage<'a, Shield>,
         WriteStorage<'a, Gun>,
-        WriteExpect<'a, SDLDisplay>,
-        WriteExpect<'a, Canvas<'static>>,
-        ReadExpect<'a, PreloadedParticles>,
+        ReadExpect<'a, red::Viewport>,
+        WriteExpect<'a, Canvas>,
+        // ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
@@ -312,9 +341,9 @@ impl<'a> System<'a> for GUISystem {
             lifes,
             shields,
             mut guns,
-            display,
+            viewport,
             mut canvas,
-            preloaded_particles,
+            // preloaded_particles,
             world,
             mut primitives_channel,
             mut ingame_ui,
@@ -324,7 +353,7 @@ impl<'a> System<'a> for GUISystem {
             mut player_stats,
             mut preloaded_images
         ) = data;
-        let dims = display.get_framebuffer_dimensions();
+        let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         ingame_ui.primitives.push(
             Primitive {
@@ -571,8 +600,9 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Shield>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
-        WriteExpect<'a, SDLDisplay>,
-        WriteExpect<'a, Canvas<'static>>,
+        ReadExpect<'a, ThreadPin<red::GL>>,
+        ReadExpect<'a, red::Viewport>,
+        WriteExpect<'a, Canvas>,
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
@@ -605,7 +635,8 @@ impl<'a> System<'a> for RenderingSystem {
                 shields,
                 mut particles_datas,
             ),
-            display,
+            gl,
+            viewport,
             mut canvas,
             preloaded_particles,
             world,
@@ -616,10 +647,12 @@ impl<'a> System<'a> for RenderingSystem {
             mouse,
             // text_data
         ) = data;
-        let dims = display.get_framebuffer_dimensions();
-        let mut target = display.draw();
-        target.clear_color(0.0, 0.0, 0.0, 1.0);
-        target.clear_stencil(0i32);
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let mut frame = red::Frame::new(&gl);
+        frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
+        frame.clear_color();
+        // target.clear_stencil(0i32);
         let (char_iso, char_pos, char_vel) = {
             let mut opt_iso = None;
             let mut opt_vel = None;
@@ -637,148 +670,157 @@ impl<'a> System<'a> for RenderingSystem {
                 opt_vel.unwrap().0
             )
         };
-        // NEBULA UNCOMMENT. TODO -- OPTIMIZE!
         for (_entity, iso, image, size, _nebula) in
-                (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+            (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+            let image_data = image_datas.get(image.0).unwrap();
             canvas
                 .render(
-                    &display,
-                    &mut target,
-                    &image_datas.get(image.0).unwrap(),
-                    &iso.0,
-                    size.0,
-                    false
-                ).unwrap();
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        false
+                );
         };
-        //         (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
-        //     canvas
-        //         .render(
-        //             &display,
-        //             &mut target,
-        //             &image_datas.get(image.0).unwrap(),
-        //             &iso.0,
-        //             size.0,
-        //             false,
-        //         )
-        //         .unwrap();
-        // }
-        //             false,
-        //         )
-        //         .unwrap();
-        // }
-        // @vlad TODO rewrite it with screen borders
-        let rectangle = (
-            char_pos.x - LIGHT_RECTANGLE_SIZE,
-            char_pos.y - LIGHT_RECTANGLE_SIZE,
-            char_pos.x + LIGHT_RECTANGLE_SIZE,
-            char_pos.y + LIGHT_RECTANGLE_SIZE,
-        );
-        let mut light_poly = LightningPolygon::new_rectangle(
-            rectangle.0,
-            rectangle.1,
-            rectangle.2,
-            rectangle.3,
-            Point2::new(char_pos.x, char_pos.y),
-        );
-        // TODO fix lights to be able to use without sorting
-        let mut data = (&entities, &isometries, &geometries, &asteroid_markers)
-            .join()
-            .collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
-        let distance = |a: &Isometry| (char_pos - a.0.translation.vector).norm();
-        data.sort_by(|&a, &b| (distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal)));
-        // UNCOMMENT TO ADD LIGHTS
-        for (_entity, iso, geom, _) in data.iter() {
-            let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
-            if pos.x > rectangle.0
-                && pos.x < rectangle.2
-                && pos.y > rectangle.1
-                && pos.y < rectangle.3
-            {
-                light_poly.clip_one(**geom, pos);
+        // {
+        //     let rectangle = (
+        //         char_pos.x - LIGHT_RECTANGLE_SIZE,
+        //         char_pos.y - LIGHT_RECTANGLE_SIZE,
+        //         char_pos.x + LIGHT_RECTANGLE_SIZE,
+        //         char_pos.y + LIGHT_RECTANGLE_SIZE,
+        //     );
+        //     let mut light_poly = LightningPolygon::new_rectangle(
+        //         rectangle.0,
+        //         rectangle.1,
+        //         rectangle.2,
+        //         rectangle.3,
+        //         Point2::new(char_pos.x, char_pos.y),
+        //     );
+        //     // TODO fix lights to be able to use without sorting
+        //     let mut data = (&entities, &isometries, &geometries, &asteroid_markers)
+        //         .join()
+        //         .collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
+        //     let distance = |a: &Isometry| (char_pos - a.0.translation.vector).norm();
+        //     data.sort_by(|&a, &b| (distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal)));
+        //     // UNCOMMENT TO ADD LIGHTS
+        //     for (_entity, iso, geom, _) in data.iter() {
+        //         let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
+        //         if pos.x > rectangle.0
+        //             && pos.x < rectangle.2
+        //             && pos.y > rectangle.1
+        //             && pos.y < rectangle.3
+        //         {
+        //             light_poly.clip_one(**geom, pos);
+        //         }
+        //     }
+        //     let triangulation = light_poly.triangulate();
+        //     let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
+            for (entity, particles_data) in (&entities, &mut particles_datas).join() {
+                match **particles_data {
+                    ParticlesData::Engine(ref mut particles) => {
+                        let mut direction = Vector3::new(0f32, -1f32, 0f32);
+                        direction = (char_iso * direction);
+                        if particles.update(
+                            Vector2::new(char_pos.x, char_pos.y),
+                            Vector2::new(char_vel.x, char_vel.y),
+                            Vector2::new(direction.x, direction.y)
+                        ) {
+                            canvas
+                                .render_instancing(
+                                    &gl,
+                                    &viewport,
+                                    &mut frame,
+                                    &particles.instancing_data,
+                                    &Isometry3::new(
+                                        Vector3::new(0f32, 0f32, 0f32),
+                                        Vector3::new(0f32, 0f32, 0f32),
+                                    ),
+                                );
+                        } else {
+                            entities.delete(entity).unwrap();
+                        }
+                    }
+                    ParticlesData::Explosion(ref mut particles) => {
+                        if particles.update() {
+                            canvas
+                                .render_instancing(
+                                    &gl,
+                                    &viewport,
+                                    &mut frame,
+                                    &particles.instancing_data,
+                                    &Isometry3::new(
+                                        Vector3::new(0f32, 0f32, 0f32),
+                                        Vector3::new(0f32, 0f32, 0f32),
+                                    )
+                                );
+                        } else {
+                            entities.delete(entity).unwrap();
+                        }
+                }
+                    _ => ()
+                };
             }
-        }
-        let triangulation = light_poly.triangulate();
-        let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
-        for (entity, particles_data) in (&entities, &mut particles_datas).join() {
-            match **particles_data {
-                ParticlesData::Explosion(ref mut particles) => {
-                    if particles.update() {
-                        canvas
-                            .render_particles(
-                                &display,
-                                &mut target,
-                                &particles.gfx,
-                                &Isometry3::new(
-                                    Vector3::new(0f32, 0f32, 0f32),
-                                    Vector3::new(0f32, 0f32, 0f32),
-                                ),
-                                1f32,
-                            )
-                            .unwrap();
-                    } else {
-                        entities.delete(entity).unwrap();
-                    }
-                }
-                ParticlesData::Engine(ref mut particles) => {
-                    let mut direction = Vector3::new(0f32, -1f32, 0f32);
-                    direction = (char_iso * direction);
-                    if particles.update(
-                        Vector2::new(char_pos.x, char_pos.y),
-                        Vector2::new(char_vel.x, char_vel.y),
-                        Vector2::new(direction.x, direction.y)
-                    ) {
-                        canvas
-                            .render_particles(
-                                &display,
-                                &mut target,
-                                &particles.gfx,
-                                &Isometry3::new(
-                                    Vector3::new(0f32, 0f32, 0f32),
-                                    Vector3::new(0f32, 0f32, 0f32),
-                                ),
-                                1f32,
-                            )
-                            .unwrap();
-                    }
-                }
-                _ => (),
-            };
-        }
+        // }
+
         for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
             let translation_vec = iso.0.translation.vector;
             let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             let pure_isometry = isometry.clone();
             isometry.translation.vector.z = canvas.get_z_shift();
-            // canvas
-            //     .render(&display, &mut target, &images[preloaded_images.background], &isometry, BACKGROUND_SIZE, false)
-            //     .unwrap();
             match **particles_datas
                 .get_mut(preloaded_particles.movement)
                 .unwrap()
             {
                 ParticlesData::MovementParticles(ref mut particles) => {
                     particles.update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
-                    canvas
-                        .render_particles(
-                            &display,
-                            &mut target,
-                            &particles.gfx,
+                     canvas
+                        .render_instancing(
+                            &gl,
+                            &viewport,
+                            &mut frame,
+                            &particles.instancing_data,
                             &pure_isometry,
-                            vel.0.norm() / VELOCITY_MAX,
-                        )
-                        .unwrap();
+                        );
                 }
                 _ => panic!(),
             };
+            // canvas
+            //     .render_geometry(
+            //         &gl,
+            //         &viewport,
+            //         &mut frame,
+            //         &vao,
+            //         &geom_data,
+            //         &Isometry3::identity(),
+            //         true,
+            //     )
+            //     .unwrap();
+        }
+
+         for (_entity, iso, image, size, _projectile) in
+            (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
+        {
             canvas
-                .render_geometry(
-                    &display,
-                    &mut target,
-                    &geom_data,
-                    &Isometry3::identity(),
-                    true,
-                )
-                .unwrap();
+                .render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_datas.get(image.0).unwrap(),
+                    &iso.0,
+                    size.0,
+                    false
+                );
+            // canvas
+            //     .render(
+            //         &display,
+            //         &mut target,
+            //         &image_datas.get(image.0).unwrap(),
+            //         &iso.0,
+            //         size.0,
+            //         false,
+            //     );
         }
         for (_entity, iso, image, size, _light) in
             (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
@@ -788,14 +830,36 @@ impl<'a> System<'a> for RenderingSystem {
             let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             canvas
                 .render(
-                    &display,
-                    &mut target,
+                    &gl,
+                    &viewport,
+                    &mut frame,
                     &image_datas.get(image.0).unwrap(),
                     &isometry,
                     size.0,
                     true,
-                )
-                .unwrap();
+                );
+        }
+        for (_entity, physics_component, image, size, _ship) in
+                    (&entities, &physics, &image_ids, &sizes, &ship_markers).join() {
+                let iso2 = world
+                    .rigid_body(physics_component.body_handle)
+                    .unwrap()
+                    .position();
+                let iso = iso2_iso3(iso2);
+                let image_data = &image_datas.get(image.0).unwrap();
+                canvas
+                    .render(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso,
+                        size.0,
+                        false,
+                    )
+                // canvas
+                //     .render(&display, &mut target, &image_datas.get(image.0).unwrap(), &iso, size.0, true)
+                //     .unwrap();
         }
         for (_entity, iso, _image, _size, polygon, _asteroid) in (
             &entities,
@@ -807,39 +871,19 @@ impl<'a> System<'a> for RenderingSystem {
         )
             .join()
         {
-            // canvas.render(&display, &mut target, &images[*image], &iso.0, size.0, false).unwrap();
             let triangulation = polygon.triangulate();
             let geom_data =
-                GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
+                GeometryData::new(&gl, &triangulation.points, &triangulation.indicies).unwrap();
+            // dbg!("{:?}", triangulation);
             canvas
-                .render_geometry(&display, &mut target, &geom_data, &iso.0, false)
-                .unwrap();
-        }
-        for (_entity, physics_component, image, size, _ship) in
-            (&entities, &physics, &image_ids, &sizes, &ship_markers).join()
-        {
-            let iso2 = world
-                .rigid_body(physics_component.body_handle)
-                .unwrap()
-                .position();
-            let iso = iso2_iso3(iso2);
-            canvas
-                .render(&display, &mut target, &image_datas.get(image.0).unwrap(), &iso, size.0, true)
-                .unwrap();
-        }
-        for (_entity, iso, image, size, _projectile) in
-            (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
-        {
-            canvas
-                .render(
-                    &display,
-                    &mut target,
-                    &image_datas.get(image.0).unwrap(),
-                    &iso.0,
-                    size.0,
-                    false,
+                .render_primitive(
+                    &gl, &viewport, 
+                    &mut frame, 
+                    &geom_data, 
+                    &iso.0, 
+                    (1f32, 1f32, 1f32),
+                    true
                 )
-                .unwrap();
         }
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
@@ -851,23 +895,24 @@ impl<'a> System<'a> for RenderingSystem {
                 } => {
                     let (model, points, indicies) = rectangle.get_geometry();
                     let geom_data =
-                        GeometryData::new(&display, &points, &indicies);
+                        GeometryData::new(&gl, &points, &indicies).unwrap();
                     match image {
                         Some(image) => {
                             canvas
                                 .render_primitive_texture(
-                                    &display, 
-                                    &mut target, 
+                                    &gl, 
+                                    &viewport,
+                                    &mut frame, 
                                     image_datas.get(image.0).unwrap(),
                                     &model, 
                                     *with_projection, 
                                     rectangle.width
-                                ).unwrap();
+                                );
                         }
                         None => {
+                            let fill_color = (rectangle.color.x, rectangle.color.y, rectangle.color.z);
                             canvas
-                                .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
-                                .unwrap();
+                                .render_primitive(&gl, &viewport, &mut frame, &geom_data, &model, fill_color, *with_projection);
 
                         }
                     }
@@ -892,9 +937,7 @@ impl<'a> System<'a> for RenderingSystem {
                 _ => ()
             }
         }
-        target.finish().unwrap();
     }
-
 }
 
 #[derive(Default)]
@@ -1182,12 +1225,12 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Size>,
             WriteStorage<'a, Polygon>,
             WriteStorage<'a, Projectile>,
-            WriteStorage<'a, ThreadPin<ParticlesData>>,
             WriteStorage<'a, NebulaMarker>,
             WriteStorage<'a, AttachPosition>,
             WriteStorage<'a, LightMarker>,
+            WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
-        WriteExpect<'a, SDLDisplay>,
+        ReadExpect<'a, ThreadPin<red::GL>>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -1217,12 +1260,12 @@ impl<'a> System<'a> for InsertSystem {
                 mut sizes,
                 mut polygons,
                 mut projectiles,
-                mut particles_datas,
                 mut nebulas,
                 mut attach_positions,
-                mut lights
+                mut lights,
+                mut particles_datas,
             ),
-            display,
+            gl,
             _stat,
             preloaded_images,
             mut world,
@@ -1407,7 +1450,7 @@ impl<'a> System<'a> for InsertSystem {
                     lifetime,
                 } => {
                     let explosion_particles = ThreadPin::new(ParticlesData::Explosion(Explosion::new(
-                        &display,
+                        &gl,
                         *position,
                         *num,
                         Some(*lifetime),
@@ -1423,7 +1466,7 @@ impl<'a> System<'a> for InsertSystem {
                     attached
                 } => {
                     let engine_particles = ThreadPin::new(ParticlesData::Engine(Engine::new(
-                        &display,   
+                        &gl,
                         *position,
                         *num,
                         None,
@@ -1437,7 +1480,7 @@ impl<'a> System<'a> for InsertSystem {
                     iso
                 } => {
                     let mut rng = thread_rng();
-                    let z = rng.gen_range(-50f32, -40f32);
+                    let z = rng.gen_range(-70f32, -40f32);
                     let nebulas_num = preloaded_images.nebulas.len();
                     let nebula_id = rng.gen_range(0, nebulas_num);
                     let nebula = entities
