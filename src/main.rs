@@ -9,7 +9,6 @@ use specs::prelude::*;
 use specs::World as SpecsWorld;
 use red::{self, GL, Frame, DrawType, glow};
 use red::glow::RenderLoop;
-use std::panic;
 
 mod components;
 mod geometry;
@@ -36,6 +35,7 @@ pub use nalgebra;
 pub use nphysics2d;
 pub use ncollide2d;
 use crate::types::{*};
+
 use components::*;
 use gfx::{Canvas};
 use physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
@@ -46,14 +46,16 @@ use systems::{
     GUISystem,
 };
 use gui::{IngameUI, Primitive};
-#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-#[macro_use] extern crate log;
-#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-extern crate android_log;
+
+const NEBULAS_NUM: usize = 3usize;
 
 // int SDL_main(int argc, char *argv[])
 #[no_mangle]
 pub extern fn SDL_main(_argc: libc::c_int, _argv: *const *const libc::c_char) -> libc::c_int {
-  run::run().unwrap();
+  main().unwrap();
   return 0;
+}
+
+pub fn main() -> Result<(), String> {
+    run::run()
 }

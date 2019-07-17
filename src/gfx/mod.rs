@@ -15,6 +15,9 @@ use image::ImageError;
 use sdl2::rwops::RWops;
 use std::path::Path;
 
+mod effects;
+pub use effects::*;
+
 const Z_CANVAS: f32 = 0f32;
 const Z_FAR: f32 = 10f32;
 const MAX_ADD_SPEED_Z: f32 = 10f32;
@@ -22,7 +25,7 @@ const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
 const ENGINE_FAR: f32 = 3f32;
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[derive(VertexAttribPointers)]
 pub struct GeometryVertex {
@@ -30,7 +33,7 @@ pub struct GeometryVertex {
 }
 
 pub struct GeometryData {
-    positions: GeometryVertexBuffer,
+    positions: GeometryVertexBuffer<GeometryVertex>,
     index_buffer: red::buffer::IndexBuffer,
 }
 
@@ -51,7 +54,7 @@ impl GeometryData {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[derive(VertexAttribPointers)]
 pub struct Vertex {
@@ -59,8 +62,24 @@ pub struct Vertex {
     pub tex_coords: red::data::f32_f32,
 }
 
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+#[derive(VertexAttribPointers)]
+pub struct WorldVertex {
+    #[divisor = "1"]
+    pub world_position: red::data::f32_f32_f32,
+}
+
+pub struct InstancingData {
+    pub vertex_buffer: GeometryVertexBuffer<GeometryVertex>,
+    pub indices: red::buffer::IndexBuffer,
+    pub per_instance: WorldVertexBuffer<WorldVertex>,
+}
+
+
 pub struct ImageData {
-    positions: VertexBuffer,
+    positions: VertexBuffer<Vertex>,
     indices: red::buffer::IndexBuffer,
     texture: red::shader::Texture,
     dim_scales: Vector2,
@@ -68,7 +87,7 @@ pub struct ImageData {
 
 impl ImageData {
     pub fn new(gl: &red::GL, image_name: &str) -> Result<Self, String> {
-        let positions = vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
+        let positions = vec![(-1f32, 1f32), (-1f32, -1f32), (1f32, -1f32), (1f32, 1f32)];
         let textures = vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
         let shape: Vec<Vertex> = positions
             .into_iter()
@@ -111,26 +130,15 @@ pub fn load_texture(gl: &red::GL, name: &str) -> red::shader::Texture {
     image
 }
 
-pub fn create_shader_program(name: String, gl: &red::GL) -> Result<red::Program, String> {
+pub fn create_shader_program(gl: &red::GL, name: &str, glsl_version: &str) -> Result<red::Program, String> {
     let vertex = format!("gles/v_{}.glsl", name);
     let fragment = format!("gles/f_{}.glsl", name);
     let (mut vertex_shader, mut fragment_shader) = (
-        read_file(&vertex).unwrap(),
-        read_file(&fragment).unwrap()
+        format!("{}\n{}", glsl_version, read_file(&vertex).unwrap()),
+        format!("{}\n{}", glsl_version, read_file(&fragment).unwrap())
     );
-    // vertex_shader = glesit(&read_file(&vertex).unwrap(), ShaderType::Vertex, Version::V100);
-    // fragment_shader = glesit(&read_file(&fragment).unwrap(), ShaderType::Fragment, Version::V100);
-    // #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-    // {
-    //     use std::fs::{self, DirEntry};
-    //     use std::path::Path;
-    //     trace!("{:?}", read_file(&vertex));
-    //     trace!("{:?}", read_file(&fragment));
-    //     vertex_shader = glesit(&read_file(&vertex).unwrap(), ShaderType::Vertex, Version::V100);
-    //     fragment_shader = glesit(&read_file(&fragment).unwrap(), ShaderType::Fragment, Version::V100);
-    //     trace!("{}", vertex_shader);
-    //     trace!("{}", fragment_shader);
-    // }
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    trace!("{:?} \n {:?} \n {:?}", vertex_shader, "---", fragment_shader);
     let vertex_shader = red::Shader::from_vert_source(&gl, &vertex_shader).unwrap();
     let fragment_shader = red::Shader::from_frag_source(&gl, &fragment_shader).unwrap();
     let program = red::Program::from_shaders(&gl, &[vertex_shader, fragment_shader])?;
@@ -151,12 +159,12 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(gl: &red::GL) -> Result<Self, String> {
-        let program = create_shader_program("".to_string(), gl)?;
-        let program_primitive = create_shader_program("primitive".to_string(), gl)?;
-        let program_primitive_texture = create_shader_program("primitive_texture".to_string(), gl)?;
-        let program_light = create_shader_program("light".to_string(), gl)?;
-        let program_instancing = create_shader_program("instancing".to_string(), gl)?;
+    pub fn new(gl: &red::GL, glsl_version: &str) -> Result<Self, String> {
+        let program = create_shader_program(gl, "", glsl_version)?;
+        let program_primitive = create_shader_program(gl, "primitive", glsl_version)?;
+        let program_primitive_texture = create_shader_program(gl, "primitive_texture", glsl_version)?;
+        let program_light = create_shader_program(gl, "light", glsl_version)?;
+        let program_instancing = create_shader_program(gl, "instancing", glsl_version)?;
         Ok(Canvas {
             program: program,
             program_primitive: program_primitive,
@@ -187,7 +195,6 @@ impl Canvas {
         gl: &red::GL,
         viewport: &red::Viewport,
         frame: &mut red::Frame,
-        vao: &red::buffer::VertexArray,
         geometry_data: &GeometryData,
         model: &Isometry3,
         // stencil: bool,
@@ -196,13 +203,152 @@ impl Canvas {
         let dims = (viewport.x as u32, viewport.y as u32);
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        let vao = &geometry_data.positions.vao;
         let program = &self.program_light;
         program.set_uniform("model", model);
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
-        program.set_layout(&gl, &vao, &[&geometry_data.positions]);
+        program.set_layout(&gl, vao, &[&geometry_data.positions]);
         let draw_type = red::DrawType::Standart;
-        frame.draw(&vao, Some(&geometry_data.index_buffer), program, &draw_type);
+        frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_type);
+    }
+
+    pub fn render_primitive(
+        &self,
+        gl: &red::GL,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        geometry_data: &GeometryData,
+        model: &Isometry3,
+        fill_color: (f32, f32, f32),
+        with_projection: bool,
+    ) {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let (projection, view) = if with_projection {
+            let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+            (perspective, view)
+        } else {
+            let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = Matrix4::identity().into();
+            (orthographic, view)
+        };
+        let vao = &geometry_data.positions.vao;
+        let program = &self.program_primitive;
+        program.set_uniform("model", model);
+        program.set_uniform("view", view);
+        program.set_uniform("projection", projection);
+        program.set_uniform("fill_color", fill_color);
+        program.set_layout(&gl, vao, &[&geometry_data.positions]);
+        let draw_type = red::DrawType::Standart;
+        frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_type)
+    }
+
+    pub fn render(
+        &self,
+        gl: &red::GL,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        image_data: &ImageData,
+        model: &Isometry3,
+        scale: f32,
+        with_lights: bool,
+    ) {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let texture = &image_data.texture;
+        // let draw_params = if with_lights {
+        //     &self.stencil_check_params
+        // } else {
+        //     &self.default_params
+        // };
+        let scales = image_data.dim_scales;
+        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        let vao = &image_data.positions.vao;
+        let program = &self.program;
+        program.set_uniform("model", model);
+        program.set_uniform("view", view);
+        program.set_uniform("perspective", perspective);
+        program.set_uniform("dim_scales", (scales.x, scales.y));
+        program.set_uniform("tex", texture.clone());
+        program.set_uniform("scale", scale);
+        program.set_layout(&gl, vao, &[&image_data.positions]);
+        let draw_type = red::DrawType::Standart;
+        frame.draw(
+            vao, 
+            Some(&image_data.indices), 
+            &program, 
+            &draw_type
+        );
+    }
+
+    pub fn render_instancing(
+        &self,
+        gl: &red::GL,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        instancing_data: &InstancingData,
+        model: &Isometry3,
+        // transparency: f32,
+    ) {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        let vao = &instancing_data.vertex_buffer.vao;
+        let program = &self.program_instancing;
+        program.set_uniform("model", model);
+        program.set_uniform("view", view);
+        program.set_uniform("perspective", perspective);
+        program.set_uniform("transparency", 1f32);
+        program.set_layout(&gl, vao, &[&instancing_data.vertex_buffer, &instancing_data.per_instance]);
+        let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len);
+        frame.draw(
+            vao, 
+            Some(&instancing_data.indices),
+            &program, 
+            &draw_type
+        );
+    }
+
+    pub fn render_primitive_texture(
+        &self,
+        gl: &red::GL,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        image_data: &ImageData,
+        model: &Isometry3,
+        with_projection: bool,
+        size: f32,
+    ) {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let vao = &image_data.positions.vao;
+        let program = &self.program_primitive_texture;
+        let (projection, view) = if with_projection {
+            let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+            (perspective, view)
+        } else {
+            let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = Matrix4::identity().into();
+            (orthographic, view)
+        };
+        program.set_uniform("model", model);
+        program.set_uniform("view", view);
+        program.set_uniform("projection", projection);
+        program.set_uniform("tex", image_data.texture.clone());
+        program.set_uniform("size", size);
+        program.set_layout(&gl, vao, &[&image_data.positions]);
+
+        let draw_type = red::DrawType::Standart;
+        frame.draw(vao, Some(&image_data.indices), &program, &draw_type);
     }
 }
 

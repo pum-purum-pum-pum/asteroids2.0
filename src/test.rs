@@ -159,39 +159,44 @@ fn gles() {
     eprintln!("{}", glesit(&String::from_str(fragment_shader_src).unwrap(), ShaderType::Fragment));
 }
 
-#[test]
-fn translate_to_gles() {
-    use std::fs::{self, DirEntry};
-    let dir = Path::new("gl");
-    for entry in fs::read_dir(dir).unwrap() {
-        let entry = entry.unwrap();
-        let path = entry.path();
-        // cb(&entry);
-        eprintln!("{:?}", path);
-        let name = path.file_name().unwrap().to_str().unwrap();
-        let es_file = format!("gles/{}", name);
-        // let shader = path.to_str().unwrap();
-        // dbg!(shader);
-        // let shader = crate::gfx::read_file(&shader).unwrap();
-        let mut shader = fs::File::open(path).unwrap();
-        let mut src = String::new();
-        shader.read_to_string(&mut src);
-        let shader = crate::gfx::glesit(
-            &src, 
-            crate::gfx::ShaderType::Vertex, 
-            crate::gfx::Version::V100
-        );
-        let mut file = fs::File::create(es_file).unwrap();
-        file.write_all(shader.as_bytes());
-    }
-    let name = "";
-    let vertex = format!("gl/v_{}.glsl", name);
-    let fragment = format!("gl/f_{}.glsl", name);
-    let (mut vertex_shader, mut fragment_shader) = (
-        crate::gfx::read_file(&vertex).unwrap(),
-        crate::gfx::read_file(&fragment).unwrap()
-    );
-    vertex_shader = crate::gfx::glesit(&crate::gfx::read_file(&vertex).unwrap(), crate::gfx::ShaderType::Vertex, crate::gfx::Version::V100);
-    fragment_shader = crate::gfx::glesit(&crate::gfx::read_file(&fragment).unwrap(), crate::gfx::ShaderType::Fragment, crate::gfx::Version::V100);
-    eprintln!("{:#?}", vertex_shader);
-}
+
+// #[test]
+// fn size() {
+//     dbg!(std::mem::size_of::<u8>());
+// }
+// #[test]
+// fn translate_to_gles() {
+//     use std::fs::{self, DirEntry};
+//     let dir = Path::new("gl");
+//     for entry in fs::read_dir(dir).unwrap() {
+//         let entry = entry.unwrap();
+//         let path = entry.path();
+//         // cb(&entry);
+//         eprintln!("{:?}", path);
+//         let name = path.file_name().unwrap().to_str().unwrap();
+//         let es_file = format!("gles/{}", name);
+//         // let shader = path.to_str().unwrap();
+//         // dbg!(shader);
+//         // let shader = crate::gfx::read_file(&shader).unwrap();
+//         let mut shader = fs::File::open(path).unwrap();
+//         let mut src = String::new();
+//         shader.read_to_string(&mut src);
+//         let shader = crate::gfx::glesit(
+//             &src, 
+//             crate::gfx::ShaderType::Vertex, 
+//             crate::gfx::Version::V100
+//         );
+//         let mut file = fs::File::create(es_file).unwrap();
+//         file.write_all(shader.as_bytes());
+//     }
+//     let name = "";
+//     let vertex = format!("gl/v_{}.glsl", name);
+//     let fragment = format!("gl/f_{}.glsl", name);
+//     let (mut vertex_shader, mut fragment_shader) = (
+//         crate::gfx::read_file(&vertex).unwrap(),
+//         crate::gfx::read_file(&fragment).unwrap()
+//     );
+//     vertex_shader = crate::gfx::glesit(&crate::gfx::read_file(&vertex).unwrap(), crate::gfx::ShaderType::Vertex, crate::gfx::Version::V100);
+//     fragment_shader = crate::gfx::glesit(&crate::gfx::read_file(&fragment).unwrap(), crate::gfx::ShaderType::Fragment, crate::gfx::Version::V100);
+//     eprintln!("{:#?}", vertex_shader);
+// }

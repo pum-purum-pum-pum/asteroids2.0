@@ -5,7 +5,6 @@ pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
 pub use crate::gui::{Button, Rectangle};
-use glium::backend::{Facade};
 use crate::types::{*};
 use sdl2::mixer::Chunk;
 use specs::prelude::*;

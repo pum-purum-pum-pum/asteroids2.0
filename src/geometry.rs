@@ -54,6 +54,7 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
     (Some(Point2::new(xt0, yt0)), Some(Point2::new(xt1, yt1)))
 }
 
+#[derive(Debug)]
 pub struct Triangulation {
     pub points: Vec<Point2>,
     pub indicies: Vec<u16>,
