@@ -7,8 +7,10 @@ pub use crate::sound::{SoundData};
 pub use crate::gui::{Button, Rectangle};
 use crate::types::{*};
 use sdl2::mixer::Chunk;
+use sdl2::sys::SDL_Finger;
 use specs::prelude::*;
 use specs_derive::Component;
+use crate::run::FINGER_NUMBER;
 
 pub const MAX_LIFES: usize = 100usize;
 pub const MAX_SHIELDS: usize = 100usize;
@@ -144,11 +146,44 @@ pub struct PreloadedImages {
     pub light_white: specs::Entity,
     pub light_sea: specs::Entity,
     pub direction: specs::Entity,
+    pub circle: specs::Entity,
 }
 
 pub struct PreloadedParticles {
     pub movement: specs::Entity,
 }
+
+#[derive(Clone, Copy, Debug)]
+pub struct Finger {
+    pub id: usize,
+    pub x: f32,
+    pub y: f32,
+    pub x_o: f32,
+    pub y_o: f32,
+    pub pressure: f32
+}
+
+impl Finger {
+    pub fn new(id: usize, x: f32, y: f32, observer: Point3, pressure: f32, width_u: u32, height_u: u32) -> Self {
+        let (width, height) = (width_u as f32, height_u as f32);
+        // dpi already multiplyed
+        let (x, y) = (x as f32, y as f32);
+        let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
+        // with z=0f32 -- which is coordinate of our canvas in 3d space
+        let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));
+        let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u);
+        Finger{
+            id: id,
+            x: point.x,
+            y: point.y,
+            x_o: ortho_point.x,
+            y_o: ortho_point.y,
+            pressure: pressure
+        }
+    }
+}
+
+pub type Touches = [Option<Finger>; FINGER_NUMBER];
 
 #[derive(Default, Debug)]
 pub struct Mouse {

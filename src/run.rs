@@ -24,6 +24,7 @@ use crate::systems::{
 use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
 const NEBULAS_NUM: usize = 3usize;
+pub const FINGER_NUMBER: usize = 20;
 
 
 pub fn run() -> Result<(), String> {
@@ -76,6 +77,8 @@ pub fn run() -> Result<(), String> {
     let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
+    let touches: Touches = [None; FINGER_NUMBER];
+    specs_world.add_resource(touches);
     specs_world.add_resource(viewport);
     specs_world.add_resource(phys_world);
     specs_world.add_resource(BodiesMap::new());
@@ -151,6 +154,9 @@ pub fn run() -> Result<(), String> {
     let direction_image_data = ThreadPin::new(
         ImageData::new(&context, "direction").unwrap()
     );
+    let circle_image_data = ThreadPin::new(
+        ImageData::new(&context, "circle").unwrap()
+    );
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
         let nebula_image_data = ThreadPin::new(
@@ -214,6 +220,10 @@ pub fn run() -> Result<(), String> {
         .create_entity()
         .with(enemy2_image_data)
         .build();
+    let circle_image = specs_world
+        .create_entity()
+        .with(circle_image_data)
+        .build();
     let preloaded_images = PreloadedImages {
         projectile: projectile_image,
         enemy_projectile: enemy_projectile_image,
@@ -227,7 +237,8 @@ pub fn run() -> Result<(), String> {
         attack_speed_upgrade: attack_speed_image,
         light_white: light_image,
         light_sea: light_sea_image,
-        direction: direction_image
+        direction: direction_image,
+        circle: circle_image
     };
 
 
@@ -388,6 +399,31 @@ pub fn run() -> Result<(), String> {
                 dims.0 as u32,
                 dims.1 as u32,
             );
+            // fingers
+            {
+                #[cfg(not(target_os = "android"))]
+                {
+                    let mut touches = specs_world.write_resource::<Touches>();
+                    
+                    touches[0] = if mouse_state.left {
+                        Some(Finger::new(
+                            0,
+                            state.x() as f32,
+                            state.y() as f32,
+                            specs_world
+                                .read_resource::<ThreadPin<Canvas>>()
+                                .observer(),
+                            0f32, 
+                            dims.0 as u32,
+                            dims.1 as u32
+                        ))
+                    } else {None};
+                }
+                #[cfg(target_os = "android")]
+                {
+                    // TODO add multy touch here
+                }
+            }
         }
         let app_state = *specs_world.read_resource::<AppState>();
         match app_state {

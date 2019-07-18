@@ -1,7 +1,6 @@
 use crate::components::*;
 use crate::geometry::*;
 use crate::nalgebra::Rotation2;
-use crate::prelude::{*};
 use crate::types::{*};
 use sdl2::mixer::{InitFlag, AUDIO_S16LSB, DEFAULT_CHANNELS};
 use std::path::Path;
@@ -50,9 +49,11 @@ fn sound() -> Result<(), String> {
 
 
 
+
 fn is_precision(word: &str) -> bool {
     let precision = vec![
         "vec2",
+        "vec4",
         "vec3",
         "mat2",
         "mat3",
@@ -68,39 +69,67 @@ fn is_precision(word: &str) -> bool {
     false
 }
 
+#[derive(PartialEq)]
 pub enum ShaderType {
     Vertex,
     Fragment
 }
 
-pub fn glesit(src: &str, shader_type: ShaderType) -> String {
+pub enum Version {
+    V300,
+    V100,
+}
+
+pub fn glesit(src: &str, shader_type: ShaderType, to_version: Version) -> String {
     let lines: Vec<_> = src.split("\n").collect();
-    let mut find_and_replace = vec![("#version 130", "#version 100")];
-    match shader_type {
-        ShaderType::Fragment => {
-            find_and_replace.push(("texture(", "texture2D("));
+    let mut find_and_replace = match to_version {
+        Version::V300 => {
+            match shader_type {
+                ShaderType::Vertex => {
+                    vec![("#version 130", "#version 300 es")]
+                }
+                ShaderType::Fragment => {
+                    vec![
+                        ("#version 130", "#version 300 es\nout mediump vec4  astro_FragColor;"),
+                        ("gl_FragColor", "astro_FragColor")
+                    ]
+                }
+            }
         }
-        ShaderType::Vertex => ()
+        Version::V100 => {
+            let mut res = vec![("#version 130", "#version 100")];
+            match shader_type {
+                ShaderType::Fragment => {
+                    res.push(("texture(", "texture2D("));
+                }
+                ShaderType::Vertex => ()
+            };
+            res
+        }
     };
     let mut subst = HashMap::new();
-    match shader_type {
-        ShaderType::Vertex => {
-            subst.insert("in", "attribute");
+    match to_version {
+        Version::V100 => {
+            match shader_type {
+                ShaderType::Vertex => {
+                    subst.insert("in", "attribute");
+                }
+                ShaderType::Fragment => {
+                    subst.insert("in", "varying");
+                }
+            }
+            subst.insert("out", "varying");
         }
-        ShaderType::Fragment => {
-            subst.insert("in", "varying");
-        }
-    }
-    subst.insert("out", "varying");
+        Version::V300 => {}
+    };
     let mut new_lines = vec!();
     for line in lines.iter() {
         let words: Vec<_> = line.split(" ").collect();
         let mut new_words = vec![];
         let mut last_word = String::new();
         for w in words.iter() {
-            if is_precision(w) && last_word != "in".to_string() {
+            if is_precision(w) && (last_word != "in".to_string() || shader_type == ShaderType::Fragment) {
                 new_words.push("mediump".to_string());
-                eprintln!("{}", &last_word);
             }
             match subst.get(w) {
                 Some(&new_word) => {
@@ -121,43 +150,43 @@ pub fn glesit(src: &str, shader_type: ShaderType) -> String {
     new_lines.join("\n")
 }
 
-#[test]
-fn gles() {
-    // use crate::gfx::{glesit, ShaderType};
-    let vertex_shader_src = r#"
-        #version 130
-        in vec2 tex_coords;
-        in vec2 position;
-        out vec2 v_tex_coords;
+// #[test]
+// fn gles() {
+//     // use crate::gfx::{glesit, ShaderType};
+//     let vertex_shader_src = r#"
+//         #version 130
+//         in vec2 tex_coords;
+//         in vec2 position;
+//         out vec2 v_tex_coords;
 
-        uniform mat4 perspective;
-        uniform mat4 view;
-        uniform mat4 model;
-        uniform float scale;
-        uniform vec2 dim_scales;
+//         uniform mat4 perspective;
+//         uniform mat4 view;
+//         uniform mat4 model;
+//         uniform float scale;
+//         uniform vec2 dim_scales;
 
-        vec2 position_scaled;
+//         vec2 position_scaled;
 
-        void main() {
-            v_tex_coords = tex_coords;
-            position_scaled = scale * dim_scales * position;
-            gl_Position = perspective * view * model * vec4(position_scaled, 0.0, 1.0);
-        }
-    "#;
-    let fragment_shader_src = r#"
-        #version 130
-        in vec2 v_tex_coords;
-        out vec4 color;
+//         void main() {
+//             v_tex_coords = tex_coords;
+//             position_scaled = scale * dim_scales * position;
+//             gl_Position = perspective * view * model * vec4(position_scaled, 0.0, 1.0);
+//         }
+//     "#;
+//     let fragment_shader_src = r#"
+//         #version 130
+//         in vec2 v_tex_coords;
+//         out vec4 color;
 
-        uniform sampler2D tex;
-        void main() {
-            vec4 texture_colors = vec4(texture(tex, v_tex_coords));
-            color = texture_colors;
-        }
-    "#;
-    eprintln!("{}", glesit(&String::from_str(vertex_shader_src).unwrap(), ShaderType::Vertex));
-    eprintln!("{}", glesit(&String::from_str(fragment_shader_src).unwrap(), ShaderType::Fragment));
-}
+//         uniform sampler2D tex;
+//         void main() {
+//             vec4 texture_colors = vec4(texture(tex, v_tex_coords));
+//             color = texture_colors;
+//         }
+//     "#;
+//     eprintln!("{}", glesit(&String::from_str(vertex_shader_src).unwrap(), ShaderType::Vertex));
+//     eprintln!("{}", glesit(&String::from_str(fragment_shader_src).unwrap(), ShaderType::Fragment));
+// }
 
 
 // #[test]

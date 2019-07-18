@@ -1,5 +1,8 @@
 TODO LIST
 
+TECH AND TEST:
+* Android Joystick touch controls
+
 GAMEPLAY
 * collectables? (from killed enemies and asteroids probably)
 * enemies

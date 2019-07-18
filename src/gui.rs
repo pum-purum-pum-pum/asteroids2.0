@@ -5,6 +5,7 @@ use std::io::{BufReader, Error as IOError};
 use specs::prelude::*;
 use specs_derive::Component;
 use crate::components::{*};
+use crate::run::FINGER_NUMBER;
 
 fn check_in(x:f32, a: f32, b: f32) -> bool {
     x > a && x < b
@@ -12,9 +13,92 @@ fn check_in(x:f32, a: f32, b: f32) -> bool {
 
 #[derive(Default)]
 pub struct IngameUI {
+    // mouse controls
     hover_id: Option<usize>,
     pressed_id: Option<usize>,
-    pub primitives: Vec<Primitive>
+    // touch controls
+    // for each finger we have id of pressed widget
+    widget_finger: [Option<usize>; FINGER_NUMBER],
+    pub primitives: Vec<Primitive>,
+}
+
+/// Note: ofcourse works only with orthographics projection
+pub struct VecController {
+    position: Point2, // screen position, center
+    radius: f32,
+    stick_radius: f32,
+    circle_image: Image,
+    controller_geometry: Primitive,
+}
+
+impl VecController {
+    pub fn new(position: Point2, radius: f32, stick_radius: f32, circle_image: Image) -> Self {
+        let controller_geometry = Primitive {
+            kind: PrimitiveKind::Rectangle(Rectangle{
+                position: position - Vector2::new(radius, radius), 
+                width: 2.0 * radius, 
+                height: 2.0 * radius,
+                color: Point3::new(1.0, 1.0, 1.0)
+            }),
+            with_projection: false,
+            image: Some(circle_image)
+        };
+        VecController {
+            position: position,
+            radius: radius,
+            stick_radius: stick_radius,
+            circle_image: circle_image,
+            controller_geometry: controller_geometry
+        }
+    }
+
+    /// returns radius vector with lenght from 0 to 1 if updated
+    pub fn set(&self, id: usize, ingame_ui: &mut IngameUI,  touches: &Touches) -> Option<Vector2> {
+        ingame_ui.primitives.push(self.controller_geometry.clone());
+        for (touch_id, touch) in touches.iter().enumerate() {
+            match touch {
+                Some(touch) => {
+                    if self.is_in(touch) {
+                        ingame_ui.widget_finger[touch_id] = Some(id);
+                        let new_pos = Point2::new(touch.x_o, touch.y_o);
+                        ingame_ui.primitives.push(
+                            self.stick_geometry(new_pos)
+                        );
+                        return Some(self.get_rad(new_pos))
+                    }
+                }
+                _ => ()
+            }
+        }
+        ingame_ui.primitives.push(
+            self.stick_geometry(self.position)
+        );
+        None
+    }
+
+    fn get_rad(&self, finger_position: Point2) -> Vector2 {
+        (finger_position - self.position) / self.radius
+    }
+
+    pub fn stick_geometry(&self, new_pos: Point2) -> Primitive {
+        Primitive {
+            kind: PrimitiveKind::Rectangle(Rectangle{
+                position: new_pos, 
+                width: self.stick_radius, 
+                height: self.stick_radius,
+                color: Point3::new(1.0, 1.0, 1.0)
+            }),
+            with_projection: false,
+            image: None
+        }
+    }
+
+    pub fn is_in(&self, touch: &Finger) -> bool {
+        Vector2::new(
+            self.position.x - touch.x_o, 
+            self.position.y - touch.y_o
+        ).norm() < self.radius
+    }
 }
 
 pub struct Button {
@@ -27,11 +111,13 @@ pub struct Button {
     text: String
 }
 
+#[derive(Clone)]
 pub enum PrimitiveKind {
     Rectangle(Rectangle),
     Text(Text)
 }
 
+#[derive(Clone)]
 pub struct Primitive {
     pub kind: PrimitiveKind,
     pub with_projection: bool,
@@ -39,7 +125,15 @@ pub struct Primitive {
 }
 
 impl Button {
-    pub fn new(position: Point2, width: f32, height: f32, color: Point3, with_projection: bool, image: Option<Image>, text: String) -> Button {
+    pub fn new(
+        position: Point2, 
+        width: f32, 
+        height: f32, 
+        color: Point3, 
+        with_projection: bool, 
+        image: Option<Image>, 
+        text: String
+    ) -> Button {
         Button {
             position: position,
             width: width,
@@ -95,11 +189,13 @@ impl Button {
     }
 }
 
+#[derive(Clone)]
 pub struct Text {
     pub position: Point2,
     pub text: String
 }
 
+#[derive(Clone)]
 pub struct Rectangle {
     pub position: Point2, // screen position
     pub width: f32,
