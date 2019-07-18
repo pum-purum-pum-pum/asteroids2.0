@@ -22,6 +22,7 @@ pub struct IngameUI {
     pub primitives: Vec<Primitive>,
 }
 
+
 /// Note: ofcourse works only with orthographics projection
 pub struct VecController {
     position: Point2, // screen position, center
@@ -48,7 +49,7 @@ impl VecController {
             radius: radius,
             stick_radius: stick_radius,
             circle_image: circle_image,
-            controller_geometry: controller_geometry
+            controller_geometry: controller_geometry,
         }
     }
 
@@ -56,18 +57,33 @@ impl VecController {
     pub fn set(&self, id: usize, ingame_ui: &mut IngameUI,  touches: &Touches) -> Option<Vector2> {
         ingame_ui.primitives.push(self.controller_geometry.clone());
         for (touch_id, touch) in touches.iter().enumerate() {
+            let previously_attached = 
+                ingame_ui.widget_finger[touch_id].is_some() && 
+                ingame_ui.widget_finger[touch_id].unwrap() == id;
+            let mut interacted = false;
             match touch {
                 Some(touch) => {
-                    if self.is_in(touch) {
+                    dbg!(ingame_ui.widget_finger[touch_id], id);
+                    if self.is_in(touch) || previously_attached {
+                        interacted = true;
+                        let mut new_pos = Point2::new(touch.x_o, touch.y_o);
+                        let mut dir = (new_pos - self.position);
+                        if dir.norm() > self.radius {
+                            dir = dir.normalize() * self.radius;
+                        }
+                        new_pos = self.position + dir;
+                        // let new_pos = Point2::new(raw.x, raw.y);
                         ingame_ui.widget_finger[touch_id] = Some(id);
-                        let new_pos = Point2::new(touch.x_o, touch.y_o);
                         ingame_ui.primitives.push(
                             self.stick_geometry(new_pos)
                         );
                         return Some(self.get_rad(new_pos))
-                    }
+                    };
                 }
                 _ => ()
+            }
+            if !interacted && previously_attached  {
+                ingame_ui.widget_finger[touch_id] = None;
             }
         }
         ingame_ui.primitives.push(

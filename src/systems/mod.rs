@@ -50,6 +50,7 @@ const NEBULA_MIN_NUMBER: usize = 20;
 
 const ASTEROIDS_MIN_NUMBER: usize = 10;
 const SHIPS_NUMBER: usize = 1 + 3; // character's ship counts
+pub const dt: f32 =  1f32 / 60f32;
 
 pub enum EntityType {
     Player,
@@ -146,24 +147,53 @@ pub struct PhysicsSystem;
 
 impl<'a> System<'a> for PhysicsSystem {
     type SystemData = (
+        Entities<'a>,
         WriteStorage<'a, Isometry>,
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, PhysicsComponent>,
+        ReadStorage<'a, CharacterMarker>,
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
         Read<'a, AppState>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (mut isometries, mut velocities, physics, mut world, _bodies_map, app_state) = data;
+        let (
+            entities,
+            mut isometries, 
+            mut velocities, 
+            physics, 
+            character_markers,
+            mut world, 
+            _bodies_map, 
+            app_state
+        ) = data;
+        let (character_position, character_prev_position) = {
+            let (character, isometry, _) = (&entities, &isometries, &character_markers).join().next().unwrap();
+            let body = world
+                .rigid_body(
+                    physics
+                        .get(character).unwrap()
+                        .body_handle
+                ).unwrap();
+            (*body.position(), *isometry)
+        };
+        for (isometry, ()) in (&mut isometries, !&physics).join() {
+            let char_vec = character_position.translation.vector;
+            let diff = Vector3::new(char_vec.x, char_vec.y, 0f32)  - character_prev_position.0.translation.vector;
+            isometry.0.translation.vector -= diff;
+        }
         for (isometry, velocity, physics_component) in
             (&mut isometries, &mut velocities, &physics).join()
         {
-            let body = world.rigid_body(physics_component.body_handle).unwrap();
-            let physics_isometry = body.position();
+            let mut body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+            let mut physics_isometry = *body.position();
+            // MOVE THE WORLD, NOT ENTITIES
+            physics_isometry.translation.vector -= character_position.translation.vector;
+            body.set_position(physics_isometry);
             let physics_velocity = body.velocity().as_vector();
             let physics_velocity = Vector2::new(physics_velocity.x, physics_velocity.y);
-            isometry.0 = iso2_iso3(physics_isometry);
+            isometry.0 = iso2_iso3(&physics_isometry);
             velocity.0 = physics_velocity;
         }
         match *app_state {
@@ -329,67 +359,68 @@ impl<'a> System<'a> for ControlSystem {
             mut insert_channel,
             player_stats,
         ) = data;
-        // TODO add dt in params
-        let dt = 1f32 / 60f32;
-        let mut character = None;
-        for (entity, iso, _vel, spin, _char_marker) in (
-            &entities,
-            &isometries,
-            &mut velocities,
-            &mut spins,
-            &character_markers,
-        )
-            .join()
+        #[cfg(not(target_os = "android"))]
         {
-            character = Some(entity);
-            let player_torque = dt
-                * calculate_player_ship_spin_for_aim(
-                    Vector2::new(mouse_state.x, mouse_state.y)
-                        - Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
-                    iso.rotation(),
-                    spin.0,
-                );
-            spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
-        }
-        let character = character.unwrap();
-        let (_character_isometry, mut character_velocity) = {
-            let character_body = world
-                .rigid_body(physics.get(character).unwrap().body_handle)
-                .unwrap();
-            (*character_body.position(), *character_body.velocity())
-        };
-        if mouse_state.left {
-            let gun = guns.get_mut(character).unwrap();
-            if gun.shoot() {
-                let isometry = *isometries.get(character).unwrap();
-                let position = isometry.0.translation.vector;
-                let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                let velocity_rel = player_stats.bullet_speed * direction;
-                let char_velocity = velocities.get(character).unwrap();
-                let projectile_velocity = Velocity::new(
-                    char_velocity.0.x + velocity_rel.x,
-                    char_velocity.0.y + velocity_rel.y,
-                ) ;
-                sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                insert_channel.single_write(InsertEvent::Bullet {
-                    kind: EntityType::Player,
-                    iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
-                    velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                    damage: gun.bullets_damage,
-                    owner: character,
-                });
+            let mut character = None;
+            for (entity, iso, _vel, spin, _char_marker) in (
+                &entities,
+                &isometries,
+                &mut velocities,
+                &mut spins,
+                &character_markers,
+            )
+                .join()
+            {
+                character = Some(entity);
+                let player_torque = dt
+                    * calculate_player_ship_spin_for_aim(
+                        Vector2::new(mouse_state.x, mouse_state.y)
+                            - Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                        iso.rotation(),
+                        spin.0,
+                    );
+                spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
             }
+            let character = character.unwrap();
+            let (_character_isometry, mut character_velocity) = {
+                let character_body = world
+                    .rigid_body(physics.get(character).unwrap().body_handle)
+                    .unwrap();
+                (*character_body.position(), *character_body.velocity())
+            };
+            if mouse_state.left {
+                let gun = guns.get_mut(character).unwrap();
+                if gun.shoot() {
+                    let isometry = *isometries.get(character).unwrap();
+                    let position = isometry.0.translation.vector;
+                    let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                    let velocity_rel = player_stats.bullet_speed * direction;
+                    let char_velocity = velocities.get(character).unwrap();
+                    let projectile_velocity = Velocity::new(
+                        char_velocity.0.x + velocity_rel.x,
+                        char_velocity.0.y + velocity_rel.y,
+                    ) ;
+                    sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                    insert_channel.single_write(InsertEvent::Bullet {
+                        kind: EntityType::Player,
+                        iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
+                        velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                        damage: gun.bullets_damage,
+                        owner: character,
+                    });
+                }
+            }
+            if mouse_state.right {
+                let rotation = isometries.get(character).unwrap().0.rotation;
+                let _vel = velocities.get_mut(character).unwrap();
+                let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
+                *character_velocity.as_vector_mut() += thrust;
+            }
+            let character_body = world
+                .rigid_body_mut(physics.get(character).unwrap().body_handle)
+                .unwrap();
+            character_body.set_velocity(character_velocity);
         }
-        if mouse_state.right {
-            let rotation = isometries.get(character).unwrap().0.rotation;
-            let _vel = velocities.get_mut(character).unwrap();
-            let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
-            *character_velocity.as_vector_mut() += thrust;
-        }
-        let character_body = world
-            .rigid_body_mut(physics.get(character).unwrap().body_handle)
-            .unwrap();
-        character_body.set_velocity(character_velocity);
     }
 }
 
@@ -1106,7 +1137,6 @@ impl<'a> System<'a> for AISystem {
             }
             res.unwrap()
         };
-        let dt = 1.0 / 60.0;
         for (entity, iso, vel, physics_component, spin, _enemy, ai_type) in (
             &entities,
             &isometries,

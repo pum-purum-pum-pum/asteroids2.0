@@ -173,12 +173,13 @@ impl<'a> System<'a> for GUISystem {
     type SystemData = (
         Entities<'a>,
         ReadStorage<'a, Isometry>,
-        ReadStorage<'a, Velocity>,
+        WriteStorage<'a, Velocity>,
         ReadStorage<'a, PhysicsComponent>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, Lifes>,
         ReadStorage<'a, Shield>,
+        WriteStorage<'a, Spin>,
         WriteStorage<'a, Gun>,
         ReadExpect<'a, red::Viewport>,
         WriteExpect<'a, Canvas>,
@@ -191,19 +192,23 @@ impl<'a> System<'a> for GUISystem {
         Read<'a, Mouse>,
         Write<'a, PlayerStats>,
         WriteExpect<'a, PreloadedImages>,
+        ReadExpect<'a, PreloadedSounds>,
         Write<'a, Touches>,
+        Write<'a, EventChannel<Sound>>,
+        Write<'a, EventChannel<InsertEvent>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
           let (
             entities,
             isometries,
-            velocities,
+            mut velocities,
             physics,
             character_markers,
             ship_markers,
             lifes,
             shields,
+            mut spins,
             mut guns,
             viewport,
             mut canvas,
@@ -216,8 +221,12 @@ impl<'a> System<'a> for GUISystem {
             mouse,
             mut player_stats,
             mut preloaded_images,
+            preloaded_sounds,
             mut touches,
+            mut sounds_channel,
+            mut insert_channel
         ) = data;
+        let (character, _) = (&entities, &character_markers).join().next().unwrap();
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let dims = (dims.0 as u32, dims.1 as u32);
@@ -225,14 +234,21 @@ impl<'a> System<'a> for GUISystem {
         //contorls
         let stick_size = w / 80.0;
         let ctrl_size = stick_size * 10.0;
-        let vec_controller = VecController::new(
+        let move_controller = VecController::new(
             Point2::new(ctrl_size, ctrl_size),
             ctrl_size,
             stick_size,
             Image(preloaded_images.circle)
         );
+        let attack_controller = VecController::new(
+            Point2::new(w - ctrl_size, ctrl_size),
+            ctrl_size,
+            stick_size,
+            Image(preloaded_images.circle)
+        );
+        
         // move controller
-        match vec_controller.set(
+        match move_controller.set(
             0,
             &mut ingame_ui,
             &touches
@@ -245,6 +261,26 @@ impl<'a> System<'a> for GUISystem {
                         .unwrap();
                     (*character_body.position(), *character_body.velocity())
                 };
+
+
+                for (entity, iso, _vel, spin, _char_marker) in (
+                    &entities,
+                    &isometries,
+                    &mut velocities,
+                    &mut spins,
+                    &character_markers,
+                ).join()
+                {
+                    let player_torque = dt
+                        * calculate_player_ship_spin_for_aim(
+                            dir,
+                            iso.rotation(),
+                            spin.0,
+                        );
+                    spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                }
+
+
                 // let rotation = isometries.get(character).unwrap().0.rotation;
                 // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
                 let thrust = player_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
@@ -256,6 +292,40 @@ impl<'a> System<'a> for GUISystem {
             }
             None => ()
         }
+
+        match attack_controller.set(
+            1,
+            &mut ingame_ui,
+            &touches
+        ) {
+            Some(dir) => {
+                let dir = dir.normalize();
+                let gun = guns.get_mut(character).unwrap();
+                if gun.shoot() {
+                    let isometry = *isometries.get(character).unwrap();
+                    let position = isometry.0.translation.vector;
+                    // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                    let velocity_rel = player_stats.bullet_speed * dir;
+                    let char_velocity = velocities.get(character).unwrap();
+                    let projectile_velocity = Velocity::new(
+                        char_velocity.0.x + velocity_rel.x,
+                        char_velocity.0.y + velocity_rel.y,
+                    ) ;
+                    sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                    let rotation = Rotation2::rotation_between(&Vector2::new(0.0, 1.0), &dir);
+                    insert_channel.single_write(InsertEvent::Bullet {
+                        kind: EntityType::Player,
+                        iso: Point3::new(position.x, position.y, rotation.angle()),
+                        velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                        damage: gun.bullets_damage,
+                        owner: character,
+                    });
+                }
+
+            }
+            None => ()
+        }
+
         // stats
         ingame_ui.primitives.push(
             Primitive {

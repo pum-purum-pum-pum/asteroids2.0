@@ -263,7 +263,7 @@ pub fn run() -> Result<(), String> {
         .create_entity()
         .with(lifes)
         .with(shields)
-        .with(Isometry::new(0f32, 0f32, 0f32))
+        .with(Isometry::new(std::f32::MAX / 2f32, std::f32::MAX / 2f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
         .with(ShipMarker::default())
@@ -421,7 +421,29 @@ pub fn run() -> Result<(), String> {
                 }
                 #[cfg(target_os = "android")]
                 {
+                    let mut touches = specs_world.write_resource::<Touches>();
                     // TODO add multy touch here
+                    if sdl2::touch::num_touch_devices() > 0 {
+                        let device = sdl2::touch::touch_device(0);
+                        for i in 0..sdl2::touch::num_touch_fingers(device) {
+                            match sdl2::touch::touch_finger(device, i) {
+                                Some(finger) => {
+                                    touches[i as usize] = Some(Finger::new(
+                                        finger.id as usize,
+                                        finger.x * dims.0 as f32,
+                                        finger.y * dims.1 as f32,
+                                        specs_world
+                                            .read_resource::<ThreadPin<Canvas>>()
+                                            .observer(),
+                                        finger.pressure,
+                                        dims.0 as u32,
+                                        dims.1 as u32
+                                    ));
+                                }
+                                None => ()
+                            }
+                        }
+                    }
                 }
             }
         }
