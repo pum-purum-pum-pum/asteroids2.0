@@ -12,15 +12,16 @@ use rand::distributions::{Bernoulli, Distribution};
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
 use ncollide2d::world::CollisionObjectHandle;
+use ncollide2d::query::{Ray};
 use nphysics2d::object::{Body, BodyStatus};
 use nphysics2d::world::World;
-use nalgebra::geometry::Translation;
+use nalgebra::geometry::{Translation};
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::Join;
 
 use crate::components::*;
-use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter};
+use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter, EPS};
 use crate::gfx::{GeometryData, Engine, ParticlesData, Explosion,
                 unproject_with_z, ortho_unproject, orthographic, orthographic_from_zero, get_view};
 use crate::physics::CollisionId;
@@ -38,7 +39,7 @@ const LIGHT_RECTANGLE_SIZE: f32 = 20f32;
 const PLAYER_BULLET_SPEED: f32 = 0.5;
 const ENEMY_BULLET_SPEED: f32 = 0.3;
 
-const _SCREEN_AREA: f32 = 10f32;
+const SCREEN_AREA: f32 = 10f32;
 // it's a kludge -- TODO redo with camera and screen sizes
 // we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
 const PLAYER_AREA: f32 = 15f32;
@@ -49,6 +50,11 @@ const NEBULA_ACTIVE_AREA: f32 = 110f32;
 const NEBULA_MIN_NUMBER: usize = 20;
 
 const ASTEROIDS_MIN_NUMBER: usize = 10;
+const ASTEROID_MAX_RADIUS: f32 = 2.2f32;
+const ASTEROID_MIN_RADIUS: f32 = 0.5;
+
+const AI_COLLISION_DISTANCE: f32 = 3.5f32;
+
 const SHIPS_NUMBER: usize = 1 + 3; // character's ship counts
 pub const dt: f32 =  1f32 / 60f32;
 
@@ -101,12 +107,6 @@ pub fn initial_asteroid_velocity() -> Velocity2 {
         rng.gen_range(-1E-1, 1E-1), 
         rng.gen_range(-1E-1, 1E-1)
     );
-    // let rotation = 0f32;
-    // let linear_velocity = Vector2::new(
-    //     0f32,
-    //     0f32
-    // );
-
     Velocity2::new(linear_velocity, rotation)
 }
 
@@ -326,12 +326,12 @@ impl<'a> System<'a> for KinematicSystem {
 }
 
 pub struct ControlSystem {
-    _reader: ReaderId<Keycode>,
+    reader: ReaderId<Keycode>,
 }
 
 impl ControlSystem {
     pub fn new(reader: ReaderId<Keycode>) -> Self {
-        ControlSystem { _reader: reader }
+        ControlSystem { reader: reader }
     }
 }
 
@@ -374,7 +374,7 @@ impl<'a> System<'a> for ControlSystem {
             _lifetimes,
             _sizes,
             character_markers,
-            _keys_channel,
+            keys_channel,
             mouse_state,
             _preloaded_images,
             mut sounds_channel,
@@ -433,6 +433,29 @@ impl<'a> System<'a> for ControlSystem {
                         damage: gun.bullets_damage,
                         owner: character,
                     });
+                }
+            
+            }
+            for key in keys_channel.read(&mut self.reader) {
+                match key {
+                    Keycode::W => {
+                        let thrust = player_stats.thrust_force * Vector3::new(0.0, 1.0, 0.0);
+                        *character_velocity.as_vector_mut() += thrust;
+                    }
+                    Keycode::S => {
+                        let thrust = player_stats.thrust_force * Vector3::new(0.0, -1.0, 0.0);
+                        *character_velocity.as_vector_mut() += thrust;
+                    }
+                    Keycode::A => {
+                        let thrust = player_stats.thrust_force * Vector3::new(-1.0, 0.0, 0.0);
+                        *character_velocity.as_vector_mut() += thrust;
+                    }
+                    Keycode::D => {
+                        let thrust = player_stats.thrust_force * Vector3::new(1.0, 0.0, 0.0);
+                        *character_velocity.as_vector_mut() += thrust;
+                    }
+                    _ => ()
+                    
                 }
             }
             if mouse_state.right {
@@ -546,6 +569,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(*light_shape, &mut geometries)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
                         .with(Velocity::new(velocity.linear.x, velocity.linear.y), &mut velocities)
+                        .with(Lifes((ASTEROID_MAX_LIFES as f32 * polygon.min_r / ASTEROID_MAX_RADIUS) as usize), &mut lifes)
                         .with(polygon.clone(), &mut polygons)
                         .with(AsteroidMarker::default(), &mut asteroid_markers)
                         .with(Image(preloaded_images.asteroid), &mut images)
@@ -836,7 +860,7 @@ impl<'a> System<'a> for GamePlaySystem {
         };
         for _ in 0..add_cnt {
             let mut rng = thread_rng();
-            let size = rng.gen_range(0.4f32, 2f32);
+            let size = rng.gen_range(ASTEROID_MIN_RADIUS, ASTEROID_MAX_RADIUS);
             let r = size;
             let asteroid_shape = Geometry::Circle { radius: r };
             let poly = generate_convex_polygon(10, r);
@@ -1012,33 +1036,39 @@ impl<'a> System<'a> for CollisionSystem {
                 swap(&mut entity1, &mut entity2);
             }
             if asteroids.get(entity1).is_some() {
+                let asteroid = entity1;
                 let mut asteroid_explosion = false;
                 if projectiles.get(entity2).is_some() {
                     let projectile = entity2;
                     entities.delete(projectile).unwrap();
-                    asteroid_explosion = true
-                }
+                    let projectile_damage = damages.get(projectile).unwrap().0;
+                    let lifes = lifes.get_mut(asteroid).unwrap();
+                    if lifes.0 > projectile_damage {
+                        lifes.0 -= projectile_damage
+                    } else {
+                        asteroid_explosion = true
+                    }
+                };
                 if ships.get(entity2).is_some() {
                     let ship = entity2;
                     let isometry = isometries.get(ship).unwrap().0;
                     let position = isometry.translation.vector;
-                    asteroid_explosion = true;
+                    // asteroid_explosion = true;
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
-                        num: 6usize,
+                        num: 3usize,
                         lifetime: 20usize,
                     };
                     insert_channel.single_write(effect);
                 }
                 if asteroid_explosion {
-                    let asteroid = entity1;
                     let isometry = isometries.get(asteroid).unwrap().0;
                     let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
                     let new_polygons = polygon.deconstruct();
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
-                        num: 6usize,
+                        num: 10usize,
                         lifetime: 20usize,
                     };
                     insert_channel.single_write(effect);
@@ -1081,6 +1111,7 @@ impl<'a> System<'a> for CollisionSystem {
                         lifes.0 -= projectile_damage
                     }
                 } else {
+                    let mut explosion_size = 2usize;
                     let life = lifes.get_mut(ship).unwrap();
                     match shields.get_mut(ship) {
                         Some(ref mut shield) if shield.0 > 0usize => {
@@ -1092,12 +1123,13 @@ impl<'a> System<'a> for CollisionSystem {
                             } else {
                                 progress.experience += 50usize;
                                 entities.delete(ship).unwrap();
+                                explosion_size = 20;
                             }
                         }
                     };
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
-                        num: 20usize,
+                        num: explosion_size,
                         lifetime: 50usize,
                     };
                     insert_channel.single_write(effect);
@@ -1197,9 +1229,51 @@ impl<'a> System<'a> for AISystem {
                     let velocity_rel = ENEMY_BULLET_SPEED * diff.normalize();
                     let projectile_velocity =
                         Velocity::new(vel.0.x + velocity_rel.x, vel.0.y + velocity_rel.y);
-                    if diff.norm() > 4f32 {
-                        let dir = speed * (diff).normalize();
-                        *vel = Velocity::new(dir.x, dir.y);
+                    
+                    fn get_min_dist(world: &mut Write<World<f32>>, ray: Ray<f32>) -> f32 {
+                        let mut mintoi = std::f32::MAX;
+                        let mut all_groups = CollisionGroups::new();
+                        for (b, inter) in world
+                                .collider_world()
+                                .interferences_with_ray(&ray, &all_groups) {
+                            if !b.query_type().is_proximity_query() && 
+                                    inter.toi < mintoi && 
+                                    inter.toi > EPS  {
+                                mintoi = inter.toi;
+                                let current_body = b.body();
+                            }
+                        }
+                        mintoi
+                    }
+                    if diff.norm() > SCREEN_AREA {
+                        let dir = Vector2::new(diff.x, diff.y).normalize();
+                        let pos = Point2::new(position.x, position.y);
+                        let ray = Ray::new(pos, dir);
+                        let ai_vel = if get_min_dist(&mut world, ray) < AI_COLLISION_DISTANCE {
+                            let rays_half_num = 3;
+                            let step = std::f32::consts::PI / 2.0 / rays_half_num as f32;
+                            let mut result_dir = Vector2::new(0f32, 0f32);
+                            for i in 1..=rays_half_num {
+                                let rotation1 = Rotation2::new(step * i as f32);
+                                let rotation2 = Rotation2::new(-step * i as f32);
+                                let dir1 = rotation1 * dir;
+                                let dir2 = rotation2 * dir;
+                                let ray1 = Ray::new(pos, dir1);
+                                let ray2 = Ray::new(pos, dir2);
+                                if get_min_dist(&mut world, ray1) > AI_COLLISION_DISTANCE {
+                                    result_dir = dir1;
+                                    // break;
+                                }
+                                if get_min_dist(&mut world, ray2) > AI_COLLISION_DISTANCE {
+                                    result_dir = dir2;
+                                    // break;
+                                }
+                            }
+                            speed * result_dir
+                        } else {
+                            speed * dir
+                        };
+                        *vel = Velocity::new(ai_vel.x, ai_vel.y);
                     } else {
                         let vel_vec = DAMPING_FACTOR * vel.0;
                         *vel = Velocity::new(vel_vec.x, vel_vec.y);
@@ -1208,7 +1282,7 @@ impl<'a> System<'a> for AISystem {
                     let mut velocity = *body.velocity();
                     *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
                     body.set_velocity(velocity);
-                    if gun.shoot() {
+                    if diff.norm() < SCREEN_AREA && gun.shoot() {
                         insert_channel.single_write(InsertEvent::Bullet {
                             kind: EntityType::Enemy,
                             iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),

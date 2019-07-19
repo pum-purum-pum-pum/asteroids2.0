@@ -2,11 +2,12 @@ TODO LIST
 not ordered by priority
 * add asteroids initial movement and rotation \/
 * redo asteroids explosions: fix rotation of parts when destructed \/ (seems good but when rotation is fast feels wrong?)
-* redo asteroids explosions: add lifes
-* redo character asteroids collision
-* redo effects spawning (explosion when destroyed, mini explosion when shoted)
-* enemies start shoot from far
-* enemies should avoid asteroids
+* redo asteroids explosions: add lifes \/
+* redo character asteroids collision?
+* redo effects spawning (explosion when destroyed, mini explosion when shoted) \/
+* enemies start shoot when theay near you and stop futher \/
+* enemies should avoid asteroids \hacked, need something clever/
+* wasd control \/
 * try shadows again
 * lazer weapon (rotation)
 * lazer weapon (no rotation)
@@ -24,6 +25,11 @@ not ordered by priority
 * * rarely throws super fast bullets
 * * lazer beam enemy
 * * lazer beams around and rotating
+* when died, restart from menu
+* scores table
+* try move camera according to gun direction
+* add text
+* asteroids damage?
 
 TECH AND TEST:
 * Android Joystick touch controls \/

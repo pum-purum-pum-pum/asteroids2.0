@@ -13,6 +13,7 @@ use specs_derive::Component;
 use crate::run::FINGER_NUMBER;
 
 pub const MAX_LIFES: usize = 100usize;
+pub const ASTEROID_MAX_LIFES: usize = 100usize;
 pub const MAX_SHIELDS: usize = 100usize;
 pub const ENEMY_MAX_LIFES: usize = 20usize;
 pub const ENEMY_MAX_SHIELDS: usize = 20usize;

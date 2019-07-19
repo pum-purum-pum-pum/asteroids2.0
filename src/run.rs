@@ -59,6 +59,7 @@ pub fn run() -> Result<(), String> {
     }
     let window = video
         .window("Asteroids 2.0", window_w, window_h)
+        // .fullscreen()
         .opengl()
         .resizable()
         .build()
