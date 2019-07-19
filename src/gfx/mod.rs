@@ -200,7 +200,8 @@ impl Canvas {
         // stencil: bool,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
-        let dims = (viewport.x as u32, viewport.y as u32);
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
         let vao = &geometry_data.positions.vao;
@@ -210,7 +211,12 @@ impl Canvas {
         program.set_uniform("perspective", perspective);
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
         let draw_type = red::DrawType::Standart;
-        frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_type);
+        frame.draw(
+            vao, 
+            Some(&geometry_data.index_buffer), 
+            &program, 
+            &draw_type
+        );
     }
 
     pub fn render_primitive(

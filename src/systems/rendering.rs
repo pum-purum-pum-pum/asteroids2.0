@@ -848,13 +848,11 @@ impl<'a> System<'a> for RenderingSystem {
                 GeometryData::new(&gl, &triangulation.points, &triangulation.indicies).unwrap();
             // dbg!("{:?}", triangulation);
             canvas
-                .render_primitive(
+                .render_geometry(
                     &gl, &viewport, 
                     &mut frame, 
                     &geom_data, 
                     &iso.0, 
-                    (1f32, 1f32, 1f32),
-                    true
                 )
         }
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));

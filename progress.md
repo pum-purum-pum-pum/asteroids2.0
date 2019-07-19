@@ -30,6 +30,7 @@ not ordered by priority
 * try move camera according to gun direction
 * add text
 * asteroids damage?
+* redo gui
 
 TECH AND TEST:
 * Android Joystick touch controls \/
