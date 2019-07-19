@@ -263,7 +263,7 @@ pub fn run() -> Result<(), String> {
         .create_entity()
         .with(lifes)
         .with(shields)
-        .with(Isometry::new(std::f32::MAX / 2f32, std::f32::MAX / 2f32, 0f32))
+        .with(Isometry::new(0f32, 0f32, 0f32))
         .with(Velocity::new(0f32, 0f32))
         .with(CharacterMarker::default())
         .with(ShipMarker::default())
@@ -289,6 +289,7 @@ pub fn run() -> Result<(), String> {
         character,
         ShapeHandle::new(character_physics_shape),
         Isometry2::new(Vector2::new(0f32, 0f32), 0f32),
+        Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
         BodyStatus::Dynamic,
         &mut specs_world.write_resource(),
         &mut specs_world.write_resource(),

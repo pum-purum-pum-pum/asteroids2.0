@@ -67,6 +67,7 @@ impl PhysicsComponent {
         entity: specs::Entity,
         shape: ShapeHandle<f32>,
         default_position: Isometry2,
+        velocity: Velocity2,
         body_status: BodyStatus,
         physics_world: &mut World<f32>,
         bodies_map: &mut BodiesMap,
@@ -78,6 +79,7 @@ impl PhysicsComponent {
         let (body_handle, body_part_handle) = {
             let rigid_body = RigidBodyDesc::new()
                 .position(default_position)
+                .velocity(velocity)
                 .local_inertia(inertia)
                 .local_center_of_mass(center_of_mass)
                 .status(body_status)

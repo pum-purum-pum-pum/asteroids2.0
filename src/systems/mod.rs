@@ -60,6 +60,7 @@ pub enum EntityType {
 pub enum InsertEvent {
     Asteroid {
         iso: Point3,
+        velocity: Velocity2,
         polygon: Polygon,
         light_shape: Geometry,
         spin: f32,
@@ -91,6 +92,22 @@ pub enum InsertEvent {
     Nebula {
         iso: Point3
     }
+}
+
+pub fn initial_asteroid_velocity() -> Velocity2 {
+    let mut rng = thread_rng();
+    let rotation = rng.gen_range(-1E-1, 1E-1);
+    let linear_velocity = Vector2::new(
+        rng.gen_range(-1E-1, 1E-1), 
+        rng.gen_range(-1E-1, 1E-1)
+    );
+    // let rotation = 0f32;
+    // let linear_velocity = Vector2::new(
+    //     0f32,
+    //     0f32
+    // );
+
+    Velocity2::new(linear_velocity, rotation)
 }
 
 pub fn spawn_position(char_pos: Point2, forbidden: f32, active: f32) -> Point2 {
@@ -152,6 +169,7 @@ impl<'a> System<'a> for PhysicsSystem {
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, PhysicsComponent>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, AsteroidMarker>,
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
         Read<'a, AppState>,
@@ -164,6 +182,7 @@ impl<'a> System<'a> for PhysicsSystem {
             mut velocities, 
             physics, 
             character_markers,
+            asteroid_markers,
             mut world, 
             _bodies_map, 
             app_state
@@ -183,6 +202,7 @@ impl<'a> System<'a> for PhysicsSystem {
             let diff = Vector3::new(char_vec.x, char_vec.y, 0f32)  - character_prev_position.0.translation.vector;
             isometry.0.translation.vector -= diff;
         }
+
         for (isometry, velocity, physics_component) in
             (&mut isometries, &mut velocities, &physics).join()
         {
@@ -257,15 +277,20 @@ impl<'a> System<'a> for KinematicSystem {
             spins,
             attach_positions,
             _character_markers,
-            _asteroids,
+            asteroid_markers,
             ship_markers,
             mut world,
         ) = data;
-        for physics_component in (&physics).join() {
+        for (physics_component, _) in (&physics, !&asteroid_markers).join() {
             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
             let mut velocity = *body.velocity();
             *velocity.as_vector_mut() *= DAMPING_FACTOR;
             body.set_velocity(velocity);
+            body.activate();
+        }
+        // activate asteroid bodyes
+        for (physics_component, _asteroid) in (&physics, &asteroid_markers).join() {
+            let mut body = world.rigid_body_mut(physics_component.body_handle).unwrap();
             body.activate();
         }
         for (_isometry, _velocity, physics_component, spin, _ship) in (
@@ -508,6 +533,7 @@ impl<'a> System<'a> for InsertSystem {
             match insert {
                 InsertEvent::Asteroid {
                     iso,
+                    velocity,
                     polygon,
                     light_shape,
                     spin,
@@ -519,7 +545,7 @@ impl<'a> System<'a> for InsertSystem {
                         .build_entity()
                         .with(*light_shape, &mut geometries)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                        .with(Velocity::new(0f32, 0f32), &mut velocities)
+                        .with(Velocity::new(velocity.linear.x, velocity.linear.y), &mut velocities)
                         .with(polygon.clone(), &mut polygons)
                         .with(AsteroidMarker::default(), &mut asteroid_markers)
                         .with(Image(preloaded_images.asteroid), &mut images)
@@ -540,7 +566,8 @@ impl<'a> System<'a> for InsertSystem {
                         &mut physics,
                         asteroid,
                         ShapeHandle::new(physics_polygon),
-                        Isometry2::new(Vector2::new(iso.x, iso.y), 0f32),
+                        Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
+                        *velocity,
                         BodyStatus::Dynamic,
                         &mut world,
                         &mut bodies_map,
@@ -588,6 +615,7 @@ impl<'a> System<'a> for InsertSystem {
                         enemy,
                         ShapeHandle::new(enemy_physics_shape),
                         Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
+                        Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
                         BodyStatus::Dynamic,
                         &mut world,
                         &mut bodies_map,
@@ -663,6 +691,7 @@ impl<'a> System<'a> for InsertSystem {
                         bullet,
                         ShapeHandle::new(ball),
                         Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
+                        Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
                         BodyStatus::Dynamic,
                         &mut world,
                         &mut bodies_map,
@@ -820,6 +849,7 @@ impl<'a> System<'a> for GamePlaySystem {
                     spawn_pos.y,
                     char_isometry.0.rotation.euler_angles().2,
                 ),
+                velocity: initial_asteroid_velocity(),
                 polygon: poly,
                 light_shape: asteroid_shape,
                 spin: spin,
@@ -1022,6 +1052,7 @@ impl<'a> System<'a> for CollisionSystem {
                             let mut rng = thread_rng();
                             let insert_event = InsertEvent::Asteroid {
                                 iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
+                                velocity: initial_asteroid_velocity(),
                                 polygon: poly.clone(),
                                 light_shape: asteroid_shape,
                                 spin: rng.gen_range(-1E-2, 1E-2),

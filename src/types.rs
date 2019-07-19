@@ -23,6 +23,7 @@ pub type Vector3 = nalgebra::Vector3<f32>;
 pub type Vector4 = nalgebra::Vector4<f32>;
 pub type Isometry3 = nalgebra::Isometry3<f32>;
 pub type Isometry2 = nalgebra::Isometry2<f32>;
+pub type Velocity2 = nphysics2d::algebra::Velocity2<f32>;
 
 pub use ncollide2d::query::Ray;
 pub type Segment = ncollide2d::shape::Segment<f32>;

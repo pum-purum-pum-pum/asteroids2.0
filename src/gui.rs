@@ -63,7 +63,6 @@ impl VecController {
             let mut interacted = false;
             match touch {
                 Some(touch) => {
-                    dbg!(ingame_ui.widget_finger[touch_id], id);
                     if self.is_in(touch) || previously_attached {
                         interacted = true;
                         let mut new_pos = Point2::new(touch.x_o, touch.y_o);
