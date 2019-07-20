@@ -302,37 +302,96 @@ impl Lazer {
     }
 }
 
+pub trait Gun {
+    fn recharge_state(&self) -> usize;
+
+    fn set_recharge_state(&mut self, recharge_state: usize);
+
+    fn recharge_time(&self) -> usize;
+
+    fn update(&mut self) {
+        self.set_recharge_state(usize::min(self.recharge_time(), self.recharge_state() + 1usize));
+        // self.recharge_state = usize::min(self.recharge_time, self.recharge_state + 1usize);
+    }
+
+    fn is_ready(&self) -> bool {
+        self.recharge_state() >= self.recharge_time()
+        // self.recharge_state >= self.recharge_time
+    }
+
+    fn shoot(&mut self) -> bool {
+        let result = self.is_ready();
+        if result {
+            self.set_recharge_state(0usize)
+        };
+        result
+    }
+}
+
+#[derive(Component, Debug)]
+pub struct ShotGun {
+    recharge_state: usize,
+    pub recharge_time: usize,
+    pub bullets_damage: usize,
+    pub side_projectiles_number: usize,
+    pub angle_shift: f32,
+}
+
+impl ShotGun {
+    pub fn new(recharge_time: usize, bullets_damage: usize, side_projectiles_number: usize, angle_shift: f32) -> Self {
+        Self {
+            recharge_state: 0usize,
+            recharge_time: recharge_time,
+            bullets_damage: bullets_damage,
+            side_projectiles_number: side_projectiles_number,
+            angle_shift: angle_shift
+        }
+    }
+}
+
+impl Gun for ShotGun {
+    fn recharge_state(&self) -> usize {
+        self.recharge_state
+    }
+
+    fn set_recharge_state(&mut self, recharge_state: usize) {
+        self.recharge_state = recharge_state;
+    }
+
+    fn recharge_time(&self) -> usize {
+        self.recharge_time
+    }
+}
+
 /// gun reloading status and time
 #[derive(Component, Debug)]
-pub struct Gun {
+pub struct Blaster {
     recharge_state: usize,
     pub recharge_time: usize,
     pub bullets_damage: usize,
 }
 
-impl Gun {
+impl Blaster {
     pub fn new(recharge_time: usize, bullets_damage: usize) -> Self {
-        Gun {
+        Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
             bullets_damage: bullets_damage
         }
     }
+}
 
-    pub fn update(&mut self) {
-        self.recharge_state = usize::min(self.recharge_time, self.recharge_state + 1usize);
+impl Gun for Blaster {
+    fn recharge_state(&self) -> usize {
+        self.recharge_state
     }
 
-    pub fn is_ready(&self) -> bool {
-        self.recharge_state >= self.recharge_time
+    fn set_recharge_state(&mut self, recharge_state: usize) {
+        self.recharge_state = recharge_state;
     }
 
-    pub fn shoot(&mut self) -> bool {
-        let result = self.is_ready();
-        if result {
-            self.recharge_state = 0usize
-        };
-        result
+    fn recharge_time(&self) -> usize {
+        self.recharge_time
     }
 }
 

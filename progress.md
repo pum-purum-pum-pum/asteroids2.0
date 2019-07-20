@@ -9,14 +9,14 @@ not ordered by priority
 * enemies should avoid asteroids \hacked, need something clever/
 * wasd control \/
 * try shadows again
-* lazer weapon (rotation)
-* lazer weapon (no rotation)
+* lazer weapon (rotation) \/
+* lazer weapon (no rotation) not fit in controls X
 * shotgun weapon
 * boosts from asteroids
 * * ship speed boost for some time
 * * "additional weapon"  -- trace like in bitblaster
 * * weapon modifier -- bullets reflection(for lazer it would be super cool too :D for shotgun it would be nice to add additional stike in place where reflected)
-* * money $$$ for buing ships
+* * money $$$ for bying ships
 * * rotated bullets around you like in bitblaster
 * * ?shield and hull repair
 * enemies
@@ -33,6 +33,11 @@ not ordered by priority
 * redo gui
 * add rotation bullets gun
 * bullet trace like in nova drift looks awesome
+* choose weapon and ship before start (it's saved from previous choise)
+* lazer sound
+* ship sound
+* animations
+* explosions with animations
 
 TECH AND TEST:
 * Android Joystick touch controls \/

@@ -180,7 +180,7 @@ impl<'a> System<'a> for GUISystem {
         ReadStorage<'a, Lifes>,
         ReadStorage<'a, Shield>,
         WriteStorage<'a, Spin>,
-        WriteStorage<'a, Gun>,
+        WriteStorage<'a, Blaster>,
         ReadExpect<'a, red::Viewport>,
         WriteExpect<'a, Canvas>,
         // ReadExpect<'a, PreloadedParticles>,
@@ -440,8 +440,12 @@ impl<'a> System<'a> for GUISystem {
             Some(choosed_upgrade) => {
                 match choosed_upgrade {
                     Upgrade::AttackSpeed => {
-                        let gun = guns.get_mut(character).unwrap();
-                        gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
+                        match guns.get_mut(character) {
+                            Some(gun) => {
+                                gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
+                            }
+                            None => ()
+                        }
                     }
                     Upgrade::ShipSpeed => {
                         player_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
