@@ -300,26 +300,28 @@ impl<'a> System<'a> for GUISystem {
         ) {
             Some(dir) => {
                 let dir = dir.normalize();
-                let gun = guns.get_mut(character).unwrap();
-                if gun.shoot() {
-                    let isometry = *isometries.get(character).unwrap();
-                    let position = isometry.0.translation.vector;
-                    // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                    let velocity_rel = player_stats.bullet_speed * dir;
-                    let char_velocity = velocities.get(character).unwrap();
-                    let projectile_velocity = Velocity::new(
-                        char_velocity.0.x + velocity_rel.x,
-                        char_velocity.0.y + velocity_rel.y,
-                    ) ;
-                    sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                    let rotation = Rotation2::rotation_between(&Vector2::new(0.0, 1.0), &dir);
-                    insert_channel.single_write(InsertEvent::Bullet {
-                        kind: EntityType::Player,
-                        iso: Point3::new(position.x, position.y, rotation.angle()),
-                        velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                        damage: gun.bullets_damage,
-                        owner: character,
-                    });
+                let gun = guns.get_mut(character);
+                if let Some(gun) = gun {
+                    if gun.shoot() {
+                        let isometry = *isometries.get(character).unwrap();
+                        let position = isometry.0.translation.vector;
+                        // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                        let velocity_rel = player_stats.bullet_speed * dir;
+                        let char_velocity = velocities.get(character).unwrap();
+                        let projectile_velocity = Velocity::new(
+                            char_velocity.0.x + velocity_rel.x,
+                            char_velocity.0.y + velocity_rel.y,
+                        ) ;
+                        sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                        let rotation = Rotation2::rotation_between(&Vector2::new(0.0, 1.0), &dir);
+                        insert_channel.single_write(InsertEvent::Bullet {
+                            kind: EntityType::Player,
+                            iso: Point3::new(position.x, position.y, rotation.angle()),
+                            velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                            damage: gun.bullets_damage,
+                            owner: character,
+                        });
+                    }
                 }
 
             }
@@ -570,6 +572,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Polygon>,
             ReadStorage<'a, Lifes>,
             ReadStorage<'a, Shield>,
+            ReadStorage<'a, Lazer>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
         ReadExpect<'a, ThreadPin<red::GL>>,
@@ -605,6 +608,7 @@ impl<'a> System<'a> for RenderingSystem {
                 polygons,
                 lifes,
                 shields,
+                lazers,
                 mut particles_datas,
             ),
             gl,
@@ -855,6 +859,31 @@ impl<'a> System<'a> for RenderingSystem {
                     &iso.0, 
                 )
         }
+        for (iso, lazer) in (&isometries, &lazers).join() {
+            if lazer.active {
+                let h = lazer.current_distance;
+                let w = 0.05f32;
+                let positions = [
+                    Point2::new(-w / 2.0, 0f32),
+                    // Point2::new(-w / 2.0, -h),
+                    // Point2::new(w / 2.0, -h),
+                    Point2::new(w / 2.0, 0f32),
+                    Point2::new(0.0, -h)
+                ];
+                // let indices = [0u16, 1, 2, 2, 3, 0];
+                let indices = [0u16, 1, 2];
+                let geometry_data = GeometryData::new(
+                    &gl, &positions, &indices
+                ).unwrap();
+                canvas.render_geometry(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &geometry_data,
+                    &iso.0
+                );
+            }
+        };
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
             match primitive {

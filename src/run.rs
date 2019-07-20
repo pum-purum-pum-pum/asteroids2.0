@@ -93,6 +93,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
     specs_world.register::<Gun>();
+    specs_world.register::<Lazer>();
     specs_world.register::<Image>();
     specs_world.register::<Sound>();
     specs_world.register::<Geometry>();
@@ -269,7 +270,8 @@ pub fn run() -> Result<(), String> {
         .with(CharacterMarker::default())
         .with(ShipMarker::default())
         .with(Image(character_image))
-        .with(Gun::new(12usize, 10usize))
+        // .with(Gun::new(12usize, 10usize))
+        .with(Lazer::new(1usize, 8f32))
         .with(Spin::default())
         .with(character_shape)
         .with(Size(char_size))

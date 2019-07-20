@@ -283,6 +283,25 @@ impl Lifetime {
 #[derive(Component, Debug)]
 pub struct AttachPosition(pub specs::Entity);
 
+#[derive(Component, Debug)]
+pub struct Lazer {
+    pub damage: usize,
+    pub active: bool,
+    pub distance: f32,
+    pub current_distance: f32,
+}
+
+impl Lazer {
+    pub fn new(damage: usize, distance: f32) -> Self {
+        Lazer {
+            damage: damage,
+            active: false,
+            distance: distance,
+            current_distance: distance
+        }
+    }
+}
+
 /// gun reloading status and time
 #[derive(Component, Debug)]
 pub struct Gun {

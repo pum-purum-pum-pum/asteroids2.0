@@ -13,7 +13,7 @@ use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
 use ncollide2d::world::CollisionObjectHandle;
 use ncollide2d::query::{Ray};
-use nphysics2d::object::{Body, BodyStatus};
+use nphysics2d::object::{Body, BodyStatus, BodyHandle};
 use nphysics2d::world::World;
 use nalgebra::geometry::{Translation};
 use shrev::EventChannel;
@@ -52,6 +52,7 @@ const NEBULA_MIN_NUMBER: usize = 20;
 const ASTEROIDS_MIN_NUMBER: usize = 10;
 const ASTEROID_MAX_RADIUS: f32 = 2.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
+const ASTEROID_INERTIA: f32 = 2f32;
 
 const AI_COLLISION_DISTANCE: f32 = 3.5f32;
 
@@ -85,6 +86,13 @@ pub enum InsertEvent {
         damage: usize,
         owner: specs::Entity,
     },
+    // Lazer {
+    //     kind: EntityType,
+    //     iso: Isometry2,
+    //     damage: usize,
+    //     distance: f32,
+    //     owner: specs::Entity
+    // },
     Explosion {
         position: Point2,
         num: usize,
@@ -157,6 +165,35 @@ pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f3
     let angle_diff = angle_shortest_dist(rotation, target_rot);
 
     (angle_diff * 10.0 - speed * 55.0)
+}
+
+fn get_collision_groups(kind: &EntityType) -> CollisionGroups {
+    match kind {
+        EntityType::Player => {
+            let mut player_bullet_collision_groups = CollisionGroups::new();
+            player_bullet_collision_groups
+                .set_membership(&[CollisionId::PlayerBullet as usize]);
+            player_bullet_collision_groups.set_whitelist(&[
+                CollisionId::Asteroid as usize,
+                CollisionId::EnemyShip as usize,
+            ]);
+            player_bullet_collision_groups
+                .set_blacklist(&[CollisionId::PlayerShip as usize]);
+            player_bullet_collision_groups
+        }
+        EntityType::Enemy => {
+            let mut enemy_bullet_collision_groups = CollisionGroups::new();
+            enemy_bullet_collision_groups
+                .set_membership(&[CollisionId::EnemyBullet as usize]);
+            enemy_bullet_collision_groups.set_whitelist(&[
+                CollisionId::Asteroid as usize,
+                CollisionId::PlayerShip as usize,
+            ]);
+            enemy_bullet_collision_groups
+                .set_blacklist(&[CollisionId::EnemyShip as usize]);
+            enemy_bullet_collision_groups
+        }
+    }
 }
 
 #[derive(Default)]
@@ -344,11 +381,15 @@ impl<'a> System<'a> for ControlSystem {
         WriteStorage<'a, Spin>,
         WriteStorage<'a, Image>,
         WriteStorage<'a, Gun>,
+        WriteStorage<'a, Lazer>,
         WriteStorage<'a, Projectile>,
         WriteStorage<'a, Geometry>,
         WriteStorage<'a, Lifetime>,
         WriteStorage<'a, Size>,
+        WriteStorage<'a, Lifes>,
+        WriteStorage<'a, Shield>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
         ReadExpect<'a, PreloadedImages>,
@@ -357,6 +398,7 @@ impl<'a> System<'a> for ControlSystem {
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
+        Write<'a, Progress>,
         Read<'a, PlayerStats>,
     );
 
@@ -369,19 +411,24 @@ impl<'a> System<'a> for ControlSystem {
             mut spins,
             _images,
             mut guns,
+            mut lazers,
             _projectiles,
             _geometries,
             _lifetimes,
             _sizes,
+            mut lifes,
+            mut shields,
             character_markers,
+            ships,
             keys_channel,
             mouse_state,
             _preloaded_images,
             mut sounds_channel,
             preloaded_sounds,
             mut world,
-            _bodies_map,
+            bodies_map,
             mut insert_channel,
+            mut progress,
             player_stats,
         ) = data;
         #[cfg(not(target_os = "android"))]
@@ -407,34 +454,91 @@ impl<'a> System<'a> for ControlSystem {
                 spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
             }
             let character = character.unwrap();
-            let (_character_isometry, mut character_velocity) = {
+            let (character_isometry, mut character_velocity) = {
                 let character_body = world
                     .rigid_body(physics.get(character).unwrap().body_handle)
                     .unwrap();
                 (*character_body.position(), *character_body.velocity())
             };
-            if mouse_state.left {
-                let gun = guns.get_mut(character).unwrap();
-                if gun.shoot() {
-                    let isometry = *isometries.get(character).unwrap();
-                    let position = isometry.0.translation.vector;
-                    let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                    let velocity_rel = player_stats.bullet_speed * direction;
-                    let char_velocity = velocities.get(character).unwrap();
-                    let projectile_velocity = Velocity::new(
-                        char_velocity.0.x + velocity_rel.x,
-                        char_velocity.0.y + velocity_rel.y,
-                    ) ;
-                    sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                    insert_channel.single_write(InsertEvent::Bullet {
-                        kind: EntityType::Player,
-                        iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
-                        velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                        damage: gun.bullets_damage,
-                        owner: character,
-                    });
+            match lazers.get_mut(character) {
+                Some(lazer) => {
+                    if mouse_state.left {
+                        lazer.active = true;
+                        let position = character_isometry.translation.vector;
+                        let pos = Point2::new(position.x, position.y);
+                        let dir = character_isometry * Vector2::new(0f32, -1f32);
+                        let ray = Ray::new(pos, dir);
+                        let mut gun_groups = CollisionGroups::new();
+                        let (min_d, closest_body) = get_min_dist(
+                            &mut world, 
+                            ray, 
+                            get_collision_groups(&EntityType::Player)
+                        );
+                        if min_d < lazer.distance {
+                            // dbg!("bang bang you're dead");
+                            lazer.current_distance = min_d;
+                            match bodies_map.get(&closest_body.unwrap()) {
+                                Some(target_entity) => {
+                                    let life = lifes.get(*target_entity);
+                                    match life {
+                                        Some(_) => {
+                                            let explosion_size = 1;
+                                            if process_damage(
+                                                lifes.get_mut(*target_entity).unwrap(),
+                                                shields.get_mut(*target_entity),
+                                                lazer.damage
+                                            ) {
+                                                progress.experience += 50usize;
+                                                entities.delete(*target_entity).unwrap();
+                                            }
+                                            let effect_position = position + dir * min_d;
+                                            let effect = InsertEvent::Explosion {
+                                                position: Point2::new(effect_position.x, effect_position.y),
+                                                num: explosion_size,
+                                                lifetime: 50usize,
+                                            };
+                                            insert_channel.single_write(effect);
+                                        }
+                                        None => ()
+                                    }
+                                }
+                                None => ()
+                            };
+                        } else {
+                            lazer.current_distance = lazer.distance
+                        }
+
+                    } else {
+                        lazer.active = false;
+                    }
                 }
-            
+                None => ()
+            }
+            if mouse_state.left {
+                match guns.get_mut(character) {
+                    Some(gun) => {
+                        if gun.shoot() {
+                            let isometry = *isometries.get(character).unwrap();
+                            let position = isometry.0.translation.vector;
+                            let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                            let velocity_rel = player_stats.bullet_speed * direction;
+                            let char_velocity = velocities.get(character).unwrap();
+                            let projectile_velocity = Velocity::new(
+                                char_velocity.0.x + velocity_rel.x,
+                                char_velocity.0.y + velocity_rel.y,
+                            ) ;
+                            sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                            insert_channel.single_write(InsertEvent::Bullet {
+                                kind: EntityType::Player,
+                                iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
+                                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                                damage: gun.bullets_damage,
+                                owner: character,
+                            });
+                        }
+                    }
+                    None => ()
+                }
             }
             for key in keys_channel.read(&mut self.reader) {
                 match key {
@@ -596,7 +700,7 @@ impl<'a> System<'a> for InsertSystem {
                         &mut world,
                         &mut bodies_map,
                         asteroid_collision_groups,
-                        10f32,
+                        ASTEROID_INERTIA,
                     );
                 }
                 InsertEvent::Ship {
@@ -607,8 +711,11 @@ impl<'a> System<'a> for InsertSystem {
                     image,
                 } => {
                     let size = 0.4f32;
-                    let enemy_shape = Geometry::Circle { radius: size };
-                    let enemy_physics_shape = ncollide2d::shape::Ball::new(size);
+
+                    let enemy_shape = 
+                        Geometry::Circle { radius: size };
+                    let enemy_physics_shape = 
+                        ncollide2d::shape::Ball::new(size);
                     let mut enemy_collision_groups = CollisionGroups::new();
                     enemy_collision_groups.set_membership(&[CollisionId::EnemyShip as usize]);
                     enemy_collision_groups.set_whitelist(&[
@@ -683,32 +790,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Lifetime::new(100usize), &mut lifetimes)
                         .with(Size(r), &mut sizes)
                         .build();
-                    let player_bullet_collision_groups = match kind {
-                        EntityType::Player => {
-                            let mut player_bullet_collision_groups = CollisionGroups::new();
-                            player_bullet_collision_groups
-                                .set_membership(&[CollisionId::PlayerBullet as usize]);
-                            player_bullet_collision_groups.set_whitelist(&[
-                                CollisionId::Asteroid as usize,
-                                CollisionId::EnemyShip as usize,
-                            ]);
-                            player_bullet_collision_groups
-                                .set_blacklist(&[CollisionId::PlayerShip as usize]);
-                            player_bullet_collision_groups
-                        }
-                        EntityType::Enemy => {
-                            let mut player_bullet_collision_groups = CollisionGroups::new();
-                            player_bullet_collision_groups
-                                .set_membership(&[CollisionId::EnemyBullet as usize]);
-                            player_bullet_collision_groups.set_whitelist(&[
-                                CollisionId::Asteroid as usize,
-                                CollisionId::PlayerShip as usize,
-                            ]);
-                            player_bullet_collision_groups
-                                .set_blacklist(&[CollisionId::EnemyShip as usize]);
-                            player_bullet_collision_groups
-                        }
-                    };
+                    let player_bullet_collision_groups = get_collision_groups(kind);
                     let ball = ncollide2d::shape::Ball::new(r);
                     let bullet_physics_component = PhysicsComponent::safe_insert(
                         &mut physics,
@@ -952,6 +1034,27 @@ impl<'a> System<'a> for GamePlaySystem {
     }
 }
 
+/// returns true if killed
+fn process_damage(life: &mut Lifes, mut shield: Option<&mut Shield>, projectile_damage: usize) -> bool {
+    match shield {
+        Some(ref mut shield) if shield.0 > 0usize => {
+            if shield.0 > projectile_damage {
+                shield.0 -= projectile_damage
+            } else {
+                shield.0 = 0
+            }
+        }
+        _ => {
+            if life.0 > projectile_damage {
+                life.0 -= projectile_damage
+            } else {
+                return true;
+            }
+        }
+    };
+    false
+}
+
 #[derive(Default)]
 pub struct CollisionSystem {
     colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
@@ -1112,21 +1215,15 @@ impl<'a> System<'a> for CollisionSystem {
                     }
                 } else {
                     let mut explosion_size = 2usize;
-                    let life = lifes.get_mut(ship).unwrap();
-                    match shields.get_mut(ship) {
-                        Some(ref mut shield) if shield.0 > 0usize => {
-                            shield.0 -= projectile_damage
-                        }
-                        _ => {
-                            if life.0 > projectile_damage {
-                                life.0 -= projectile_damage
-                            } else {
-                                progress.experience += 50usize;
-                                entities.delete(ship).unwrap();
-                                explosion_size = 20;
-                            }
-                        }
-                    };
+                    if process_damage(
+                        lifes.get_mut(ship).unwrap(),
+                        shields.get_mut(ship),
+                        projectile_damage
+                    ) {
+                        progress.experience += 50usize;
+                        entities.delete(ship).unwrap();
+                        explosion_size = 20;
+                    }
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
                         num: explosion_size,
@@ -1156,6 +1253,26 @@ impl<'a> System<'a> for CollisionSystem {
             }
         }
     }
+}
+
+fn get_min_dist(
+    world: &mut Write<World<f32>>, 
+    ray: Ray<f32>, 
+    collision_gropus: CollisionGroups
+) -> (f32, Option<BodyHandle>) {
+    let mut mintoi = std::f32::MAX;
+    let mut closest_body = None;
+    for (b, inter) in world
+            .collider_world()
+            .interferences_with_ray(&ray, &collision_gropus) {
+        if !b.query_type().is_proximity_query() && 
+                inter.toi < mintoi && 
+                inter.toi > EPS  {
+            mintoi = inter.toi;
+            closest_body = Some(b.body());
+        }
+    }
+    (mintoi, closest_body)
 }
 
 #[derive(Default)]
@@ -1229,27 +1346,12 @@ impl<'a> System<'a> for AISystem {
                     let velocity_rel = ENEMY_BULLET_SPEED * diff.normalize();
                     let projectile_velocity =
                         Velocity::new(vel.0.x + velocity_rel.x, vel.0.y + velocity_rel.y);
-                    
-                    fn get_min_dist(world: &mut Write<World<f32>>, ray: Ray<f32>) -> f32 {
-                        let mut mintoi = std::f32::MAX;
-                        let mut all_groups = CollisionGroups::new();
-                        for (b, inter) in world
-                                .collider_world()
-                                .interferences_with_ray(&ray, &all_groups) {
-                            if !b.query_type().is_proximity_query() && 
-                                    inter.toi < mintoi && 
-                                    inter.toi > EPS  {
-                                mintoi = inter.toi;
-                                let current_body = b.body();
-                            }
-                        }
-                        mintoi
-                    }
                     if diff.norm() > SCREEN_AREA {
                         let dir = Vector2::new(diff.x, diff.y).normalize();
                         let pos = Point2::new(position.x, position.y);
                         let ray = Ray::new(pos, dir);
-                        let ai_vel = if get_min_dist(&mut world, ray) < AI_COLLISION_DISTANCE {
+                        let mut all_groups = CollisionGroups::new();
+                        let ai_vel = if get_min_dist(&mut world, ray, all_groups).0 < AI_COLLISION_DISTANCE {
                             let rays_half_num = 3;
                             let step = std::f32::consts::PI / 2.0 / rays_half_num as f32;
                             let mut result_dir = Vector2::new(0f32, 0f32);
@@ -1260,11 +1362,11 @@ impl<'a> System<'a> for AISystem {
                                 let dir2 = rotation2 * dir;
                                 let ray1 = Ray::new(pos, dir1);
                                 let ray2 = Ray::new(pos, dir2);
-                                if get_min_dist(&mut world, ray1) > AI_COLLISION_DISTANCE {
+                                if get_min_dist(&mut world, ray1, all_groups).0 > AI_COLLISION_DISTANCE {
                                     result_dir = dir1;
                                     // break;
                                 }
-                                if get_min_dist(&mut world, ray2) > AI_COLLISION_DISTANCE {
+                                if get_min_dist(&mut world, ray2, all_groups).0 > AI_COLLISION_DISTANCE {
                                     result_dir = dir2;
                                     // break;
                                 }

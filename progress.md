@@ -31,6 +31,8 @@ not ordered by priority
 * add text
 * asteroids damage?
 * redo gui
+* add rotation bullets gun
+* bullet trace like in nova drift looks awesome
 
 TECH AND TEST:
 * Android Joystick touch controls \/
