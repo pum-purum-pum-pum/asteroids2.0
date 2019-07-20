@@ -390,8 +390,10 @@ impl<'a> System<'a> for ControlSystem {
             WriteStorage<'a, Size>,
             WriteStorage<'a, Lifes>,
             WriteStorage<'a, Shield>,
+            WriteStorage<'a, Polygon>,
             ReadStorage<'a, CharacterMarker>,
             ReadStorage<'a, ShipMarker>,
+            ReadStorage<'a, AsteroidMarker>,
         ),
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
@@ -423,8 +425,10 @@ impl<'a> System<'a> for ControlSystem {
                 _sizes,
                 mut lifes,
                 mut shields,
+                mut polygons,
                 character_markers,
                 ships,
+                asteroid_markers,
             ),
             keys_channel,
             mouse_state,
@@ -491,7 +495,44 @@ impl<'a> System<'a> for ControlSystem {
                                     lazer.damage
                                 ) {
                                     progress.experience += 50usize;
+
+                                    
+                                    
+                                    if asteroid_markers.get(*target_entity).is_some() { // COPY PASTE. TODO REFACTOR
+                                        let asteroid = *target_entity;
+                                        let isometry = isometries.get(asteroid).unwrap().0;
+                                        let position = isometry.translation.vector;
+                                        let polygon = polygons.get(asteroid).unwrap();
+                                        let new_polygons = polygon.deconstruct();
+                                        let effect = InsertEvent::Explosion {
+                                            position: Point2::new(position.x, position.y),
+                                            num: 10usize,
+                                            lifetime: 20usize,
+                                        };
+                                        insert_channel.single_write(effect);
+                                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                                        if new_polygons.len() == 1 {
+
+                                        } else {
+                                            for poly in new_polygons.iter() {
+                                                let r = poly.min_r;
+                                                let asteroid_shape = Geometry::Circle { radius: r };
+                                                let mut rng = thread_rng();
+                                                let insert_event = InsertEvent::Asteroid {
+                                                    iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
+                                                    velocity: initial_asteroid_velocity(),
+                                                    polygon: poly.clone(),
+                                                    light_shape: asteroid_shape,
+                                                    spin: rng.gen_range(-1E-2, 1E-2),
+                                                };
+                                                insert_channel.single_write(insert_event);
+                                            }
+                                        }
+                                    }
                                     entities.delete(*target_entity).unwrap();
+                                    
+                                    
+                                    
                                 }
                                 let effect_position = position + dir * min_d;
                                 let effect = InsertEvent::Explosion {

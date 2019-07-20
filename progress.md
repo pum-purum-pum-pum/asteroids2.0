@@ -11,12 +11,12 @@ not ordered by priority
 * try shadows again
 * lazer weapon (rotation) \/
 * lazer weapon (no rotation) not fit in controls X
-* shotgun weapon
+* shotgun weapon \/
 * boosts from asteroids
-* * ship speed boost for some time
+* * ship speed boost for some time X
 * * "additional weapon"  -- trace like in bitblaster
 * * weapon modifier -- bullets reflection(for lazer it would be super cool too :D for shotgun it would be nice to add additional stike in place where reflected)
-* * money $$$ for bying ships
+* * money $$$ for buying ships
 * * rotated bullets around you like in bitblaster
 * * ?shield and hull repair
 * enemies
@@ -38,6 +38,8 @@ not ordered by priority
 * ship sound
 * animations
 * explosions with animations
+* add screen border markers to indicate enemies out of screen
+* shotgun enemies
 
 TECH AND TEST:
 * Android Joystick touch controls \/
