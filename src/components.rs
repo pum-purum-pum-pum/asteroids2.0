@@ -28,8 +28,23 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 
+#[derive(Debug, Clone)]
+pub struct UpgradeCard {
+    pub upgrade_type: UpgradeType,
+    pub image: Image,
+    pub name: String,
+    pub description: String
+}
+
+pub type AvaliableUpgrades = Vec<UpgradeCard>;
+
+// #[derive(Default)]
+// pub struct AvaliableUpgrades {
+//     pub list: Vec<UpgradeCard>
+// }
+
 #[derive(Debug, Clone, Copy)]
-pub enum Upgrade {
+pub enum UpgradeType {
     AttackSpeed,
     BulletSpeed,
     ShipSpeed,
@@ -64,7 +79,9 @@ impl Default for PlayerStats {
 #[derive(Debug, Clone, Copy)]
 pub enum PlayState {
     Action,
-    Upgrade
+    Upgrade {
+        list: [usize; 2] // ids of avaliable upgrades
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -93,7 +110,7 @@ pub enum Geometry {
 pub struct Size(pub f32);
 
 /// Index of Images structure
-#[derive(Component, Clone, Copy)]
+#[derive(Debug, Component, Clone, Copy)]
 pub struct Image(pub specs::Entity);
 
 #[derive(Component, Clone, Copy)]
@@ -134,6 +151,7 @@ impl Progress {
 /// contains preloaded images ids
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
+    pub character: specs::Entity,
     pub projectile: specs::Entity,
     pub enemy_projectile: specs::Entity,
     pub asteroid: specs::Entity,

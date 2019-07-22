@@ -36,6 +36,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         ReadExpect<'a, red::Viewport>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
+        Write<'a, EventChannel<InsertEvent>>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
     );
@@ -63,6 +64,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             viewport,
             mut primitives_channel,
             mut ui,
+            mut insert_channel,
             mouse,
             mut app_state,
             // text_data
@@ -98,6 +100,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         );
         if button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::Play(PlayState::Action);
+            insert_channel.single_write(InsertEvent::Character);
         }
         primitives_channel.iter_write(ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
@@ -196,6 +199,7 @@ impl<'a> System<'a> for GUISystem {
         Write<'a, Touches>,
         Write<'a, EventChannel<Sound>>,
         Write<'a, EventChannel<InsertEvent>>,
+        Read<'a, AvaliableUpgrades>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -224,7 +228,8 @@ impl<'a> System<'a> for GUISystem {
             preloaded_sounds,
             mut touches,
             mut sounds_channel,
-            mut insert_channel
+            mut insert_channel,
+            avaliable_upgrades
         ) = data;
         let (character, _) = (&entities, &character_markers).join().next().unwrap();
         let dims = viewport.dimensions();
@@ -389,57 +394,40 @@ impl<'a> System<'a> for GUISystem {
 
         // upgrade UI
         let mut choosed_upgrade = None;
+        let (upgrade_button_w, upgrade_button_h) = ((w/4f32).min(h/2f32), (w/4f32).min(h/2f32));
+        let shift = upgrade_button_h / 10f32;
+        let mut rng = thread_rng();
         match *app_state {
-            AppState::Play(PlayState::Upgrade) => {
-                let (upgrade_button_w, upgrade_button_h) = ((w/4f32).min(h/2f32), (w/4f32).min(h/2f32));
-                let shift = upgrade_button_h / 10f32;
-                let mut current_point = Point2::new(shift, h - upgrade_button_h - shift);
-                let upgrade_button1 = Button::new(
-                    current_point,
-                    upgrade_button_w, upgrade_button_h, 
-                    white_color.clone(), 
-                    false,
-                    Some(Image(preloaded_images.attack_speed_upgrade)),
-                    "Attack speed".to_string()
-                );
-                current_point.x += shift + upgrade_button_w;
-                let upgrade_button2 = Button::new(
-                    current_point,
-                    upgrade_button_w, upgrade_button_h, 
-                    white_color.clone(), 
-                    false,
-                    Some(Image(preloaded_images.bullet_speed_upgrade)),
-                    "Bullets speed".to_string()
-                );
-                current_point.x += shift + upgrade_button_w;
-                let upgrade_button3 = Button::new(
-                    current_point,
-                    upgrade_button_w, upgrade_button_h, 
-                    white_color.clone(), 
-                    false,
-                    Some(Image(preloaded_images.ship_speed_upgrade)),
-                    "Ship speed".to_string()
-                );
-                let upgrades = vec![Upgrade::AttackSpeed, Upgrade::BulletSpeed, Upgrade::ShipSpeed];
-                if upgrade_button1.place_and_check(&mut ingame_ui, &*mouse) {
-                    choosed_upgrade = Some(upgrades[0]);
-                    *app_state = AppState::Play(PlayState::Action);
-                }
-                if upgrade_button2.place_and_check(&mut ingame_ui, &*mouse) {
-                    choosed_upgrade = Some(upgrades[1]);
-                    *app_state = AppState::Play(PlayState::Action);
-                }
-                if upgrade_button3.place_and_check(&mut ingame_ui, &*mouse) {
-                    choosed_upgrade = Some(upgrades[2]);
-                    *app_state = AppState::Play(PlayState::Action);
+            AppState::Play(PlayState::Upgrade{list: upgrades}) => {
+                for (i, upg_id) in upgrades.iter().enumerate() {
+                    let upg = &avaliable_upgrades[*upg_id];
+                    let mut current_point = 
+                        Point2::new(
+                            i as f32 * (upgrade_button_w + shift), 
+                            h - upgrade_button_h - shift
+                        );
+                    let upgrade_button = Button::new(
+                        current_point,
+                        upgrade_button_w, upgrade_button_h, 
+                        white_color.clone(), 
+                        false,
+                        Some(upg.image),
+                        upg.name.clone()
+                    );
+                    if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
+                        choosed_upgrade = Some(upg.upgrade_type);
+                        *app_state = AppState::Play(PlayState::Action);
+                    }
+
                 }
             }
             _ => ()
         }
+
         match choosed_upgrade {
             Some(choosed_upgrade) => {
                 match choosed_upgrade {
-                    Upgrade::AttackSpeed => {
+                    UpgradeType::AttackSpeed => {
                         match guns.get_mut(character) {
                             Some(gun) => {
                                 gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
@@ -447,13 +435,13 @@ impl<'a> System<'a> for GUISystem {
                             None => ()
                         }
                     }
-                    Upgrade::ShipSpeed => {
+                    UpgradeType::ShipSpeed => {
                         player_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
                     }
-                    Upgrade::ShipRotationSpeed => {
+                    UpgradeType::ShipRotationSpeed => {
                         player_stats.ship_rotation_speed += 0.1 * SHIP_ROTATION_SPEED_INIT;
                     }
-                    Upgrade::BulletSpeed => {
+                    UpgradeType::BulletSpeed => {
                         player_stats.bullet_speed += 0.1 * BULLET_SPEED_INIT;
                     }
                 }

@@ -228,6 +228,7 @@ pub fn run() -> Result<(), String> {
         .with(circle_image_data)
         .build();
     let preloaded_images = PreloadedImages {
+        character: character_image,
         projectile: projectile_image,
         enemy_projectile: enemy_projectile_image,
         asteroid: asteroid_image,
@@ -256,70 +257,7 @@ pub fn run() -> Result<(), String> {
         movement: movement_particles_entity,
     };
 
-    let char_size = 0.4f32;
-    let character_shape = Geometry::Circle { radius: char_size };
-    let enemy_size = 0.4f32;
-    let _enemy_shape = Geometry::Circle { radius: enemy_size };
-    let lifes = Lifes(MAX_LIFES);
-    let shields = Shield(MAX_SHIELDS);
-    let character = specs_world
-        .create_entity()
-        .with(lifes)
-        .with(shields)
-        .with(Isometry::new(0f32, 0f32, 0f32))
-        .with(Velocity::new(0f32, 0f32))
-        .with(CharacterMarker::default())
-        .with(ShipMarker::default())
-        .with(Image(character_image))
-        // .with(Blaster::new(12usize, 10usize))
-        .with(Lazer::new(1usize, 8f32))
-        // .with(ShotGun::new(12usize, 10usize, 1, 0.25))
-        .with(Spin::default())
-        .with(character_shape)
-        .with(Size(char_size))
-        .build();
-    let character_physics_shape = ncollide2d::shape::Ball::new(char_size);
-
-    let mut character_collision_groups = CollisionGroups::new();
-    character_collision_groups.set_membership(&[CollisionId::PlayerShip as usize]);
-    character_collision_groups.set_whitelist(&[
-        CollisionId::Asteroid as usize,
-        CollisionId::EnemyBullet as usize,
-        CollisionId::EnemyShip as usize,
-    ]);
-    character_collision_groups.set_blacklist(&[CollisionId::PlayerBullet as usize]);
-
-    PhysicsComponent::safe_insert(
-        &mut specs_world.write_storage(),
-        character,
-        ShapeHandle::new(character_physics_shape),
-        Isometry2::new(Vector2::new(0f32, 0f32), 0f32),
-        Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
-        BodyStatus::Dynamic,
-        &mut specs_world.write_resource(),
-        &mut specs_world.write_resource(),
-        character_collision_groups,
-        0.5f32,
-    );
     let insert_system = InsertSystem::new(insert_channel.register_reader());
-    insert_channel.single_write(InsertEvent::Engine {
-        position: Point2::new(0f32, 0f32),
-        num: 4usize,
-        attached: AttachPosition(character)
-    });
-    // insert_channel.single_write(InsertEvent::)
-    {
-        let _light = specs_world
-            .create_entity()
-            .with(Isometry::new(0f32, 0f32, 0f32))
-            .with(AttachPosition(character))
-            .with(Velocity::new(0f32, 0f32))
-            .with(Image(light_image))
-            .with(Spin::default())
-            .with(Size(15f32))
-            .with(LightMarker)
-            .build();
-    }
     let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
     let menu_rendering_system = MenuRenderingSystem::new(primitives_channel.register_reader());
     let mut menu_dispatcher = DispatcherBuilder::new()
@@ -336,6 +274,27 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
+    let mut avaliable_upgrades = vec![
+        UpgradeCard {
+            upgrade_type: UpgradeType::AttackSpeed,
+            image: Image(preloaded_images.attack_speed_upgrade),
+            name: "Attack speed".to_string(),
+            description: "+ X% attack speed".to_string()
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::BulletSpeed,
+            image: Image(preloaded_images.bullet_speed_upgrade),
+            name: "Bullet speed".to_string(),
+            description: "+ X% bullet speed. Also by law of physics bullets go futher".to_string()
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::ShipSpeed,
+            image: Image(preloaded_images.ship_speed_upgrade),
+            name: "Ship speed".to_string(),
+            description: "+ X% attack speed".to_string()
+        }
+    ];
+    specs_world.add_resource(avaliable_upgrades);
     let mut dispatcher = DispatcherBuilder::new()
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
@@ -353,9 +312,12 @@ pub fn run() -> Result<(), String> {
         )
         .with(KinematicSystem {}, "kinematic_system", &["physics_system"])
         .with_thread_local(gui_system)
-        .with_thread_local(insert_system)
+        // .with_thread_local(insert_system)
         .with_thread_local(rendering_system)
         .with_thread_local(sound_system)
+        .build();
+    let mut insert_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(insert_system)
         .build();
     specs_world.add_resource(keys_channel);
     specs_world.add_resource(sounds_channel);
@@ -377,6 +339,7 @@ pub fn run() -> Result<(), String> {
     // ------------------------------
 
     let mut events_loop = sdl_context.event_pump().unwrap();
+    insert_dispatcher.dispatch(&specs_world.res);
     safe_maintain(&mut specs_world);
 
     render_loop.run(move |running: &mut bool| {
@@ -462,6 +425,7 @@ pub fn run() -> Result<(), String> {
                 dispatcher.dispatch(&specs_world.res);
             }
         }
+        insert_dispatcher.dispatch(&specs_world.res);
         safe_maintain(&mut specs_world);
         for event in events_loop.poll_iter() {
             use sdl2::event::Event;

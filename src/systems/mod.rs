@@ -56,7 +56,7 @@ const ASTEROID_INERTIA: f32 = 2f32;
 
 const AI_COLLISION_DISTANCE: f32 = 3.5f32;
 
-const SHIPS_NUMBER: usize = 1 + 3; // character's ship counts
+const SHIPS_NUMBER: usize = 1 + 6; // character's ship counts
 pub const dt: f32 =  1f32 / 60f32;
 
 pub enum EntityType {
@@ -65,6 +65,7 @@ pub enum EntityType {
 }
 
 pub enum InsertEvent {
+    Character,
     Asteroid {
         iso: Point3,
         velocity: Velocity2,
@@ -254,7 +255,7 @@ impl<'a> System<'a> for PhysicsSystem {
             velocity.0 = physics_velocity;
         }
         match *app_state {
-            AppState::Play(PlayState::Upgrade) => (),
+            AppState::Play(PlayState::Upgrade{list}) => (),
             _ => {
                 world.step();
             }
@@ -556,7 +557,9 @@ impl<'a> System<'a> for ControlSystem {
                     if blaster.shoot() {
                         let isometry = *isometries.get(character).unwrap();
                         let position = isometry.0.translation.vector;
-                        let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                        let mut rng = rand::thread_rng();
+                        let shift = rng.gen_range(-0.2f32, 0.2f32);
+                        let direction = isometry.0 * Vector3::new(shift, -1f32, 0f32).normalize();
                         let velocity_rel = player_stats.bullet_speed * direction;
                         let char_velocity = velocities.get(character).unwrap();
                         let projectile_velocity = Velocity::new(
@@ -694,6 +697,7 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, NebulaMarker>,
             WriteStorage<'a, AttachPosition>,
             WriteStorage<'a, LightMarker>,
+            WriteStorage<'a, CharacterMarker>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
         ReadExpect<'a, ThreadPin<red::GL>>,
@@ -729,6 +733,7 @@ impl<'a> System<'a> for InsertSystem {
                 mut nebulas,
                 mut attach_positions,
                 mut lights,
+                mut character_markers,
                 mut particles_datas,
             ),
             gl,
@@ -740,6 +745,73 @@ impl<'a> System<'a> for InsertSystem {
         ) = data;
         for insert in insert_channel.read(&mut self.reader) {
             match insert {
+                InsertEvent::Character => {
+                    let char_size = 0.4f32;
+                    let character_shape = Geometry::Circle { radius: char_size };
+                    let enemy_size = 0.4f32;
+                    let _enemy_shape = Geometry::Circle { radius: enemy_size };
+                    let life = Lifes(MAX_LIFES);
+                    let shield = Shield(MAX_SHIELDS);
+                    let character = entities
+                        .build_entity()
+                        .with(life, &mut lifes)
+                        .with(shield, &mut shields)
+                        .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
+                        .with(Velocity::new(0f32, 0f32), &mut velocities)
+                        .with(CharacterMarker::default(), &mut character_markers)
+                        .with(ShipMarker::default(), &mut ships)
+                        .with(Image(preloaded_images.character), &mut images)
+                        .with(Blaster::new(12usize, 10usize), &mut blasters)
+                        // .with(Lazer::new(1usize, 8f32))
+                        // .with(ShotGun::new(12usize, 10usize, 1, 0.25))
+                        .with(Spin::default(), &mut spins)
+                        .with(character_shape, &mut geometries)
+                        .with(Size(char_size), &mut sizes)
+                        .build();
+                    let character_physics_shape = ncollide2d::shape::Ball::new(char_size);
+
+                    let mut character_collision_groups = CollisionGroups::new();
+                    character_collision_groups.set_membership(&[CollisionId::PlayerShip as usize]);
+                    character_collision_groups.set_whitelist(&[
+                        CollisionId::Asteroid as usize,
+                        CollisionId::EnemyBullet as usize,
+                        CollisionId::EnemyShip as usize,
+                    ]);
+                    character_collision_groups.set_blacklist(&[CollisionId::PlayerBullet as usize]);
+
+                    PhysicsComponent::safe_insert(
+                        &mut physics,
+                        character,
+                        ShapeHandle::new(character_physics_shape),
+                        Isometry2::new(Vector2::new(0f32, 0f32), 0f32),
+                        Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
+                        BodyStatus::Dynamic,
+                        &mut world,
+                        &mut bodies_map,
+                        character_collision_groups,
+                        0.5f32,
+                    );
+                    // TODO ENGINE
+                    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                    // insert_channel.single_write(InsertEvent::Engine {
+                    //     position: Point2::new(0f32, 0f32),
+                    //     num: 4usize,
+                    //     attached: AttachPosition(character)
+                    // });
+                    // insert_channel.single_write(InsertEvent::)
+                    {
+                        entities
+                            .build_entity()
+                            .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
+                            .with(AttachPosition(character), &mut attach_positions)
+                            .with(Velocity::new(0f32, 0f32), &mut velocities)
+                            .with(Image(preloaded_images.light_white), &mut images)
+                            .with(Spin::default(), &mut spins)
+                            .with(Size(15f32), &mut sizes)
+                            .with(LightMarker, &mut lights)
+                            .build();
+                    }
+                }
                 InsertEvent::Asteroid {
                     iso,
                     velocity,
@@ -816,7 +888,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(ShipMarker::default(), &mut ships)
                         .with(*image, &mut images)
                         .with(Lifes(ENEMY_MAX_LIFES), &mut lifes)
-                        .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
+                        // .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
                         .with(*kind, &mut ai_types)
                         .with(Blaster::new(50usize, 10usize), &mut blasters)
                         .with(Spin::default(), &mut spins)
@@ -856,7 +928,7 @@ impl<'a> System<'a> for InsertSystem {
                     damage,
                     owner,
                 } => {
-                    let r = 0.1;
+                    let r = 0.12;
                     let image = match kind {
                         EntityType::Player => preloaded_images.projectile,
                         EntityType::Enemy => preloaded_images.enemy_projectile
@@ -973,7 +1045,8 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, Progress>,
-        Write<'a, AppState>
+        Write<'a, AppState>,
+        Read<'a, AvaliableUpgrades>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1000,11 +1073,23 @@ impl<'a> System<'a> for GamePlaySystem {
             _bodies_map,
             mut insert_channel,
             mut progress,
-            mut app_state
+            mut app_state,
+            avaliable_upgrades,
         ) = data;
         if progress.experience >= progress.current_max_experience() {
             progress.level_up();
-            *app_state = AppState::Play(PlayState::Upgrade);
+            let mut rng = thread_rng();
+            let up_id = rng.gen_range(0, avaliable_upgrades.len());
+            let mut second_id = rng.gen_range(0, avaliable_upgrades.len());
+            while second_id == up_id {
+                second_id = rng.gen_range(0, avaliable_upgrades.len());
+            }
+            *app_state = AppState::Play(PlayState::Upgrade{
+                list: [
+                    up_id,
+                    second_id
+                ]
+            });
         }
         let (char_isometry, _char) = (&isometries, &character_markers).join().next().unwrap();
         let pos3d = char_isometry.0.translation.vector;
@@ -1171,6 +1256,7 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, Progress>,
+        Write<'a, AppState>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1191,7 +1277,8 @@ impl<'a> System<'a> for CollisionSystem {
             mut insert_channel,
             mut sounds_channel,
             preloaded_sounds,
-            mut progress
+            mut progress,
+            mut app_state,
         ) = data;
         self.colliding_start_events.clear();
         self.colliding_end_events.clear();
@@ -1293,13 +1380,22 @@ impl<'a> System<'a> for CollisionSystem {
                 let isometry = isometries.get(ship).unwrap().0;
                 let position = isometry.translation.vector;
                 if character_markers.get(ship).is_some() {
-                    let shield = shields.get_mut(ship).unwrap();
-                    let lifes = lifes.get_mut(ship).unwrap();
-                    if shield.0 > 0 {
-                        shield.0 -= projectile_damage
-                    } else {
-                        lifes.0 -= projectile_damage
+                    if process_damage(
+                        lifes.get_mut(ship).unwrap(),
+                        shields.get_mut(ship),
+                        projectile_damage
+                    ) {
+                        *app_state = AppState::Menu;
+                        // delete character
+                        entities.delete(ship).unwrap();
                     }
+                    // let shield = shields.get_mut(ship).unwrap();
+                    // let lifes = lifes.get_mut(ship).unwrap();
+                    // if shield.0 > 0 {
+                    //     shield.0 -= projectile_damage
+                    // } else {
+                    //     lifes.0 -= projectile_damage
+                    // }
                 } else {
                     let mut explosion_size = 2usize;
                     if process_damage(
