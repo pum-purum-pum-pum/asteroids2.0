@@ -41,7 +41,7 @@ use gfx::{Canvas};
 use physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
 use sound::init_sound;
 use systems::{
-    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertEvent, InsertSystem,
+    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
     GUISystem,
 };

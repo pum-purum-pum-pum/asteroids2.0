@@ -1,22 +1,48 @@
+* add text
+
 TODO LIST
+* Pick gun UI \/
+* Don't slow down bullets \/
+* enemies
+* * rarely throws bullets around \/
+* * lazer beam enemy
+* * constantly trhows slow bullets in spiral(while rotating)
+* * rarely throws super fast bullets
+* * lazer beams around and rotating
+ws bullets around
+* * constantly trhows slow bullets in spiral(while rotating)
+* * rarely throws super fast bullets
+
+* Lazer add skilss
+* * Lazer length
+
+* Sample only usefull upgrades
+
+* upgrades from files
+
+
+* increase ship size with max health upgrade
+
+* add placeholder music
+
+
 * sample random skills \/
-* when died, restart from menu
-* skill menu via hotkey
+* when died, restart from menu \/
+* skill menu via hotkey \/
 * blaster add skills 
 * * reflection (initial speed of each reflection is less than prev)
 * * additional side bullets
 * * damage
 * * accuracy (reduce bullets spread)
-*  Angnostic skills
-* * ship speed
-* * ship rotation speed
-* * shield regen
-* * hull regen
-* * shield size
-* * hull size
+*  Angnostic skills \/
+* * ship rotation speed \/
+* * shield regen \/
+* * hull regen \/
+* * shield size \/
+* * hull size \/
 
+* skill choise button
 
-* add text
 
 
 
@@ -43,12 +69,6 @@ not ordered by priority
 * * money $$$ for buying ships and weapons
 * * ?shield and hull repair
 * weapon rotated bullets around you like in bitblaster
-* enemies
-* * rarely throws bullets around
-* * constantly trhows slow bullets in spiral(while rotating)
-* * rarely throws super fast bullets
-* * lazer beam enemy
-* * lazer beams around and rotating
 * scores table
 * try move camera according to gun direction
 * asteroids damage?
@@ -63,7 +83,7 @@ not ordered by priority
 * add screen border markers to indicate enemies out of screen
 * shotgun enemies
 * * weapon modifier -- bullets reflection(for lazer it would be super cool too :D for shotgun it would be nice to add additional stike in place where reflected)
-
+* when oriented towards speed is more and also add reactor on the back like in "weired game wich name I forgot"
 
 * more bass to sound lol :)
 * random explosions

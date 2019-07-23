@@ -37,8 +37,10 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         Write<'a, EventChannel<InsertEvent>>,
+        WriteExpect<'a, PreloadedImages>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
+        Write<'a, MenuChosedGun>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -65,31 +67,59 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mut primitives_channel,
             mut ui,
             mut insert_channel,
+            mut preloaded_images,
             mouse,
             mut app_state,
             // text_data
+            mut chosed_gun
         ) = data;
         let vao = red::buffer::VertexArray::new(&*gl).unwrap();
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
         frame.clear_color();
         let dims = viewport.dimensions();
-        // canvas.render_geometry(
-            // gl: &red::GL,
-            // viewport: &red::Viewport,
-            // frame: &mut red::Frame,
-            // vao: &red::buffer::VertexArray,
-            // geometry_data: &GeometryData,
-            // model: &Isometry3,
-        // );
-    //     let mut target = display.draw();
-    //     target.clear_color(0.0, 0.0, 0.0, 1.0);
-    //     target.clear_stencil(0i32);
-    //     let dims = display.get_framebuffer_dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let (button_w, button_h) = (w/4f32, h/4f32);
+        let lazer_button = Button::new(
+            Point2::new(0f32, h - 2.0 * button_h),
+            button_w,
+            button_h,
+            Point3::new(0f32, 0f32, 0f32),
+            false,
+            Some(Image(preloaded_images.lazer)),
+            "Lazer gun".to_string()
+        );
+        let blaster_button = Button::new(
+            Point2::new(button_w + 0.1, h - 2.0 * button_h),
+            button_w,
+            button_h,
+            Point3::new(0f32, 0f32, 0f32),
+            false,
+            Some(Image(preloaded_images.blaster)),
+            "Lazer gun".to_string()
+        );
+
+        let shotgun_button = Button::new(
+            Point2::new(2.0 * button_w + 0.1, h - 2.0 * button_h),
+            button_w,
+            button_h,
+            Point3::new(0f32, 0f32, 0f32),
+            false,
+            Some(Image(preloaded_images.shotgun)),
+            "Lazer gun".to_string()
+        );
+        
+        if lazer_button.place_and_check(&mut ui, &*mouse) {
+            chosed_gun.0 = Some(GunKind::Lazer)
+        }
+        if blaster_button.place_and_check(&mut ui, &*mouse) {
+            chosed_gun.0 = Some(GunKind::Blaster)
+        }
+        if shotgun_button.place_and_check(&mut ui, &*mouse) {
+            chosed_gun.0 = Some(GunKind::ShotGun)
+        }
         let button = Button::new(
-            Point2::new(w/2.0 - button_w / 2.0, h/2.0 - button_h / 2.0), 
+            Point2::new(w/2.0 - button_w / 2.0, 0f32), 
             // Point2::new(0f32, 0f32),
             button_w, 
             button_h, 
@@ -98,9 +128,12 @@ impl<'a> System<'a> for MenuRenderingSystem {
             None, 
             "Play".to_string()
         );
-        if button.place_and_check(&mut ui, &*mouse) {
-            *app_state = AppState::Play(PlayState::Action);
-            insert_channel.single_write(InsertEvent::Character);
+        if let Some(gun) = chosed_gun.0 {
+            if button.place_and_check(&mut ui, &*mouse) {
+                *app_state = AppState::Play(PlayState::Action);
+                insert_channel.single_write(InsertEvent::Character{ gun_kind: gun });
+                chosed_gun.0 = None;
+            }
         }
         primitives_channel.iter_write(ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
@@ -115,16 +148,16 @@ impl<'a> System<'a> for MenuRenderingSystem {
                         GeometryData::new(&gl, &points, &indicies).unwrap();
                     match image {
                         Some(image) => {
-                            // unimplemented!();
-                            // canvas
-                            //     .render_primitive_texture(
-                            //         &display, 
-                            //         &mut target, 
-                            //         image_datas.get(image.0).unwrap(),
-                            //         &model, 
-                            //         *with_projection, 
-                            //         rectangle.width
-                            //     ).unwrap();
+                            canvas
+                                .render_primitive_texture(
+                                    &gl, 
+                                    &viewport,
+                                    &mut frame, 
+                                    image_datas.get(image.0).unwrap(),
+                                    &model, 
+                                    *with_projection, 
+                                    rectangle.width
+                                );
                         }
                         None => {
                             let fill_color = rectangle.color;
@@ -200,6 +233,7 @@ impl<'a> System<'a> for GUISystem {
         Write<'a, EventChannel<Sound>>,
         Write<'a, EventChannel<InsertEvent>>,
         Read<'a, AvaliableUpgrades>,
+        Write<'a, SpawnedUpgrades>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -229,7 +263,8 @@ impl<'a> System<'a> for GUISystem {
             mut touches,
             mut sounds_channel,
             mut insert_channel,
-            avaliable_upgrades
+            avaliable_upgrades,
+            mut spawned_upgrades,
         ) = data;
         let (character, _) = (&entities, &character_markers).join().next().unwrap();
         let dims = viewport.dimensions();
@@ -398,28 +433,52 @@ impl<'a> System<'a> for GUISystem {
         let shift = upgrade_button_h / 10f32;
         let mut rng = thread_rng();
         match *app_state {
-            AppState::Play(PlayState::Upgrade{list: upgrades}) => {
-                for (i, upg_id) in upgrades.iter().enumerate() {
-                    let upg = &avaliable_upgrades[*upg_id];
-                    let mut current_point = 
-                        Point2::new(
-                            i as f32 * (upgrade_button_w + shift), 
-                            h - upgrade_button_h - shift
+            AppState::Play(PlayState::Upgrade) => {
+                let upgrades = spawned_upgrades.last();
+                if let Some(upgrades) = upgrades {
+                    let mut chosed = false;
+                    for (i, upg_id) in upgrades.iter().enumerate() {
+                        let upg = &avaliable_upgrades[*upg_id];
+                        let mut current_point = 
+                            Point2::new(
+                                i as f32 * (upgrade_button_w + shift), 
+                                h - upgrade_button_h - shift
+                            );
+                        let upgrade_button = Button::new(
+                            current_point,
+                            upgrade_button_w, upgrade_button_h, 
+                            white_color.clone(), 
+                            false,
+                            Some(upg.image),
+                            upg.name.clone()
                         );
-                    let upgrade_button = Button::new(
-                        current_point,
-                        upgrade_button_w, upgrade_button_h, 
-                        white_color.clone(), 
-                        false,
-                        Some(upg.image),
-                        upg.name.clone()
-                    );
-                    if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
-                        choosed_upgrade = Some(upg.upgrade_type);
-                        *app_state = AppState::Play(PlayState::Action);
+                        if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
+                            choosed_upgrade = Some(upg.upgrade_type);
+                            *app_state = AppState::Play(PlayState::Action);
+                            // with multytouch things it's not cheatable
+                            chosed = true;
+                        }
                     }
-
+                    if chosed {
+                        spawned_upgrades.pop();
+                    }
                 }
+
+
+                let done_button = Button::new(
+                    Point2::new(w / 2.0, 0.0),
+                    upgrade_button_w, upgrade_button_h, 
+                    white_color.clone(), 
+                    false,
+                    None,
+                    "Done".to_string()
+                );
+                if done_button.place_and_check(&mut ingame_ui, &*mouse) {
+                    *app_state = AppState::Play(PlayState::Action);
+                }
+
+
+
             }
             _ => ()
         }
@@ -439,10 +498,22 @@ impl<'a> System<'a> for GUISystem {
                         player_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
                     }
                     UpgradeType::ShipRotationSpeed => {
-                        player_stats.ship_rotation_speed += 0.1 * SHIP_ROTATION_SPEED_INIT;
+                        player_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
                     }
                     UpgradeType::BulletSpeed => {
                         player_stats.bullet_speed += 0.1 * BULLET_SPEED_INIT;
+                    }
+                    UpgradeType::HealthRegen => {
+                        player_stats.health_regen += 1;
+                    }
+                    UpgradeType::ShieldRegen => {
+                        player_stats.shield_regen += 1;
+                    }
+                    UpgradeType::HealthSize => {
+                        player_stats.max_health += 20;
+                    }
+                    UpgradeType::ShieldSize => {
+                        player_stats.max_shield += 20;
                     }
                 }
             }

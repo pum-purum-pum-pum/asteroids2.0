@@ -17,7 +17,7 @@ use crate::gfx::{Canvas};
 use crate::physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
 use crate::sound::init_sound;
 use crate::systems::{
-    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertEvent, InsertSystem,
+    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
     GUISystem,
 };
@@ -79,6 +79,8 @@ pub fn run() -> Result<(), String> {
     // ------------------- SPECS SETUP
     let mut specs_world = SpecsWorld::new();
     let touches: Touches = [None; FINGER_NUMBER];
+    let spawned_upgrades: SpawnedUpgrades = vec![];
+    specs_world.add_resource(spawned_upgrades);
     specs_world.add_resource(touches);
     specs_world.add_resource(viewport);
     specs_world.add_resource(phys_world);
@@ -114,10 +116,6 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Damage>();
     specs_world.register::<AIType>();
     specs_world.register::<ThreadPin<ParticlesData>>();
-    {
-        // Create menu widges
-        
-    }
     let background_image_data = ThreadPin::new(
         ImageData::new(&context, "back").unwrap()
     );
@@ -159,6 +157,33 @@ pub fn run() -> Result<(), String> {
     );
     let circle_image_data = ThreadPin::new(
         ImageData::new(&context, "circle").unwrap()
+    );
+    let rotation_speed_image_data = ThreadPin::new(
+        ImageData::new(&context, "rotation_speed").unwrap()
+    );
+    let shield_regen_image_data = ThreadPin::new(
+        ImageData::new(&context, "shield_regen").unwrap()
+    );
+    let health_regen_image_data = ThreadPin::new(
+        ImageData::new(&context, "health_regen").unwrap()
+    );
+    let health_size_image_data = ThreadPin::new(
+        ImageData::new(&context, "health_size").unwrap()
+    );
+    let shield_size_image_data = ThreadPin::new(
+        ImageData::new(&context, "shield_size").unwrap()
+    );
+    let lazer_gun_image_data = ThreadPin::new(
+        ImageData::new(&context, "lazer_gun").unwrap()
+    );
+    let blaster_image_data = ThreadPin::new(
+        ImageData::new(&context, "blaster_gun").unwrap()
+    );
+    let shotgun_image_data = ThreadPin::new(
+        ImageData::new(&context, "shotgun").unwrap()
+    );
+    let enemy3_image_data = ThreadPin::new(
+        ImageData::new(&context, "enemy3").unwrap()
     );
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
@@ -227,6 +252,42 @@ pub fn run() -> Result<(), String> {
         .create_entity()
         .with(circle_image_data)
         .build();
+    let rotation_speed_image = specs_world
+        .create_entity()
+        .with(rotation_speed_image_data)
+        .build();
+    let shield_regen_image = specs_world
+        .create_entity()
+        .with(shield_regen_image_data)
+        .build();
+    let health_regen_image = specs_world
+        .create_entity()
+        .with(health_regen_image_data)
+        .build();
+    let shield_size_image = specs_world
+        .create_entity()
+        .with(shield_size_image_data)
+        .build();
+    let health_size_image = specs_world
+        .create_entity()
+        .with(health_size_image_data)
+        .build();
+    let lazer_gun_image = specs_world
+        .create_entity()
+        .with(lazer_gun_image_data)
+        .build();
+    let blaster_image = specs_world
+        .create_entity()
+        .with(blaster_image_data)
+        .build();
+    let shotgun_image = specs_world
+        .create_entity()
+        .with(shotgun_image_data)
+        .build();
+    let enemy3_image = specs_world
+        .create_entity()
+        .with(enemy3_image_data)
+        .build();
     let preloaded_images = PreloadedImages {
         character: character_image,
         projectile: projectile_image,
@@ -242,7 +303,11 @@ pub fn run() -> Result<(), String> {
         light_white: light_image,
         light_sea: light_sea_image,
         direction: direction_image,
-        circle: circle_image
+        circle: circle_image,
+        lazer: lazer_gun_image,
+        blaster: blaster_image,
+        shotgun: shotgun_image,
+        enemy3: enemy3_image,
     };
 
 
@@ -271,6 +336,7 @@ pub fn run() -> Result<(), String> {
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
     let (preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    specs_world.add_resource(MenuChosedGun::default());
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
@@ -292,6 +358,36 @@ pub fn run() -> Result<(), String> {
             image: Image(preloaded_images.ship_speed_upgrade),
             name: "Ship speed".to_string(),
             description: "+ X% attack speed".to_string()
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::ShipRotationSpeed,
+            image: Image(rotation_speed_image),
+            name: "Ship rotation speed".to_string(),
+            description: "Improves rotation speed by X%".to_string() 
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::ShieldRegen,
+            image: Image(shield_regen_image),
+            name: "Shield reneration".to_string(),
+            description: "+ 60 hp per sec".to_string()
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::HealthRegen,
+            image: Image(health_regen_image),
+            name: "Health regeneration".to_string(),
+            description: "+ 60 hp per sec".to_string()
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::ShieldSize,
+            image: Image(shield_size_image),
+            name: "Shield size".to_string(),
+            description: "More shield".to_string()
+        },
+        UpgradeCard {
+            upgrade_type: UpgradeType::HealthSize,
+            image: Image(health_size_image),
+            name: "Health size".to_string(),
+            description: "More health".to_string()
         }
     ];
     specs_world.add_resource(avaliable_upgrades);

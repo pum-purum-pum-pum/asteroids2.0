@@ -11,6 +11,7 @@ use sdl2::sys::SDL_Finger;
 use specs::prelude::*;
 use specs_derive::Component;
 use crate::run::FINGER_NUMBER;
+use rand::prelude::*;
 
 pub const MAX_LIFES: usize = 100usize;
 pub const ASTEROID_MAX_LIFES: usize = 100usize;
@@ -27,6 +28,64 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
+pub type SpawnedUpgrades = Vec<[usize; 2]>;
+
+#[derive(Clone, Copy)]
+pub enum EntityType {
+    Player,
+    Enemy,
+}
+
+pub enum InsertEvent {
+    Character {
+        gun_kind: GunKind
+    },
+    Asteroid {
+        iso: Point3,
+        velocity: Velocity2,
+        polygon: Polygon,
+        light_shape: Geometry,
+        spin: f32,
+    },
+    Ship {
+        iso: Point3,
+        light_shape: Geometry,
+        spin: f32,
+        gun_kind: GunKind,
+        kind: AIType,
+        image: Image
+    },
+    Bullet {
+        kind: EntityType,
+        iso: Point3,
+        velocity: Point2,
+        damage: usize,
+        owner: specs::Entity,
+    },
+    // Lazer {
+    //     kind: EntityType,
+    //     iso: Isometry2,
+    //     damage: usize,
+    //     distance: f32,
+    //     owner: specs::Entity
+    // },
+    Explosion {
+        position: Point2,
+        num: usize,
+        lifetime: usize,
+    },
+    Engine {
+        position: Point2,
+        num: usize,
+        attached: AttachPosition
+    },
+    Nebula {
+        iso: Point3
+    }
+}
+
+#[derive(Default, Clone, Copy)]
+pub struct MenuChosedGun(pub Option<GunKind>);
 
 #[derive(Debug, Clone)]
 pub struct UpgradeCard {
@@ -49,6 +108,10 @@ pub enum UpgradeType {
     BulletSpeed,
     ShipSpeed,
     ShipRotationSpeed,
+    ShieldRegen,
+    HealthRegen,
+    ShieldSize,
+    HealthSize,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -61,8 +124,13 @@ pub enum AIType {
 pub struct PlayerStats {
     // pub attack_speed: f32,
     pub bullet_speed: f32,
+    pub bullet_damage: f32,
     pub thrust_force: f32,
-    pub ship_rotation_speed: f32
+    pub torque: f32,
+    pub health_regen: usize,
+    pub shield_regen: usize,
+    pub max_health: usize,
+    pub max_shield: usize
 }
 
 impl Default for PlayerStats {
@@ -70,8 +138,13 @@ impl Default for PlayerStats {
         PlayerStats {
             // attack_speed: 1f32,
             bullet_speed: 0.5f32,
+            bullet_damage: 1f32,
             thrust_force: 0.01f32,
-            ship_rotation_speed: 1f32
+            torque: 0.2f32,
+            health_regen: 1usize,
+            shield_regen: 1usize,
+            max_health: MAX_LIFES,
+            max_shield: MAX_SHIELDS
         }
     }
 }
@@ -79,9 +152,7 @@ impl Default for PlayerStats {
 #[derive(Debug, Clone, Copy)]
 pub enum PlayState {
     Action,
-    Upgrade {
-        list: [usize; 2] // ids of avaliable upgrades
-    }
+    Upgrade
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -137,7 +208,7 @@ pub struct Progress {
 
 impl Progress {
     pub fn current_max_experience(&self) -> usize {
-        100usize * 2usize.pow(self.level as u32)
+        100usize * (1f32 +1.2f32.powf(self.level as f32)) as usize
     }
 
     pub fn level_up(&mut self) {
@@ -157,6 +228,7 @@ pub struct PreloadedImages {
     pub asteroid: specs::Entity,
     pub enemy: specs::Entity,
     pub enemy2: specs::Entity,
+    pub enemy3: specs::Entity,
     pub background: specs::Entity,
     pub nebulas: Vec<specs::Entity>,
     pub ship_speed_upgrade: specs::Entity,
@@ -166,6 +238,9 @@ pub struct PreloadedImages {
     pub light_sea: specs::Entity,
     pub direction: specs::Entity,
     pub circle: specs::Entity,
+    pub lazer: specs::Entity,
+    pub blaster: specs::Entity,
+    pub shotgun: specs::Entity,
 }
 
 pub struct PreloadedParticles {
@@ -301,6 +376,13 @@ impl Lifetime {
 #[derive(Component, Debug)]
 pub struct AttachPosition(pub specs::Entity);
 
+#[derive(Clone, Copy)]
+pub enum GunKind {
+    Blaster,
+    Lazer,
+    ShotGun
+}
+
 #[derive(Component, Debug)]
 pub struct Lazer {
     pub damage: usize,
@@ -344,6 +426,16 @@ pub trait Gun {
         };
         result
     }
+
+    fn spawn_bullets(
+        &self,
+        entity_type: EntityType,
+        isometry: Isometry3,
+        bullet_speed: f32,
+        bullet_damage: usize,
+        ship_velocity: Vector2,
+        owner: specs::Entity
+    ) -> Vec<InsertEvent>;
 }
 
 #[derive(Component, Debug)]
@@ -379,6 +471,60 @@ impl Gun for ShotGun {
     fn recharge_time(&self) -> usize {
         self.recharge_time
     }
+
+    fn spawn_bullets(
+        &self,
+        entity_type: EntityType,
+        isometry: Isometry3,
+        bullet_speed: f32,
+        bullet_damage: usize,
+        ship_velocity: Vector2,
+        owner: specs::Entity
+    ) -> Vec<InsertEvent> {
+
+        let mut res = vec![];
+        let position = isometry.translation.vector;
+        {
+            let direction = isometry * Vector3::new(0f32, -1f32, 0f32);
+            let velocity_rel = bullet_speed * direction;
+            let projectile_velocity = Velocity::new(
+                ship_velocity.x + velocity_rel.x,
+                ship_velocity.y + velocity_rel.y,
+            ) ;
+            res.push(InsertEvent::Bullet {
+                kind: entity_type,
+                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                damage: bullet_damage,
+                owner: owner,
+            });
+        }
+        for i in 1..=self.side_projectiles_number {
+            for j in 0i32..=1 {
+                let sign = j * 2 - 1;
+                let shift = self.angle_shift * i as f32 * sign as f32;
+                let rotation = Rotation3::new(Vector3::new(0f32, 0f32, shift));
+                let direction = isometry * (rotation * Vector3::new(0f32, -1f32, 0f32));
+                let velocity_rel = bullet_speed * direction;
+                let projectile_velocity = Velocity::new(
+                    ship_velocity.x + velocity_rel.x,
+                    ship_velocity.y + velocity_rel.y,
+                ) ;
+                res.push(InsertEvent::Bullet {
+                    kind: entity_type,
+                    iso: Point3::new(
+                        position.x, 
+                        position.y, 
+                        isometry.rotation.euler_angles().2 + shift
+                    ),
+                    velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                    damage: self.bullets_damage,
+                    owner: owner,
+                });
+            }
+        }
+        res
+    }
 }
 
 /// gun reloading status and time
@@ -410,6 +556,39 @@ impl Gun for Blaster {
 
     fn recharge_time(&self) -> usize {
         self.recharge_time
+    }
+
+    fn spawn_bullets(
+        &self,
+        entity_type: EntityType,
+        isometry: Isometry3,
+        bullet_speed: f32,
+        bullet_damage: usize,
+        ship_velocity: Vector2,
+        owner: specs::Entity
+    ) -> Vec<InsertEvent> {
+        let mut rng = thread_rng();
+        let mut res = vec![];
+        {
+            let position = isometry.translation.vector;
+            let mut rng = rand::thread_rng();
+            let shift = rng.gen_range(-0.2f32, 0.2f32);
+            let direction = isometry * Vector3::new(shift, -1f32, 0f32).normalize();
+            let velocity_rel = bullet_speed * direction;
+            let projectile_velocity = Velocity::new(
+                ship_velocity.x + velocity_rel.x,
+                ship_velocity.y + velocity_rel.y,
+            ) ;
+            let insert_event = InsertEvent::Bullet {
+                kind: entity_type,
+                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                damage: bullet_damage,
+                owner: owner,
+            };
+            res.push(insert_event)
+        }
+        res
     }
 }
 

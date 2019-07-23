@@ -59,56 +59,6 @@ const AI_COLLISION_DISTANCE: f32 = 3.5f32;
 const SHIPS_NUMBER: usize = 1 + 6; // character's ship counts
 pub const dt: f32 =  1f32 / 60f32;
 
-pub enum EntityType {
-    Player,
-    Enemy,
-}
-
-pub enum InsertEvent {
-    Character,
-    Asteroid {
-        iso: Point3,
-        velocity: Velocity2,
-        polygon: Polygon,
-        light_shape: Geometry,
-        spin: f32,
-    },
-    Ship {
-        iso: Point3,
-        light_shape: Geometry,
-        spin: f32,
-        kind: AIType,
-        image: Image
-    },
-    Bullet {
-        kind: EntityType,
-        iso: Point3,
-        velocity: Point2,
-        damage: usize,
-        owner: specs::Entity,
-    },
-    // Lazer {
-    //     kind: EntityType,
-    //     iso: Isometry2,
-    //     damage: usize,
-    //     distance: f32,
-    //     owner: specs::Entity
-    // },
-    Explosion {
-        position: Point2,
-        num: usize,
-        lifetime: usize,
-    },
-    Engine {
-        position: Point2,
-        num: usize,
-        attached: AttachPosition
-    },
-    Nebula {
-        iso: Point3
-    }
-}
-
 pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut rng = thread_rng();
     let rotation = rng.gen_range(-1E-1, 1E-1);
@@ -255,7 +205,7 @@ impl<'a> System<'a> for PhysicsSystem {
             velocity.0 = physics_velocity;
         }
         match *app_state {
-            AppState::Play(PlayState::Upgrade{list}) => (),
+            AppState::Play(PlayState::Upgrade) => (),
             _ => {
                 world.step();
             }
@@ -303,7 +253,9 @@ impl<'a> System<'a> for KinematicSystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, ShipMarker>,
+        ReadStorage<'a, Projectile>,
         Write<'a, World<f32>>,
+        Read<'a, PlayerStats>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -314,12 +266,14 @@ impl<'a> System<'a> for KinematicSystem {
             physics,
             spins,
             attach_positions,
-            _character_markers,
+            character_markers,
             asteroid_markers,
             ship_markers,
+            projectiles,
             mut world,
+            player_stats,
         ) = data;
-        for (physics_component, _) in (&physics, !&asteroid_markers).join() {
+        for (physics_component, _, _) in (&physics, !&asteroid_markers, !&projectiles).join() {
             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
             let mut velocity = *body.velocity();
             *velocity.as_vector_mut() *= DAMPING_FACTOR;
@@ -331,7 +285,8 @@ impl<'a> System<'a> for KinematicSystem {
             let mut body = world.rigid_body_mut(physics_component.body_handle).unwrap();
             body.activate();
         }
-        for (_isometry, _velocity, physics_component, spin, _ship) in (
+        for (entity, _isometry, _velocity, physics_component, spin, _ship) in (
+            &entities,
             &mut isometries,
             &mut velocities,
             &physics,
@@ -341,7 +296,11 @@ impl<'a> System<'a> for KinematicSystem {
             .join()
         {
             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
-            body.set_angular_velocity(spin.0);
+            if let Some(_) = character_markers.get(entity) {
+                body.set_angular_velocity(player_stats.torque * spin.0);
+            } else {
+                body.set_angular_velocity(spin.0);
+            }
         }
         let mut attach_pairs = vec![];
         for (entity, _, attach) in (&entities, &mut isometries, &attach_positions).join() {
@@ -406,6 +365,7 @@ impl<'a> System<'a> for ControlSystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, Progress>,
         Read<'a, PlayerStats>,
+        Write<'a, AppState>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -441,6 +401,7 @@ impl<'a> System<'a> for ControlSystem {
             mut insert_channel,
             mut progress,
             player_stats,
+            mut app_state
         ) = data;
         #[cfg(not(target_os = "android"))]
         {
@@ -462,7 +423,10 @@ impl<'a> System<'a> for ControlSystem {
                         iso.rotation(),
                         spin.0,
                     );
-                spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                spin.0 += player_torque
+                    .max(-MAX_TORQUE)
+                    .min(MAX_TORQUE);
+
             }
             let character = character.unwrap();
             let (character_isometry, mut character_velocity) = {
@@ -556,72 +520,31 @@ impl<'a> System<'a> for ControlSystem {
                 if let Some(blaster) = blasters.get_mut(character) {
                     if blaster.shoot() {
                         let isometry = *isometries.get(character).unwrap();
-                        let position = isometry.0.translation.vector;
-                        let mut rng = rand::thread_rng();
-                        let shift = rng.gen_range(-0.2f32, 0.2f32);
-                        let direction = isometry.0 * Vector3::new(shift, -1f32, 0f32).normalize();
-                        let velocity_rel = player_stats.bullet_speed * direction;
-                        let char_velocity = velocities.get(character).unwrap();
-                        let projectile_velocity = Velocity::new(
-                            char_velocity.0.x + velocity_rel.x,
-                            char_velocity.0.y + velocity_rel.y,
-                        ) ;
+                        let bullets = blaster.spawn_bullets(
+                            EntityType::Player,
+                            isometries.get(character).unwrap().0,
+                            player_stats.bullet_speed,
+                            blaster.bullets_damage,
+                            velocities.get(character).unwrap().0,
+                            character
+                        );
                         sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                        insert_channel.single_write(InsertEvent::Bullet {
-                            kind: EntityType::Player,
-                            iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
-                            velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                            damage: blaster.bullets_damage,
-                            owner: character,
-                        });
+                        insert_channel.iter_write(bullets.into_iter());
                     }
                 }
                 if let Some(shotgun) = shotguns.get_mut(character) {
                     let isometry = *isometries.get(character).unwrap();
                     if shotgun.shoot() {
-                        let position = isometry.0.translation.vector;
-                        {
-                            let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                            let velocity_rel = player_stats.bullet_speed * direction;
-                            let char_velocity = velocities.get(character).unwrap();
-                            let projectile_velocity = Velocity::new(
-                                char_velocity.0.x + velocity_rel.x,
-                                char_velocity.0.y + velocity_rel.y,
-                            ) ;
-                            sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                            insert_channel.single_write(InsertEvent::Bullet {
-                                kind: EntityType::Player,
-                                iso: Point3::new(position.x, position.y, isometry.0.rotation.euler_angles().2),
-                                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                                damage: shotgun.bullets_damage,
-                                owner: character,
-                            });
-                        }
-                        for i in 1..=shotgun.side_projectiles_number {
-                            for j in 0i32..=1 {
-                                let sign = j * 2 - 1;
-                                let shift = shotgun.angle_shift * i as f32 * sign as f32;
-                                let rotation = Rotation3::new(Vector3::new(0f32, 0f32, shift));
-                                let direction = isometry.0 * (rotation * Vector3::new(0f32, -1f32, 0f32));
-                                let velocity_rel = player_stats.bullet_speed * direction;
-                                let char_velocity = velocities.get(character).unwrap();
-                                let projectile_velocity = Velocity::new(
-                                    char_velocity.0.x + velocity_rel.x,
-                                    char_velocity.0.y + velocity_rel.y,
-                                ) ;
-                                insert_channel.single_write(InsertEvent::Bullet {
-                                    kind: EntityType::Player,
-                                    iso: Point3::new(
-                                        position.x, 
-                                        position.y, 
-                                        isometry.0.rotation.euler_angles().2 + shift
-                                    ),
-                                    velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                                    damage: shotgun.bullets_damage,
-                                    owner: character,
-                                });
-                            }
-                        }
+                        let bullets = shotgun.spawn_bullets(
+                            EntityType::Player,
+                            isometries.get(character).unwrap().0,
+                            player_stats.bullet_speed,
+                            shotgun.bullets_damage,
+                            velocities.get(character).unwrap().0,
+                            character
+                        );
+                        sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                        insert_channel.iter_write(bullets.into_iter());
                     }
                 }
             }
@@ -642,6 +565,9 @@ impl<'a> System<'a> for ControlSystem {
                     Keycode::D => {
                         let thrust = player_stats.thrust_force * Vector3::new(1.0, 0.0, 0.0);
                         *character_velocity.as_vector_mut() += thrust;
+                    }
+                    Keycode::Space => {
+                        *app_state = AppState::Play(PlayState::Upgrade)
                     }
                     _ => ()
                     
@@ -682,6 +608,8 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Velocity>,
             WriteStorage<'a, Spin>,
             WriteStorage<'a, Blaster>,
+            WriteStorage<'a, Lazer>,
+            WriteStorage<'a, ShotGun>,
             WriteStorage<'a, Damage>,
             WriteStorage<'a, Lifes>,
             WriteStorage<'a, Shield>,
@@ -705,6 +633,7 @@ impl<'a> System<'a> for InsertSystem {
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
         Write<'a, BodiesMap>,
+        Write<'a, Progress>,
         Read<'a, EventChannel<InsertEvent>>,
     );
 
@@ -718,6 +647,8 @@ impl<'a> System<'a> for InsertSystem {
                 mut velocities,
                 mut spins,
                 mut blasters,
+                mut lazers,
+                mut shotguns,
                 mut damages,
                 mut lifes,
                 mut shields,
@@ -741,19 +672,34 @@ impl<'a> System<'a> for InsertSystem {
             preloaded_images,
             mut world,
             mut bodies_map,
+            mut progress,
             insert_channel,
         ) = data;
         for insert in insert_channel.read(&mut self.reader) {
             match insert {
-                InsertEvent::Character => {
+                InsertEvent::Character {gun_kind} => {
+                    *progress = Progress::default();
                     let char_size = 0.4f32;
                     let character_shape = Geometry::Circle { radius: char_size };
                     let enemy_size = 0.4f32;
                     let _enemy_shape = Geometry::Circle { radius: enemy_size };
                     let life = Lifes(MAX_LIFES);
                     let shield = Shield(MAX_SHIELDS);
-                    let character = entities
-                        .build_entity()
+                    let mut character = match gun_kind {
+                        GunKind::Blaster => {
+                            entities.build_entity()
+                                .with(Blaster::new(12usize, 10usize), &mut blasters)
+                        }
+                        GunKind::Lazer => {
+                            entities.build_entity()
+                                .with(Lazer::new(1usize, 8f32), &mut lazers)
+                        }
+                        GunKind::ShotGun => {
+                            entities.build_entity()
+                                .with(ShotGun::new(30usize, 10usize, 1, 0.25), &mut shotguns)
+                        }
+                    };
+                    let character = character
                         .with(life, &mut lifes)
                         .with(shield, &mut shields)
                         .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
@@ -761,9 +707,6 @@ impl<'a> System<'a> for InsertSystem {
                         .with(CharacterMarker::default(), &mut character_markers)
                         .with(ShipMarker::default(), &mut ships)
                         .with(Image(preloaded_images.character), &mut images)
-                        .with(Blaster::new(12usize, 10usize), &mut blasters)
-                        // .with(Lazer::new(1usize, 8f32))
-                        // .with(ShotGun::new(12usize, 10usize, 1, 0.25))
                         .with(Spin::default(), &mut spins)
                         .with(character_shape, &mut geometries)
                         .with(Size(char_size), &mut sizes)
@@ -862,6 +805,7 @@ impl<'a> System<'a> for InsertSystem {
                     light_shape: _,
                     spin: _,
                     kind,
+                    gun_kind,
                     image,
                 } => {
                     let size = 0.4f32;
@@ -879,9 +823,26 @@ impl<'a> System<'a> for InsertSystem {
                         CollisionId::PlayerBullet as usize,
                     ]);
                     enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
+                    let mut enemy = entities
+                        .build_entity();
+                    match gun_kind {
+                        GunKind::ShotGun => {
+                            let side_num = 3usize;
+                            let shift = std::f32::consts::PI / (side_num as f32 + 1.0);
+                            enemy = enemy
+                                .with(ShotGun::new(400usize, 10usize, side_num, shift), &mut shotguns)
+                        }
+                        GunKind::Blaster => {
+                            enemy = enemy
+                                .with(Blaster::new(50usize, 10usize), &mut blasters)
+                        }
+                        GunKind::Lazer => {
+                            enemy = enemy
+                                .with(Lazer::new(1usize, 5f32), &mut lazers)
+                        }
+                    } 
 
-                    let enemy = entities
-                        .build_entity()
+                    let enemy = enemy
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
                         .with(Velocity::new(0f32, 0f32), &mut velocities)
                         .with(EnemyMarker::default(), &mut enemies)
@@ -890,7 +851,6 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Lifes(ENEMY_MAX_LIFES), &mut lifes)
                         // .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
                         .with(*kind, &mut ai_types)
-                        .with(Blaster::new(50usize, 10usize), &mut blasters)
                         .with(Spin::default(), &mut spins)
                         .with(enemy_shape, &mut geometries)
                         .with(Size(size), &mut sizes)
@@ -941,7 +901,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Image(image), &mut images)
                         .with(Spin::default(), &mut spins)
                         .with(Projectile { owner: *owner }, &mut projectiles)
-                        .with(Lifetime::new(100usize), &mut lifetimes)
+                        .with(Lifetime::new(200usize), &mut lifetimes)
                         .with(Size(r), &mut sizes)
                         .build();
                     let player_bullet_collision_groups = get_collision_groups(kind);
@@ -1023,22 +983,27 @@ pub struct GamePlaySystem;
 
 impl<'a> System<'a> for GamePlaySystem {
     type SystemData = (
-        Entities<'a>,
-        WriteStorage<'a, PhysicsComponent>,
-        WriteStorage<'a, Geometry>,
-        WriteStorage<'a, Isometry>,
-        WriteStorage<'a, Velocity>,
-        WriteStorage<'a, Spin>,
-        WriteStorage<'a, Blaster>,
-        WriteStorage<'a, ShotGun>,
-        WriteStorage<'a, Lifetime>,
-        WriteStorage<'a, AsteroidMarker>,
-        ReadStorage<'a, CharacterMarker>,
-        ReadStorage<'a, ShipMarker>,
-        WriteStorage<'a, Image>,
-        WriteStorage<'a, Size>,
-        WriteStorage<'a, Polygon>,
-        WriteStorage<'a, NebulaMarker>,
+        (
+            Entities<'a>,
+            WriteStorage<'a, PhysicsComponent>,
+            WriteStorage<'a, Geometry>,
+            WriteStorage<'a, Isometry>,
+            WriteStorage<'a, Velocity>,
+            WriteStorage<'a, Spin>,
+            WriteStorage<'a, Blaster>,
+            WriteStorage<'a, ShotGun>,
+            WriteStorage<'a, Lifetime>,
+            WriteStorage<'a, AsteroidMarker>,
+            ReadStorage<'a, CharacterMarker>,
+            ReadStorage<'a, ShipMarker>,
+            WriteStorage<'a, Image>,
+            WriteStorage<'a, Size>,
+            WriteStorage<'a, Polygon>,
+            WriteStorage<'a, NebulaMarker>,
+            WriteStorage<'a, Shield>,
+            WriteStorage<'a, Lifes>,
+        ),
+        Read<'a, PlayerStats>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -1046,27 +1011,33 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, Progress>,
         Write<'a, AppState>,
+        Write<'a, SpawnedUpgrades>,
         Read<'a, AvaliableUpgrades>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            entities,
-            _physics,
-            _geometries,
-            isometries,
-            _velocities,
-            _spins,
-            mut blasters,
-            mut shotguns,
-            mut lifetimes,
-            asteroid_markers,
-            character_markers,
-            ships,
-            _images,
-            _sizes,
-            _polygons,
-            nebulas,
+            (
+                entities,
+                _physics,
+                _geometries,
+                isometries,
+                _velocities,
+                _spins,
+                mut blasters,
+                mut shotguns,
+                mut lifetimes,
+                asteroid_markers,
+                character_markers,
+                ships,
+                _images,
+                _sizes,
+                _polygons,
+                nebulas,
+                mut shields,
+                mut lifes,
+            ),
+            player_stats,
             _stat,
             preloaded_images,
             _world,
@@ -1074,8 +1045,13 @@ impl<'a> System<'a> for GamePlaySystem {
             mut insert_channel,
             mut progress,
             mut app_state,
+            mut spawned_upgrades,
             avaliable_upgrades,
         ) = data;
+        for (shield, life, _character) in (&mut shields, &mut lifes, &character_markers).join() {
+            shield.0 = (shield.0 + player_stats.shield_regen).min(player_stats.max_shield);
+            life.0 = (life.0 + player_stats.health_regen).min(player_stats.max_health);
+        }
         if progress.experience >= progress.current_max_experience() {
             progress.level_up();
             let mut rng = thread_rng();
@@ -1084,12 +1060,8 @@ impl<'a> System<'a> for GamePlaySystem {
             while second_id == up_id {
                 second_id = rng.gen_range(0, avaliable_upgrades.len());
             }
-            *app_state = AppState::Play(PlayState::Upgrade{
-                list: [
-                    up_id,
-                    second_id
-                ]
-            });
+            spawned_upgrades.push([up_id, second_id]);
+            // *app_state = AppState::Play(PlayState::Upgrade);
         }
         let (char_isometry, _char) = (&isometries, &character_markers).join().next().unwrap();
         let pos3d = char_isometry.0.translation.vector;
@@ -1151,6 +1123,7 @@ impl<'a> System<'a> for GamePlaySystem {
                     light_shape: ship_shape,
                     spin: 0f32,
                     kind: AIType::Kamikadze,
+                    gun_kind: GunKind::Blaster,
                     image: Image(preloaded_images.enemy2)
                 })
             } else {
@@ -1159,7 +1132,8 @@ impl<'a> System<'a> for GamePlaySystem {
                     light_shape: ship_shape,
                     spin: 0f32,
                     kind: AIType::ShootAndFollow,
-                    image: Image(preloaded_images.enemy)
+                    gun_kind: GunKind::Lazer,
+                    image: Image(preloaded_images.enemy3)
                 })
             }
         };
@@ -1250,6 +1224,7 @@ impl<'a> System<'a> for CollisionSystem {
         WriteStorage<'a, Shield>,
         ReadStorage<'a, Damage>,
         WriteStorage<'a, Polygon>,
+        Read<'a, PlayerStats>,
         Write<'a, World<f32>>,
         Read<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
@@ -1272,6 +1247,7 @@ impl<'a> System<'a> for CollisionSystem {
             mut shields,
             damages,
             polygons,
+            player_stats,
             mut world,
             bodies_map,
             mut insert_channel,
@@ -1383,7 +1359,7 @@ impl<'a> System<'a> for CollisionSystem {
                     if process_damage(
                         lifes.get_mut(ship).unwrap(),
                         shields.get_mut(ship),
-                        projectile_damage
+                        (projectile_damage as f32 * player_stats.bullet_damage) as usize
                     ) {
                         *app_state = AppState::Menu;
                         // delete character
@@ -1469,6 +1445,8 @@ impl<'a> System<'a> for AISystem {
         ReadStorage<'a, PhysicsComponent>,
         WriteStorage<'a, Spin>,
         WriteStorage<'a, Blaster>,
+        WriteStorage<'a, ShotGun>,
+        WriteStorage<'a, Lazer>,
         WriteStorage<'a, EnemyMarker>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AIType>,
@@ -1485,6 +1463,8 @@ impl<'a> System<'a> for AISystem {
             physics,
             mut spins,
             mut blasters,
+            mut shotguns,
+            mut lazers,
             enemies,
             character_markers,
             ai_types,
@@ -1513,7 +1493,6 @@ impl<'a> System<'a> for AISystem {
         {
             match ai_type {
                 AIType::ShootAndFollow => {
-                    let gun = blasters.get_mut(entity).unwrap();
                     let isometry = iso.0;
                     let position = isometry.translation.vector;
                     let ship_torque = dt
@@ -1529,8 +1508,8 @@ impl<'a> System<'a> for AISystem {
                     let velocity_rel = ENEMY_BULLET_SPEED * diff.normalize();
                     let projectile_velocity =
                         Velocity::new(vel.0.x + velocity_rel.x, vel.0.y + velocity_rel.y);
+                    let dir = Vector2::new(diff.x, diff.y).normalize();
                     if diff.norm() > SCREEN_AREA {
-                        let dir = Vector2::new(diff.x, diff.y).normalize();
                         let pos = Point2::new(position.x, position.y);
                         let ray = Ray::new(pos, dir);
                         let mut all_groups = CollisionGroups::new();
@@ -1567,14 +1546,51 @@ impl<'a> System<'a> for AISystem {
                     let mut velocity = *body.velocity();
                     *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
                     body.set_velocity(velocity);
-                    if diff.norm() < SCREEN_AREA && gun.shoot() {
-                        insert_channel.single_write(InsertEvent::Bullet {
-                            kind: EntityType::Enemy,
-                            iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
-                            velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                            damage: gun.bullets_damage,
-                            owner: entity,
-                        });
+                    let gun = blasters.get_mut(entity);
+                    if let Some(gun) = gun {
+                        if diff.norm() < SCREEN_AREA && gun.shoot() {
+                            let bullets = gun.spawn_bullets(
+                                EntityType::Enemy,
+                                isometry,
+                                0.05,
+                                gun.bullets_damage,
+                                Vector2::new(vel.0.x, vel.0.y),
+                                entity
+                            );
+                            insert_channel.iter_write(bullets.into_iter());
+                        }
+                    }
+                    let shotgun = shotguns.get_mut(entity);
+                    if let Some(shotgun) = shotgun {
+                        if diff.norm() < SCREEN_AREA && shotgun.shoot() {
+                            let bullets = shotgun.spawn_bullets(
+                                EntityType::Enemy,
+                                isometry,
+                                0.05,
+                                shotgun.bullets_damage,
+                                Vector2::new(vel.0.x, vel.0.y),
+                                entity
+                            );
+                            insert_channel.iter_write(bullets.into_iter());
+                        }
+                    }
+                    if let Some(lazer) = lazers.get_mut(entity) {
+                        lazer.active = true;
+                        let ray = Ray::new(
+                            Point2::new(position.x, position.y), 
+                            Vector2::new(dir.x, dir.y)
+                        );
+                        let (min_d, closest_body) = get_min_dist(
+                            &mut world, 
+                            ray, 
+                            get_collision_groups(&EntityType::Enemy)
+                        );
+                        if min_d < lazer.distance {
+                            lazer.current_distance = min_d;
+                        } else {
+                            lazer.current_distance = lazer.distance
+                        }
+
                     }
                 }
                 AIType::Kamikadze => {
