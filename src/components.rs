@@ -139,7 +139,7 @@ impl Default for PlayerStats {
             // attack_speed: 1f32,
             bullet_speed: 0.5f32,
             bullet_damage: 1f32,
-            thrust_force: 0.01f32,
+            thrust_force: 0.003f32,
             torque: 0.2f32,
             health_regen: 1usize,
             shield_regen: 1usize,
