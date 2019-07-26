@@ -1,5 +1,11 @@
+use crate::gfx::TextData;
+use glyph_brush::GlyphBrush;
 use super::*;
 use crate::gui::VecController;
+use glyph_brush::{BrushAction, BrushError, Section, rusttype::Scale, Layout, HorizontalAlign, VerticalAlign};
+use red::glow;
+use red::glow::Context;
+use red::shader::Texture;
 
 pub struct MenuRenderingSystem {
     reader: ReaderId<Primitive>,
@@ -15,6 +21,7 @@ impl MenuRenderingSystem {
 
 impl<'a> System<'a> for MenuRenderingSystem {
     type SystemData = (
+     (
         Entities<'a>,
         ReadStorage<'a, Isometry>,
         ReadStorage<'a, Velocity>,
@@ -31,6 +38,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         ReadStorage<'a, Size>,
         ReadStorage<'a, Polygon>,
         ReadExpect<'a, ThreadPin<red::GL>>,
+    ),
         WriteExpect<'a, Canvas>,
         Read<'a, World<f32>>,
         ReadExpect<'a, red::Viewport>,
@@ -41,26 +49,29 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Read<'a, Mouse>,
         Write<'a, AppState>,
         Write<'a, MenuChosedGun>,
+        WriteExpect<'a, ThreadPin<TextData<'static>>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            entities,
-            isometries,
-            velocities,
-            physics,
-            character_markers,
-            ship_markers,
-            asteroid_markers,
-            light_markers,
-            nebulas,
-            projectiles,
-            image_datas,
-            image_ids,
-            geometries,
-            sizes,
-            polygons,
-            gl,
+            (
+                entities,
+                isometries,
+                velocities,
+                physics,
+                character_markers,
+                ship_markers,
+                asteroid_markers,
+                light_markers,
+                nebulas,
+                projectiles,
+                image_datas,
+                image_ids,
+                geometries,
+                sizes,
+                polygons,
+                gl,
+            ),
             mut canvas,
             world,
             viewport,
@@ -71,17 +82,19 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mouse,
             mut app_state,
             // text_data
-            mut chosed_gun
+            mut chosed_gun,
+            mut text_data
         ) = data;
-        let vao = red::buffer::VertexArray::new(&*gl).unwrap();
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
         frame.clear_color();
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
+        // return;
+
         let (button_w, button_h) = (w/4f32, h/4f32);
         let lazer_button = Button::new(
-            Point2::new(0f32, h - 2.0 * button_h),
+            Point2::new(0f32, h - button_h),
             button_w,
             button_h,
             Point3::new(0f32, 0f32, 0f32),
@@ -90,7 +103,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             "Lazer gun".to_string()
         );
         let blaster_button = Button::new(
-            Point2::new(button_w + 0.1, h - 2.0 * button_h),
+            Point2::new(button_w + 0.1, h - button_h),
             button_w,
             button_h,
             Point3::new(0f32, 0f32, 0f32),
@@ -100,7 +113,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         );
 
         let shotgun_button = Button::new(
-            Point2::new(2.0 * button_w + 0.1, h - 2.0 * button_h),
+            Point2::new(2.0 * button_w + 0.1, h - button_h),
             button_w,
             button_h,
             Point3::new(0f32, 0f32, 0f32),
@@ -135,6 +148,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 chosed_gun.0 = None;
             }
         }
+        let scale = Scale::uniform((0.3 * mouse.hdpi as f32).round());
         primitives_channel.iter_write(ui.primitives.drain(..));
         for primitive in primitives_channel.read(&mut self.reader) {
             match primitive {
@@ -156,7 +170,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                                     image_datas.get(image.0).unwrap(),
                                     &model, 
                                     *with_projection, 
-                                    rectangle.width
+                                    rectangle.height
                                 );
                         }
                         None => {
@@ -182,24 +196,47 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     with_projection: _,
                     image: _
                 } => {
-                    // unimplemented!();
-                    // let scale = 30f32;
-                    // let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
-                    // let view = get_view(canvas.observer()).to_homogeneous();
-                    // let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
-                    //     .to_homogeneous();
-                    // let mut scaler = scale * Matrix4::identity();
-                    // let scale_len = scaler.len();
-                    // scaler[scale_len - 1] = 1.0;
-                    // let matrix = orthographic * model * scaler;
-                    // // let text = glium_text_rusttype::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
-                    // // glium_text_rusttype::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
+                    text_data.glyph_brush.queue(Section {
+                        text: &text.text,
+                        scale,
+                        screen_position: (text.position.x, text.position.y),
+                        bounds: (w /3.15, h),
+                        color: [1.0, 1.0, 1.0, 1.0],
+                        ..Section::default()
+                    });
                 }
                 _ => ()
             }
         }
         // target.finish().unwrap();
+
+        // text_data.glyph_brush.queue(Section {
+        //     text: &"texttexttexttexttexttexttexttexttexttexttexttexttexttexttexttexttext",
+        //     scale,
+        //     screen_position: (0.0, 0.0),
+        //     bounds: (w /3.15, h),
+        //     color: [0.9, 0.3, 0.3, 1.0],
+        //     ..Section::default()
+        // });
+        // text_data.glyph_brush.queue(Section {
+        //     text: &"text",
+        //     scale,
+        //     screen_position: (w / 2.0, h / 2.0),
+        //     bounds: (w / 3.15, h),
+        //     color: [0.3, 0.9, 0.3, 1.0],
+        //     layout: Layout::default()
+        //         .h_align(HorizontalAlign::Center)
+        //         .v_align(VerticalAlign::Center),
+        //     ..Section::default()
+        // });
+
+        canvas.render_text(
+            &mut text_data,
+            &viewport,
+            &mut frame
+        );
     }
+
 }
 
 #[derive(Default)]
@@ -759,7 +796,7 @@ impl<'a> System<'a> for RenderingSystem {
             for (entity, particles_data) in (&entities, &mut particles_datas).join() {
                 match **particles_data {
                     ParticlesData::Engine(ref mut particles) => {
-                        let mut direction = Vector3::new(0f32, -1f32, 0f32);
+                        let mut direction = Vector3::new(0f32, 1f32, 0f32);
                         direction = (char_iso * direction);
                         if particles.update(
                             Vector2::new(char_pos.x, char_pos.y),

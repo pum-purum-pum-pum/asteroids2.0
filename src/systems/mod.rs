@@ -23,7 +23,8 @@ use specs::Join;
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, LightningPolygon, Polygon, TriangulateFromCenter, EPS};
 use crate::gfx::{GeometryData, Engine, ParticlesData, Explosion,
-                unproject_with_z, ortho_unproject, orthographic, orthographic_from_zero, get_view};
+                unproject_with_z, ortho_unproject, orthographic, orthographic_from_zero, get_view,
+                to_vertex, TextVertex, TextVertexBuffer};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData};
 use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};
@@ -187,7 +188,8 @@ impl<'a> System<'a> for PhysicsSystem {
         };
         for (isometry, ()) in (&mut isometries, !&physics).join() {
             let char_vec = character_position.translation.vector;
-            let diff = Vector3::new(char_vec.x, char_vec.y, 0f32)  - character_prev_position.0.translation.vector;
+            let prev_vec = character_prev_position.0.translation.vector;
+            let diff = Vector3::new(char_vec.x, char_vec.y, 0f32)  - Vector3::new(prev_vec.x, prev_vec.y, 0f32);
             isometry.0.translation.vector -= diff;
         }
 
@@ -470,7 +472,7 @@ impl<'a> System<'a> for ControlSystem {
                     lazer.active = true;
                     let position = character_isometry.translation.vector;
                     let pos = Point2::new(position.x, position.y);
-                    let dir = character_isometry * Vector2::new(0f32, -1f32);
+                    let dir = character_isometry * Vector2::new(0f32, 1f32);
                     let ray = Ray::new(pos, dir);
                     let mut gun_groups = CollisionGroups::new();
                     let (min_d, closest_body) = get_min_dist(
@@ -587,7 +589,7 @@ impl<'a> System<'a> for ControlSystem {
             if mouse_state.right {
                 let rotation = isometries.get(character).unwrap().0.rotation;
                 let _vel = velocities.get_mut(character).unwrap();
-                let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
+                let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, 1.0, 0.0));
                 *character_velocity.as_vector_mut() += thrust;
             }
             let character_body = world
@@ -1124,29 +1126,65 @@ impl<'a> System<'a> for GamePlaySystem {
         };
         let r = 1f32;
         let ship_shape = Geometry::Circle { radius: r };
+        let mut rng = thread_rng();
         for _ in 0..add_cnt {
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
-            let d = Bernoulli::new(0.5);
-            let v = d.sample(&mut rand::thread_rng());
-            if v {
-                insert_channel.single_write(InsertEvent::Ship {
+            // TODO move from loop 
+            let ships = [
+                InsertEvent::Ship {
                     iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
                     light_shape: ship_shape,
                     spin: 0f32,
                     kind: AIType::Kamikadze,
                     gun_kind: GunKind::Blaster,
                     image: Image(preloaded_images.enemy2)
-                })
-            } else {
-                insert_channel.single_write(InsertEvent::Ship {
+                },
+                InsertEvent::Ship {
                     iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
                     light_shape: ship_shape,
                     spin: 0f32,
                     kind: AIType::ShootAndFollow,
                     gun_kind: GunKind::Lazer,
+                    image: Image(preloaded_images.enemy4)
+                },
+                InsertEvent::Ship {
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+                    light_shape: ship_shape,
+                    spin: 0f32,
+                    kind: AIType::ShootAndFollow,
+                    gun_kind: GunKind::ShotGun,
                     image: Image(preloaded_images.enemy3)
-                })
-            }
+                },
+                InsertEvent::Ship {
+                    iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+                    light_shape: ship_shape,
+                    spin: 0f32,
+                    kind: AIType::ShootAndFollow,
+                    gun_kind: GunKind::Blaster,
+                    image: Image(preloaded_images.enemy)
+                },
+            ];
+            let ship_id = rng.gen_range(0, ships.len());
+            insert_channel.single_write(ships[ship_id].clone());
+            // if v {
+            //     insert_channel.single_write(InsertEvent::Ship {
+            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+            //         light_shape: ship_shape,
+            //         spin: 0f32,
+            //         kind: AIType::Kamikadze,
+            //         gun_kind: GunKind::Blaster,
+            //         image: Image(preloaded_images.enemy2)
+            //     })
+            // } else {
+            //     insert_channel.single_write(InsertEvent::Ship {
+            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+            //         light_shape: ship_shape,
+            //         spin: 0f32,
+            //         kind: AIType::ShootAndFollow,
+            //         gun_kind: GunKind::Lazer,
+            //         image: Image(preloaded_images.enemy3)
+            //     })
+            // }
         };
         // for _ in 0..add_cnt {
         //     let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
@@ -1534,7 +1572,9 @@ impl<'a> System<'a> for AISystem {
                     let projectile_velocity =
                         Velocity::new(vel.0.x + velocity_rel.x, vel.0.y + velocity_rel.y);
                     let dir = Vector2::new(diff.x, diff.y).normalize();
-                    if diff.norm() > SCREEN_AREA {
+                    // TODO remove this hack with another AI mechanism?
+                    let follow_area = if let Some(lazer) = lazers.get(entity) {lazer.distance * 0.95} else {SCREEN_AREA};
+                    if diff.norm() > follow_area {
                         let pos = Point2::new(position.x, position.y);
                         let ray = Ray::new(pos, dir);
                         let mut all_groups = CollisionGroups::new();
@@ -1612,55 +1652,45 @@ impl<'a> System<'a> for AISystem {
                         );
                         if min_d < lazer.distance {
                             lazer.current_distance = min_d;
-
-
-
-
-                        lazer.current_distance = min_d;
-                        if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) { 
-                                            // TODO REFACTOR. almost copy paste (except removed progress)
-                            if let Some(_) = lifes.get(*target_entity) {
-                                let explosion_size = 1;
-                                if process_damage(
-                                    lifes.get_mut(*target_entity).unwrap(),
-                                    shields.get_mut(*target_entity),
-                                    lazer.damage
-                                ) {
-                                    if asteroid_markers.get(*target_entity).is_some() {
-                                        let effect = InsertEvent::Explosion {
-                                            position: Point2::new(position.x, position.y),
-                                            num: 10usize,
-                                            lifetime: 20usize,
-                                        };
-                                        insert_channel.single_write(effect);
-                                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
-                                        let asteroid = *target_entity;
-                                        spawn_asteroids(
-                                            isometries.get(asteroid).unwrap().0, 
-                                            polygons.get(asteroid).unwrap(), 
-                                            &mut insert_channel,
-                                        );
+                            lazer.current_distance = min_d;
+                            if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) { 
+                                                // TODO REFACTOR. almost copy paste (except removed progress)
+                                if let Some(_) = lifes.get(*target_entity) {
+                                    let explosion_size = 1;
+                                    if process_damage(
+                                        lifes.get_mut(*target_entity).unwrap(),
+                                        shields.get_mut(*target_entity),
+                                        lazer.damage
+                                    ) {
+                                        if asteroid_markers.get(*target_entity).is_some() {
+                                            let effect = InsertEvent::Explosion {
+                                                position: Point2::new(position.x, position.y),
+                                                num: 10usize,
+                                                lifetime: 20usize,
+                                            };
+                                            insert_channel.single_write(effect);
+                                            sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                                            let asteroid = *target_entity;
+                                            spawn_asteroids(
+                                                isometries.get(asteroid).unwrap().0, 
+                                                polygons.get(asteroid).unwrap(), 
+                                                &mut insert_channel,
+                                            );
+                                        }
+                                        entities.delete(*target_entity).unwrap();
+                                        
+                                        
+                                        
                                     }
-                                    entities.delete(*target_entity).unwrap();
-                                    
-                                    
-                                    
+                                    let effect_position = Vector2::new(position.x, position.y) + dir * min_d;
+                                    let effect = InsertEvent::Explosion {
+                                        position: Point2::new(effect_position.x, effect_position.y),
+                                        num: explosion_size,
+                                        lifetime: 50usize,
+                                    };
+                                    insert_channel.single_write(effect);
                                 }
-                                let effect_position = Vector2::new(position.x, position.y) + dir * min_d;
-                                let effect = InsertEvent::Explosion {
-                                    position: Point2::new(effect_position.x, effect_position.y),
-                                    num: explosion_size,
-                                    lifetime: 50usize,
-                                };
-                                insert_channel.single_write(effect);
                             }
-                        }
-
-
-
-
-
-
                         } else {
                             lazer.current_distance = lazer.distance
                         }

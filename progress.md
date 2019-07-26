@@ -1,11 +1,19 @@
 * add text
+* move enemies,all stats, guns and ships etc into file for tweaking 
+* * balance enemies and player stats
+* redo gui
+* * button selection
+* * add score
+
+* try move camera according to gun direction
+
 
 TODO LIST
-* Pick gun UI \/
-* Don't slow down bullets \/
+<!-- * Pick gun UI \/ -->
+<!-- * Don't slow down bullets \/ -->
 * enemies
-* * rarely throws bullets around \/
-* * lazer beam enemy
+<!-- * * rarely throws bullets around \/ -->
+<!-- * * lazer beam enemy \/ -->
 * * constantly trhows slow bullets in spiral(while rotating)
 * * rarely throws super fast bullets
 * * lazer beams around and rotating
@@ -26,20 +34,20 @@ ws bullets around
 * add placeholder music
 
 
-* sample random skills \/
-* when died, restart from menu \/
-* skill menu via hotkey \/
+<!-- * sample random skills \/ -->
+<!-- * when died, restart from menu \/ -->
+<!-- * skill menu via hotkey \/ -->
 * blaster add skills 
 * * reflection (initial speed of each reflection is less than prev)
 * * additional side bullets
 * * damage
 * * accuracy (reduce bullets spread)
-*  Angnostic skills \/
-* * ship rotation speed \/
-* * shield regen \/
-* * hull regen \/
-* * shield size \/
-* * hull size \/
+<!-- *  Angnostic skills \/ -->
+<!-- * * ship rotation speed \/ -->
+<!-- * * shield regen \/ -->
+<!-- * * hull regen \/ -->
+<!-- * * shield size \/ -->
+<!-- * * hull size \/ -->
 
 * skill choise button
 
@@ -47,18 +55,18 @@ ws bullets around
 
 
 not ordered by priority
-* add asteroids initial movement and rotation \/
+<!-- * add asteroids initial movement and rotation \/
 * redo asteroids explosions: fix rotation of parts when destructed \/ (seems good but when rotation is fast feels wrong?)
-* redo asteroids explosions: add lifes \/
+* redo asteroids explosions: add lifes \/ -->
 * redo character asteroids collision?
-* redo effects spawning (explosion when destroyed, mini explosion when shoted) \/
-* enemies start shoot when theay near you and stop futher \/
+<!-- * redo effects spawning (explosion when destroyed, mini explosion when shoted) \/ -->
+<!-- * enemies start shoot when theay near you and stop futher \/ -->
 * enemies should avoid asteroids \hacked, need something clever/
-* wasd control \/
+<!-- * wasd control \/ -->
 * try shadows again
-* lazer weapon (rotation) \/
-* lazer weapon (no rotation) not fit in controls X
-* shotgun weapon \/
+<!-- * lazer weapon (rotation) \/ -->
+<!-- * lazer weapon (no rotation) not fit in controls X -->
+<!-- * shotgun weapon \/ -->
 * boosts from asteroids
  <!-- * * ship speed boost for some time X -->
 <!-- * * "additional weapon"  -- trace like in bitblaster -->
@@ -70,9 +78,7 @@ not ordered by priority
 * * ?shield and hull repair
 * weapon rotated bullets around you like in bitblaster
 * scores table
-* try move camera according to gun direction
 * asteroids damage?
-* redo gui
 * choose weapon and ship before start (it's saved from previous choise)
 * add rotation bullets gun
 * bullet trace like in nova drift looks awesome
@@ -135,3 +141,20 @@ MEDIA:
 * parallax background
 * particles on movement
 * camera distance based on speed
+
+
+
+Vlad Zhukov, [26.07.19 15:39]
+Что-то не могу перейти left hand view матрицы к right hand (с right hand все работает, но ось y логично оказывается перепутанной из-за моего переворота в шейдере).
+Делаю так:
+* меняю Isometry3::look_at_rh(&observer, &target, &Vector3::y()) на Isometry3::look_at_lh(&observer, &target, &Vector3::y())
+* В перспективном преобразовании меняю z_near и z_far местами, поскольку мне нужно взять его какбы с другими знаками, но оно инвариатно относительно переворота оси z: f(-z1, -z2) = f(z1, z2)
+* меняю z координату observer на противоположную
+* programming by permutation: пробовал отключать эти пункты по отдельности  :)))
+ЧЯДНТ?
+
+
+Y_INVERSE * rh_view(up = y_axis ) !=
+Y_INVERSE * lh_view(up = -y_axis)
+
+где Y_INVERSE — матрица инвертирующая y

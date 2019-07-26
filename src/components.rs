@@ -30,12 +30,16 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
+// TODO move in textBuffer or whatever
+pub struct TextVertNum(pub i32);
+
 #[derive(Clone, Copy)]
 pub enum EntityType {
     Player,
     Enemy,
 }
 
+#[derive(Clone)]
 pub enum InsertEvent {
     Character {
         gun_kind: GunKind
@@ -229,6 +233,7 @@ pub struct PreloadedImages {
     pub enemy: specs::Entity,
     pub enemy2: specs::Entity,
     pub enemy3: specs::Entity,
+    pub enemy4: specs::Entity,
     pub background: specs::Entity,
     pub nebulas: Vec<specs::Entity>,
     pub ship_speed_upgrade: specs::Entity,
@@ -301,10 +306,10 @@ impl Mouse {
         let (x, y) = (x as f32, y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
-        let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));
+        let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, y));
         self.o_x = ortho_point.x;
         self.o_y = ortho_point.y;
-        let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u);
+        let point = unproject_with_z(observer, &Point2::new(x, y), 0f32, width_u, height_u);
         self.x = point.x;
         self.y = point.y;
     }
@@ -373,7 +378,7 @@ impl Lifetime {
 }
 
 /// attach entity positions to some other entity position
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct AttachPosition(pub specs::Entity);
 
 #[derive(Clone, Copy)]

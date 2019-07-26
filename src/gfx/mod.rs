@@ -9,11 +9,19 @@ use nalgebra::geometry::Orthographic3;
 use red;
 use red::VertexAttribPointers;
 use red::glow::Context;
+use red::glow;
 use red::shader::UniformValue;
 use image;
 use image::ImageError;
 use sdl2::rwops::RWops;
 use std::path::Path;
+use glyph_brush::{
+    BrushAction, BrushError, Section, rusttype::{Scale, Rect, point}, 
+    Layout, HorizontalAlign, VerticalAlign, GlyphBrush,
+    DefaultSectionHasher
+};
+use red::shader::Texture;
+use red::data::{*};
 
 mod effects;
 pub use effects::*;
@@ -25,12 +33,63 @@ const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
 const ENGINE_FAR: f32 = 3f32;
 
+pub fn get_view(observer: Point3) -> Isometry3 {
+    let mut target = observer.clone();
+    target.z = Z_CANVAS;
+    Isometry3::look_at_lh(&observer, &target, &Vector3::y())
+}
+
+
+pub fn perspective(width: u32, height: u32) -> Perspective3 {
+    let aspect_ratio = width as f32 / height as f32;
+    Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 10.0)
+}
+
+macro_rules! gl_assert_ok {
+    (gl_context) => {{
+        let err = gl_context.get_error();
+        // eprintln!("{:?}", gl_err_to_str(err));
+        assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));
+    }};
+}
+
+fn gl_err_to_str(err: u32) -> &'static str {
+    match err {
+        glow::INVALID_ENUM => "INVALID_ENUM",
+        glow::INVALID_VALUE => "INVALID_VALUE",
+        glow::INVALID_OPERATION => "INVALID_OPERATION",
+        glow::INVALID_FRAMEBUFFER_OPERATION => "INVALID_FRAMEBUFFER_OPERATION",
+        glow::OUT_OF_MEMORY => "OUT_OF_MEMORY",
+        glow::STACK_UNDERFLOW => "STACK_UNDERFLOW",
+        glow::STACK_OVERFLOW => "STACK_OVERFLOW",
+        _ => "Unknown error",
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[derive(VertexAttribPointers)]
 pub struct GeometryVertex {
     pub position: red::data::f32_f32,
 }
+
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+#[derive(VertexAttribPointers)]
+pub struct TextVertex {
+    #[divisor = "1"]
+    left_top: f32_f32_f32,
+    #[divisor = "1"]
+    right_bottom: f32_f32,
+    #[divisor = "1"]
+    tex_left_top: f32_f32,
+    #[divisor = "1"]
+    tex_right_bottom: f32_f32,
+    #[divisor = "1"]
+    color: f32_f32_f32_f32,
+}
+
+pub type GlyphVertex = [std::os::raw::c_float; 13];
 
 pub struct GeometryData {
     positions: GeometryVertexBuffer<GeometryVertex>,
@@ -77,6 +136,12 @@ pub struct InstancingData {
     pub per_instance: WorldVertexBuffer<WorldVertex>,
 }
 
+pub struct TextData<'a> {
+    pub vertex_buffer: TextVertexBuffer<TextVertex>,
+    pub vertex_num: i32,
+    pub glyph_texture: red::Texture,
+    pub glyph_brush: GlyphBrush<'a, GlyphVertex, DefaultSectionHasher>
+}
 
 pub struct ImageData {
     positions: VertexBuffer<Vertex>,
@@ -87,7 +152,8 @@ pub struct ImageData {
 
 impl ImageData {
     pub fn new(gl: &red::GL, image_name: &str) -> Result<Self, String> {
-        let positions = vec![(-1f32, 1f32), (-1f32, -1f32), (1f32, -1f32), (1f32, 1f32)];
+        // let positions = vec![(-1f32, 1f32), (-1f32, -1f32), (1f32, -1f32), (1f32, 1f32)];
+        let positions = vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
         let textures = vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
         let shape: Vec<Vertex> = positions
             .into_iter()
@@ -152,6 +218,7 @@ pub struct Canvas {
     program_instancing: red::Program,
     program_primitive: red::Program,
     program_primitive_texture: red::Program,
+    pub program_glyph: red::Program,
     observer: Point3,
     // default_params: glium::DrawParameters<'a>,
     // stencil_check_params: glium::DrawParameters<'a>,
@@ -165,6 +232,7 @@ impl Canvas {
         let program_primitive_texture = create_shader_program(gl, "primitive_texture", glsl_version)?;
         let program_light = create_shader_program(gl, "light", glsl_version)?;
         let program_instancing = create_shader_program(gl, "instancing", glsl_version)?;
+        let program_glyph = create_shader_program(gl, "text", &glsl_version)?;
         Ok(Canvas {
             program: program,
             program_primitive: program_primitive,
@@ -172,6 +240,7 @@ impl Canvas {
             program_light: program_light,
             program_instancing: program_instancing,
             observer: Point3::new(0f32, 0f32, Z_FAR),
+            program_glyph: program_glyph
         })
     }
 
@@ -188,6 +257,99 @@ impl Canvas {
 
     pub fn get_z_shift(&self) -> f32 {
         self.observer.z - Z_FAR
+    }
+
+    pub fn render_text(
+        &self, 
+        text_data: &mut TextData, 
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+    ) {
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        let program = &self.program_glyph;
+        let transform: [[f32; 4]; 4] = orthographic(dims.0 as u32, dims.1 as u32).to_homogeneous().into();
+
+
+        // TODO move to resource
+        let max_image_dimension = {
+            let value = unsafe { frame.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE,) };
+            value as u32
+        };
+        let mut brush_action;
+        loop {
+            let current_texture = text_data.glyph_texture.texture.clone();
+            brush_action = text_data.glyph_brush.process_queued(
+                |rect, tex_data| unsafe {
+                    // eprintln!("{:?}, {:?}", rect, tex_data);
+                    // Update part of gpu texture with new glyph alpha values
+                    frame.gl.bind_texture(glow::TEXTURE_2D, Some(current_texture));
+                    frame.gl.tex_sub_image_2d_u8_slice(
+                        glow::TEXTURE_2D,-
+                        0,
+                        rect.min.x as _,
+                        rect.min.y as _,
+                        rect.width() as _,
+                        rect.height() as _,
+                        glow::RED,
+                        glow::UNSIGNED_BYTE,
+                        Some(tex_data),
+                    );
+                    // gl_assert_ok!(gl)
+                },
+                to_vertex,
+            );
+            match brush_action {
+                Ok(_) => break,
+                Err(BrushError::TextureTooSmall { suggested, .. }) => {
+                    let (new_width, new_height) = if (suggested.0 > max_image_dimension
+                        || suggested.1 > max_image_dimension)
+                        && (text_data.glyph_brush.texture_dimensions().0 < max_image_dimension
+                            || text_data.glyph_brush.texture_dimensions().1 < max_image_dimension)
+                    {
+                        (max_image_dimension, max_image_dimension)
+                    } else {
+                        suggested
+                    };
+                    // eprint!("\r                            \r");
+                    // eprintln!("Resizing glyph texture -> {}x{}", new_width, new_height);
+
+                    // Recreate texture as a larger size to fit more
+                    text_data.glyph_texture = Texture::new(&frame.gl, (new_width, new_height));//GlGlyphTexture::new((new_width, new_height));
+
+                    text_data.glyph_brush.resize_texture(new_width, new_height);
+                }
+            }
+        }
+
+        match brush_action.unwrap() {
+            BrushAction::Draw(vertices) => {
+                text_data.vertex_num = vertices.len() as i32;
+                unsafe {
+                    text_data.vertex_buffer.dynamic_draw_data(
+                        std::slice::from_raw_parts(
+                            vertices.as_ptr() as *const TextVertex, 
+                            vertices.len()
+                        ),
+                    );
+                }
+            }
+                // vertex_max = vertex_max.max(vertex_count);
+            // }
+            BrushAction::ReDraw => {}
+        }
+        program.set_uniform("transform", transform);
+        program.set_uniform("font_tex", text_data.glyph_texture.clone()); 
+        let text_vb: &TextVertexBuffer<TextVertex> = &text_data.vertex_buffer;
+        program.set_layout(&frame.gl, &text_vb.vao, &[text_vb]);
+        let vao = &text_vb.vao;
+        unsafe {
+            vao.bind();
+            program.set_used();
+            frame.gl.draw_arrays_instanced(glow::TRIANGLE_STRIP, 0, 4, text_data.vertex_num);
+            vao.unbind()
+        }
     }
 
     pub fn render_geometry(
@@ -313,7 +475,7 @@ impl Canvas {
         program.set_uniform("perspective", perspective);
         program.set_uniform("transparency", 1f32);
         program.set_layout(&gl, vao, &[&instancing_data.vertex_buffer, &instancing_data.per_instance]);
-        let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len);
+        let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len.unwrap());
         frame.draw(
             vao, 
             Some(&instancing_data.indices),
@@ -359,24 +521,13 @@ impl Canvas {
 }
 
 
-pub fn get_view(observer: Point3) -> Isometry3 {
-    let mut target = observer.clone();
-    target.z = Z_CANVAS;
-    Isometry3::look_at_rh(&observer, &target, &Vector3::y())
-}
-
 pub fn orthographic_from_zero(width: u32, height: u32) -> Orthographic3<f32> {
     Orthographic3::new(0f32, width as f32, 0f32, height as f32, -0.9, 0.0)
 } 
 
 // creates ortograohic projection left=bot=0 z_near=0.1 far=1.0
 pub fn orthographic(width: u32, height: u32) -> Orthographic3<f32>{
-    Orthographic3::new(0f32, width as f32, 0f32, height as f32, 0.1, 1f32)
-}
-
-pub fn perspective(width: u32, height: u32) -> Perspective3 {
-    let aspect_ratio = width as f32 / height as f32;
-    Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 1000.0)
+    Orthographic3::new(0f32, width as f32, 0f32, height as f32, -1f32, 1f32)
 }
 
 pub fn ortho_unproject(width: u32, height: u32, point: Point2) -> Point2 {
@@ -422,4 +573,65 @@ pub fn unproject_with_z(
     let (pos, dir) = unproject(observer, window_coord, width, height);
     let z_safe_scaler = (-pos.z + z_coord) / dir.z;
     return pos + dir * z_safe_scaler;
+}
+
+
+// text
+
+
+
+#[inline]
+pub fn to_vertex(
+    glyph_brush::GlyphVertex {
+        mut tex_coords,
+        pixel_coords,
+        bounds,
+        color,
+        z,
+    }: glyph_brush::GlyphVertex,
+) -> GlyphVertex {
+    let gl_bounds = bounds;
+
+    let mut gl_rect = Rect {
+        min: point(pixel_coords.min.x as f32, pixel_coords.min.y as f32),
+        max: point(pixel_coords.max.x as f32, pixel_coords.max.y as f32),
+    };
+
+    // handle overlapping bounds, modify uv_rect to preserve texture aspect
+    if gl_rect.max.x > gl_bounds.max.x {
+        let old_width = gl_rect.width();
+        gl_rect.max.x = gl_bounds.max.x;
+        tex_coords.max.x = tex_coords.min.x + tex_coords.width() * gl_rect.width() / old_width;
+    }
+    if gl_rect.min.x < gl_bounds.min.x {
+        let old_width = gl_rect.width();
+        gl_rect.min.x = gl_bounds.min.x;
+        tex_coords.min.x = tex_coords.max.x - tex_coords.width() * gl_rect.width() / old_width;
+    }
+    if gl_rect.max.y > gl_bounds.max.y {
+        let old_height = gl_rect.height();
+        gl_rect.max.y = gl_bounds.max.y;
+        tex_coords.max.y = tex_coords.min.y + tex_coords.height() * gl_rect.height() / old_height;
+    }
+    if gl_rect.min.y < gl_bounds.min.y {
+        let old_height = gl_rect.height();
+        gl_rect.min.y = gl_bounds.min.y;
+        tex_coords.min.y = tex_coords.max.y - tex_coords.height() * gl_rect.height() / old_height;
+    }
+
+    [
+        gl_rect.min.x,
+        gl_rect.max.y,
+        z,
+        gl_rect.max.x,
+        gl_rect.min.y,
+        tex_coords.min.x,
+        tex_coords.max.y,
+        tex_coords.max.x,
+        tex_coords.min.y,
+        color[0],
+        color[1],
+        color[2],
+        color[3],
+    ]
 }

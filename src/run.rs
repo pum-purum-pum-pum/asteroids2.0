@@ -1,3 +1,6 @@
+use sdl2::rwops::RWops;
+use std::path::Path;
+use std::io::Read;
 use backtrace::Backtrace;
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
@@ -13,7 +16,7 @@ use red::glow::RenderLoop;
 use std::panic;
 use crate::types::{*};
 use crate::components::*;
-use crate::gfx::{Canvas};
+use crate::gfx::{Canvas, GlyphVertex, TextVertexBuffer, TextData};
 use crate::physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
 use crate::sound::init_sound;
 use crate::systems::{
@@ -21,13 +24,19 @@ use crate::systems::{
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
     GUISystem,
 };
+use glyph_brush::{rusttype::*, *};
 use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
 const NEBULAS_NUM: usize = 3usize;
 pub const FINGER_NUMBER: usize = 20;
 
-
 pub fn run() -> Result<(), String> {
+    let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
+    // let path_str = format!("assets/{}.png", );
+    // let dejavu = RWops::from_file(Path::new(&"assets/fonts/DejaVuSans.ttf"), "r").unwrap();
+    // let dejavu: Vec<u8> = dejavu.bytes().map(|x| x.unwrap() ).collect();
+    // let dejavu = dejavu.as_slice();
+    let mut glyph_brush: GlyphBrush<GlyphVertex, _> = GlyphBrushBuilder::using_font_bytes(dejavu).build();
     #[cfg(any(target_os = "android"))]
     panic::set_hook(Box::new(|panic_info| {
         trace!("AAA PANIC");
@@ -55,7 +64,7 @@ pub fn run() -> Result<(), String> {
     #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
     {
         gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-        gl_attr.set_context_version(3, 0);
+        gl_attr.set_context_version(3, 2);
     }
     let window = video
         .window("Asteroids 2.0", window_w, window_h)
@@ -71,6 +80,16 @@ pub fn run() -> Result<(), String> {
         video.gl_get_proc_address(s) as *const _
     });
     let context = GL::new(context);
+    let text_buffer = TextVertexBuffer::empty_new(&context).unwrap();
+    let glyph_texture = red::shader::Texture::new(&context, glyph_brush.texture_dimensions());
+    let text_data = ThreadPin::new(TextData{
+        vertex_buffer: text_buffer,
+        vertex_num: 0,
+        glyph_texture: glyph_texture.clone(),
+        glyph_brush
+    });
+
+    let mut text_vb = ThreadPin::new(TextVertexBuffer::empty_new(&context).unwrap());
     let canvas = Canvas::new(&context, &glsl_version).unwrap();
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
@@ -80,6 +99,9 @@ pub fn run() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     let touches: Touches = [None; FINGER_NUMBER];
     let spawned_upgrades: SpawnedUpgrades = vec![];
+    specs_world.add_resource(text_data);
+    // specs_world.add_resource(glyph_brush);
+    specs_world.add_resource(glyph_texture);
     specs_world.add_resource(spawned_upgrades);
     specs_world.add_resource(touches);
     specs_world.add_resource(viewport);
@@ -185,6 +207,10 @@ pub fn run() -> Result<(), String> {
     let enemy3_image_data = ThreadPin::new(
         ImageData::new(&context, "enemy3").unwrap()
     );
+    let enemy4_image_data = ThreadPin::new(
+        ImageData::new(&context, "enemy4").unwrap()
+    );
+
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
         let nebula_image_data = ThreadPin::new(
@@ -288,6 +314,10 @@ pub fn run() -> Result<(), String> {
         .create_entity()
         .with(enemy3_image_data)
         .build();
+    let enemy4_image = specs_world
+        .create_entity()
+        .with(enemy4_image_data)
+        .build();
     let preloaded_images = PreloadedImages {
         character: character_image,
         projectile: projectile_image,
@@ -295,6 +325,8 @@ pub fn run() -> Result<(), String> {
         asteroid: asteroid_image,
         enemy: enemy_image,
         enemy2: enemy2_image,
+        enemy3: enemy3_image,
+        enemy4: enemy4_image,
         background: background_image,
         nebulas: nebula_images,
         ship_speed_upgrade: ship_speed_image,
@@ -307,7 +339,6 @@ pub fn run() -> Result<(), String> {
         lazer: lazer_gun_image,
         blaster: blaster_image,
         shotgun: shotgun_image,
-        enemy3: enemy3_image,
     };
 
 
