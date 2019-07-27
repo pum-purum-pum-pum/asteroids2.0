@@ -1,32 +1,30 @@
-use sdl2::rwops::RWops;
-use std::path::Path;
-use std::io::Read;
-use backtrace::Backtrace;
-use ncollide2d::shape::ShapeHandle;
-use ncollide2d::world::CollisionGroups;
-use nphysics2d::object::BodyStatus;
 use nphysics2d::world::World;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
-use red::{self, GL, Frame, DrawType, glow};
+use red::{self, GL, glow};
 use red::glow::RenderLoop;
+#[cfg(any(target_os = "android"))]
+use backtrace::Backtrace;
+#[cfg(any(target_os = "android"))]
 use std::panic;
 use crate::types::{*};
 use crate::components::*;
 use crate::gfx::{Canvas, GlyphVertex, TextVertexBuffer, TextData};
-use crate::physics::{safe_maintain, CollisionId, PHYSICS_SIMULATION_TIME};
+use crate::physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
 use crate::sound::init_sound;
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
     GUISystem,
 };
-use glyph_brush::{rusttype::*, *};
+use glyph_brush::{*};
 use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
+use std::collections::{HashMap};
+
 const NEBULAS_NUM: usize = 3usize;
 pub const FINGER_NUMBER: usize = 20;
 
@@ -36,7 +34,7 @@ pub fn run() -> Result<(), String> {
     // let dejavu = RWops::from_file(Path::new(&"assets/fonts/DejaVuSans.ttf"), "r").unwrap();
     // let dejavu: Vec<u8> = dejavu.bytes().map(|x| x.unwrap() ).collect();
     // let dejavu = dejavu.as_slice();
-    let mut glyph_brush: GlyphBrush<GlyphVertex, _> = GlyphBrushBuilder::using_font_bytes(dejavu).build();
+    let glyph_brush: GlyphBrush<GlyphVertex, _> = GlyphBrushBuilder::using_font_bytes(dejavu).build();
     #[cfg(any(target_os = "android"))]
     panic::set_hook(Box::new(|panic_info| {
         trace!("AAA PANIC");
@@ -47,14 +45,14 @@ pub fn run() -> Result<(), String> {
     #[cfg(any(target_os = "android"))]
     android_log::init("MyApp").unwrap();
     let (window_w, window_h) = (1024u32, 769);
-    let mut viewport = red::Viewport::for_window(window_w as i32, window_h as i32);
+    let viewport = red::Viewport::for_window(window_w as i32, window_h as i32);
     let mut phys_world: World<f32> = World::new();
     phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
     let sdl_context = sdl2::init().unwrap();
     let video = sdl_context.video().unwrap();
     let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
         let gl_attr = video.gl_attr();
-    let mut glsl_version = "#version 130";
+    let glsl_version = "#version 130";
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
     {
         gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
@@ -89,7 +87,6 @@ pub fn run() -> Result<(), String> {
         glyph_brush
     });
 
-    let mut text_vb = ThreadPin::new(TextVertexBuffer::empty_new(&context).unwrap());
     let canvas = Canvas::new(&context, &glsl_version).unwrap();
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
@@ -138,79 +135,45 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Damage>();
     specs_world.register::<AIType>();
     specs_world.register::<ThreadPin<ParticlesData>>();
-    let background_image_data = ThreadPin::new(
-        ImageData::new(&context, "back").unwrap()
-    );
-    let character_image_data = ThreadPin::new(
-        ImageData::new(&context, "player_new").unwrap()
-    );
-    let asteroid_image_data = ThreadPin::new(
-        ImageData::new(&context, "asteroid").unwrap()
-    );
-    let light_image_data = ThreadPin::new(
-        ImageData::new(&context, "light").unwrap()
-    );
-    let light_sea_image_data = ThreadPin::new(
-        ImageData::new(&context, "light_sea").unwrap()
-    );
-    let projectile_image_data = ThreadPin::new(
-        ImageData::new(&context, "projectile").unwrap()
-    );
-    let enemy_projectile_image_data = ThreadPin::new(
-        ImageData::new(&context, "enemy_projectile").unwrap()
-    );
-    let enemy_image_data = ThreadPin::new(
-        ImageData::new(&context, "enemy_new").unwrap()
-    );
-    let enemy2_image_data = ThreadPin::new(
-        ImageData::new(&context, "enemy2").unwrap()
-    );
-    let bullet_speed_image_data = ThreadPin::new(
-        ImageData::new(&context, "bullet_speed").unwrap()
-    );
-    let ship_speed_image_data = ThreadPin::new(
-        ImageData::new(&context, "ship_speed").unwrap()
-    );
-    let attack_speed_image_data = ThreadPin::new(
-        ImageData::new(&context, "attack_speed").unwrap()
-    );
-    let direction_image_data = ThreadPin::new(
-        ImageData::new(&context, "direction").unwrap()
-    );
-    let circle_image_data = ThreadPin::new(
-        ImageData::new(&context, "circle").unwrap()
-    );
-    let rotation_speed_image_data = ThreadPin::new(
-        ImageData::new(&context, "rotation_speed").unwrap()
-    );
-    let shield_regen_image_data = ThreadPin::new(
-        ImageData::new(&context, "shield_regen").unwrap()
-    );
-    let health_regen_image_data = ThreadPin::new(
-        ImageData::new(&context, "health_regen").unwrap()
-    );
-    let health_size_image_data = ThreadPin::new(
-        ImageData::new(&context, "health_size").unwrap()
-    );
-    let shield_size_image_data = ThreadPin::new(
-        ImageData::new(&context, "shield_size").unwrap()
-    );
-    let lazer_gun_image_data = ThreadPin::new(
-        ImageData::new(&context, "lazer_gun").unwrap()
-    );
-    let blaster_image_data = ThreadPin::new(
-        ImageData::new(&context, "blaster_gun").unwrap()
-    );
-    let shotgun_image_data = ThreadPin::new(
-        ImageData::new(&context, "shotgun").unwrap()
-    );
-    let enemy3_image_data = ThreadPin::new(
-        ImageData::new(&context, "enemy3").unwrap()
-    );
-    let enemy4_image_data = ThreadPin::new(
-        ImageData::new(&context, "enemy4").unwrap()
-    );
+    specs_world.register::<ShipStats>();
+    let images = [
+        "back",
+        "player_new", 
+        "asteroid",
+        "light",
+        "light_sea",
+        "projectile",
+        "enemy_projectile",
+        "enemy1",
+        "enemy2",
+        "enemy3",
+        "enemy4",
+        "bullet_speed",
+        "ship_speed",
+        "attack_speed",
+        "direction",
+        "circle",
+        "rotation_speed",
+        "shield_regen",
+        "health_regen",
+        "health_size",
+        "shield_size",
+        "lazer_gun",
+        "blaster_gun",
+        "shotgun",
 
+    ];
+    let mut name_to_image = HashMap::new();
+    for image_name in images.iter() {
+        let image_data = ThreadPin::new(
+            ImageData::new(&context, image_name).unwrap()
+        );
+        let image = specs_world
+            .create_entity()
+            .with(image_data)
+            .build();        
+        name_to_image.insert(image_name.to_string(), image);
+    }
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
         let nebula_image_data = ThreadPin::new(
@@ -222,123 +185,108 @@ pub fn run() -> Result<(), String> {
             .build();
         nebula_images.push(nebula_image);
     }
-    let background_image = specs_world
-        .create_entity()
-        .with(background_image_data)
-        .build();
-    let character_image = specs_world
-        .create_entity()
-        .with(character_image_data)
-        .build();
-    let asteroid_image = specs_world
-        .create_entity()
-        .with(asteroid_image_data)
-        .build();
-    let light_image = specs_world
-        .create_entity()
-        .with(light_image_data)
-        .build();
-    let light_sea_image = specs_world
-        .create_entity()
-        .with(light_sea_image_data)
-        .build();
-    let direction_image = specs_world
-        .create_entity()
-        .with(direction_image_data)
-        .build();
-    let enemy_projectile_image = specs_world
-        .create_entity()
-        .with(enemy_projectile_image_data)
-        .build();
-    let projectile_image = specs_world
-        .create_entity()
-        .with(projectile_image_data)
-        .build();
-    let enemy_image = specs_world
-        .create_entity()
-        .with(enemy_image_data)
-        .build();
-    let ship_speed_image = specs_world
-        .create_entity()
-        .with(ship_speed_image_data)
-        .build();
-    let bullet_speed_image = specs_world
-        .create_entity()
-        .with(bullet_speed_image_data)
-        .build();
-    let attack_speed_image = specs_world
-        .create_entity()
-        .with(attack_speed_image_data)
-        .build();
-    let enemy2_image = specs_world
-        .create_entity()
-        .with(enemy2_image_data)
-        .build();
-    let circle_image = specs_world
-        .create_entity()
-        .with(circle_image_data)
-        .build();
-    let rotation_speed_image = specs_world
-        .create_entity()
-        .with(rotation_speed_image_data)
-        .build();
-    let shield_regen_image = specs_world
-        .create_entity()
-        .with(shield_regen_image_data)
-        .build();
-    let health_regen_image = specs_world
-        .create_entity()
-        .with(health_regen_image_data)
-        .build();
-    let shield_size_image = specs_world
-        .create_entity()
-        .with(shield_size_image_data)
-        .build();
-    let health_size_image = specs_world
-        .create_entity()
-        .with(health_size_image_data)
-        .build();
-    let lazer_gun_image = specs_world
-        .create_entity()
-        .with(lazer_gun_image_data)
-        .build();
-    let blaster_image = specs_world
-        .create_entity()
-        .with(blaster_image_data)
-        .build();
-    let shotgun_image = specs_world
-        .create_entity()
-        .with(shotgun_image_data)
-        .build();
-    let enemy3_image = specs_world
-        .create_entity()
-        .with(enemy3_image_data)
-        .build();
-    let enemy4_image = specs_world
-        .create_entity()
-        .with(enemy4_image_data)
-        .build();
+
+    {   // load .ron files with tweaks 
+        use ron::de::from_reader;
+        use ron::ser::{PrettyConfig};
+        use serde::{Serialize, Deserialize};
+        use std::fs::File;
+
+        #[derive(Debug, Serialize, Deserialize)]
+        pub struct DescriptionSave {
+            player_ships_stats: Vec<ShipStats>,
+            enemies: Vec<EnemyKindSave>
+        }
+  
+        fn process_description(
+            description_save: DescriptionSave, 
+            name_to_image: &HashMap<String, specs::Entity>
+        ) -> Description {
+            Description {
+                player_ships_stats: description_save.player_ships_stats,
+                enemies: description_save.enemies.iter().map(
+                    |enemy| {
+                        load_enemy(enemy, name_to_image)
+                    })
+                .collect()
+            }
+        }
+
+        fn load_enemy(enemy_save: &EnemyKindSave, name_to_image: &HashMap<String, specs::Entity>) -> EnemyKind {
+            EnemyKind {
+                ai_kind: enemy_save.ai_kind,
+                gun_kind: enemy_save.gun_kind,
+                image: Image(name_to_image[&enemy_save.image_name])
+            }
+        }
+        #[derive(Debug, Serialize, Deserialize)]
+        pub struct EnemyKindSave {
+            pub ai_kind: AIType,
+            pub gun_kind: GunKind,
+            pub image_name: String,
+        };
+        let file = File::open("desc.ron").unwrap();
+        let desc: DescriptionSave = match from_reader(file) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("Failed to load config: {}", e);
+
+                std::process::exit(1);
+            }
+        };
+        let desc = process_description(desc, &name_to_image);
+        specs_world.add_resource(desc);
+        #[derive(Debug, Serialize, Deserialize)]
+        pub struct UpgradeCardSave {
+            upgrade_type: UpgradeType,
+            image: String,
+            name: String,
+            description: String            
+        }
+        let file = File::open("upgrades.ron").unwrap();
+        let mut upgrades: Vec<UpgradeCardSave> = match from_reader(file) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("Failed to load config: {}", e);
+
+                std::process::exit(1);
+            }
+        };
+        let upgrades: Vec<UpgradeCard> = upgrades.drain(..).map(
+            |upgrade| {
+                UpgradeCard {
+                    upgrade_type: upgrade.upgrade_type,
+                    image: Image(name_to_image[&upgrade.image]),
+                    name: upgrade.name,
+                    description: upgrade.description
+                }
+            }
+        ).collect();
+        let avaliable_upgrades = upgrades;
+        specs_world.add_resource(avaliable_upgrades);
+    }
+
     let preloaded_images = PreloadedImages {
-        character: character_image,
-        projectile: projectile_image,
-        enemy_projectile: enemy_projectile_image,
-        asteroid: asteroid_image,
-        enemy: enemy_image,
-        enemy2: enemy2_image,
-        enemy3: enemy3_image,
-        enemy4: enemy4_image,
-        background: background_image,
+        character: name_to_image["player_new"],
+        projectile: name_to_image["projectile"],
+        enemy_projectile: name_to_image["enemy_projectile"],
+        asteroid: name_to_image["asteroid"],
+        enemy: name_to_image["enemy1"],
+        enemy2: name_to_image["enemy2"],
+        enemy3: name_to_image["enemy3"],
+        enemy4: name_to_image["enemy4"],
+        background: name_to_image["back"],
         nebulas: nebula_images,
-        ship_speed_upgrade: ship_speed_image,
-        bullet_speed_upgrade: bullet_speed_image,
-        attack_speed_upgrade: attack_speed_image,
-        light_white: light_image,
-        light_sea: light_sea_image,
-        direction: direction_image,
-        circle: circle_image,
-        lazer: lazer_gun_image,
-        blaster: blaster_image,
-        shotgun: shotgun_image,
+        ship_speed_upgrade: name_to_image["ship_speed"],
+        bullet_speed_upgrade: name_to_image["bullet_speed"],
+        attack_speed_upgrade: name_to_image["attack_speed"],
+        light_white: name_to_image["light"],
+        light_sea: name_to_image["light_sea"],
+        direction: name_to_image["direction"],
+        circle: name_to_image["circle"],
+        lazer: name_to_image["lazer_gun"],
+        blaster: name_to_image["blaster_gun"],
+        shotgun: name_to_image["shotgun"],
     };
 
 
@@ -371,57 +319,6 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
-    let mut avaliable_upgrades = vec![
-        UpgradeCard {
-            upgrade_type: UpgradeType::AttackSpeed,
-            image: Image(preloaded_images.attack_speed_upgrade),
-            name: "Attack speed".to_string(),
-            description: "+ X% attack speed".to_string()
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::BulletSpeed,
-            image: Image(preloaded_images.bullet_speed_upgrade),
-            name: "Bullet speed".to_string(),
-            description: "+ X% bullet speed. Also by law of physics bullets go futher".to_string()
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::ShipSpeed,
-            image: Image(preloaded_images.ship_speed_upgrade),
-            name: "Ship speed".to_string(),
-            description: "+ X% attack speed".to_string()
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::ShipRotationSpeed,
-            image: Image(rotation_speed_image),
-            name: "Ship rotation speed".to_string(),
-            description: "Improves rotation speed by X%".to_string() 
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::ShieldRegen,
-            image: Image(shield_regen_image),
-            name: "Shield reneration".to_string(),
-            description: "+ 60 hp per sec".to_string()
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::HealthRegen,
-            image: Image(health_regen_image),
-            name: "Health regeneration".to_string(),
-            description: "+ 60 hp per sec".to_string()
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::ShieldSize,
-            image: Image(shield_size_image),
-            name: "Shield size".to_string(),
-            description: "More shield".to_string()
-        },
-        UpgradeCard {
-            upgrade_type: UpgradeType::HealthSize,
-            image: Image(health_size_image),
-            name: "Health size".to_string(),
-            description: "More health".to_string()
-        }
-    ];
-    specs_world.add_resource(avaliable_upgrades);
     let mut dispatcher = DispatcherBuilder::new()
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
@@ -462,7 +359,6 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(IngameUI::default());
     specs_world.add_resource(primitives_channel);
     specs_world.add_resource(Progress::default());
-    specs_world.add_resource(PlayerStats::default());
     // ------------------------------
 
     let mut events_loop = sdl_context.event_pump().unwrap();

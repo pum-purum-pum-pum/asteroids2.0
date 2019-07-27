@@ -35,6 +35,8 @@ derive_deref = "1.1.0"
 num_enum = "0.1.1"
 red = {path = "red"}
 glyph_brush = "0.5.3"
+ron = "0.5.1"
+serde = "1.0.97"
 
 [dependencies.sdl2]
 version = "0.32.2"

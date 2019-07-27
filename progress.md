@@ -1,14 +1,18 @@
-* add text
+* add text \/
 * move enemies,all stats, guns and ships etc into file for tweaking 
 * * balance enemies and player stats
 * redo gui
 * * button selection
-* * add score
+* * add score table
 
 * try move camera according to gun direction
 
 
 TODO LIST
+* new projectiles
+* * rocketes
+* * granades
+
 <!-- * Pick gun UI \/ -->
 <!-- * Don't slow down bullets \/ -->
 * enemies

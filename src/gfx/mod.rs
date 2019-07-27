@@ -1,23 +1,22 @@
 use crate::types::{*};
 use rand::prelude::*;
-use std::fs::File;
+
 use std::io::{BufReader, Error as IOError, Read};
-use std::str::FromStr;
-use std::collections::HashMap;
+
+
 use nalgebra::geometry::Orthographic3;
 
 use red;
 use red::VertexAttribPointers;
 use red::glow::Context;
 use red::glow;
-use red::shader::UniformValue;
+
 use image;
-use image::ImageError;
+
 use sdl2::rwops::RWops;
 use std::path::Path;
 use glyph_brush::{
-    BrushAction, BrushError, Section, rusttype::{Scale, Rect, point}, 
-    Layout, HorizontalAlign, VerticalAlign, GlyphBrush,
+    BrushAction, BrushError, rusttype::{Rect, point}, GlyphBrush,
     DefaultSectionHasher
 };
 use red::shader::Texture;
@@ -36,21 +35,18 @@ const ENGINE_FAR: f32 = 3f32;
 pub fn get_view(observer: Point3) -> Isometry3 {
     let mut target = observer.clone();
     target.z = Z_CANVAS;
-    Isometry3::look_at_lh(&observer, &target, &Vector3::y())
+    Isometry3::look_at_rh(&observer, &target, &Vector3::y())
 }
 
 
 pub fn perspective(width: u32, height: u32) -> Perspective3 {
     let aspect_ratio = width as f32 / height as f32;
-    Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 10.0)
+    Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 1000.0)
 }
 
-macro_rules! gl_assert_ok {
-    (gl_context) => {{
-        let err = gl_context.get_error();
-        // eprintln!("{:?}", gl_err_to_str(err));
-        assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));
-    }};
+fn gl_assert_ok(gl_context: &red::GL) {
+    let err = unsafe{gl_context.get_error()};
+    assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));    
 }
 
 fn gl_err_to_str(err: u32) -> &'static str {
@@ -199,7 +195,7 @@ pub fn load_texture(gl: &red::GL, name: &str) -> red::shader::Texture {
 pub fn create_shader_program(gl: &red::GL, name: &str, glsl_version: &str) -> Result<red::Program, String> {
     let vertex = format!("gles/v_{}.glsl", name);
     let fragment = format!("gles/f_{}.glsl", name);
-    let (mut vertex_shader, mut fragment_shader) = (
+    let (vertex_shader, fragment_shader) = (
         format!("{}\n{}", glsl_version, read_file(&vertex).unwrap()),
         format!("{}\n{}", glsl_version, read_file(&fragment).unwrap())
     );
@@ -267,9 +263,8 @@ impl Canvas {
     ) {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
-        let (w, h) = (dims.0 as f32, dims.1 as f32);
         let program = &self.program_glyph;
-        let transform: [[f32; 4]; 4] = orthographic(dims.0 as u32, dims.1 as u32).to_homogeneous().into();
+        let transform: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
 
 
         // TODO move to resource
@@ -296,7 +291,7 @@ impl Canvas {
                         glow::UNSIGNED_BYTE,
                         Some(tex_data),
                     );
-                    // gl_assert_ok!(gl)
+                    gl_assert_ok(&frame.gl)
                 },
                 to_vertex,
             );
@@ -422,7 +417,7 @@ impl Canvas {
         image_data: &ImageData,
         model: &Isometry3,
         scale: f32,
-        with_lights: bool,
+        _with_lights: bool,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -521,7 +516,7 @@ impl Canvas {
 }
 
 
-pub fn orthographic_from_zero(width: u32, height: u32) -> Orthographic3<f32> {
+pub fn _orthographic_from_zero(width: u32, height: u32) -> Orthographic3<f32> {
     Orthographic3::new(0f32, width as f32, 0f32, height as f32, -0.9, 0.0)
 } 
 

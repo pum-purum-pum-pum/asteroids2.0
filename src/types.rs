@@ -1,9 +1,9 @@
 use nalgebra;
 use std::mem;
 use std::thread::{self, ThreadId};
-use std::ops::{Deref, DerefMut, Index, IndexMut};
+use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
-use std::collections::HashMap;
+
 use hibitset::BitSetLike;
 use specs_derive::{Component};
 use specs::prelude::*;
@@ -20,7 +20,7 @@ pub type Point4 = nalgebra::Point4<f32>;
 pub type Matrix4 = nalgebra::Matrix4<f32>;
 pub type Vector2 = nalgebra::Vector2<f32>;
 pub type Vector3 = nalgebra::Vector3<f32>;
-pub type Vector4 = nalgebra::Vector4<f32>;
+pub type _Vector4 = nalgebra::Vector4<f32>;
 pub type Isometry3 = nalgebra::Isometry3<f32>;
 pub type Isometry2 = nalgebra::Isometry2<f32>;
 pub type Velocity2 = nphysics2d::algebra::Velocity2<f32>;
@@ -108,7 +108,7 @@ where
     }
 }
 
-pub struct RetainedStorage<C, T = UnprotectedStorage<C>> {
+pub struct RetainedStorage<C, T = dyn UnprotectedStorage<C>> {
     retained: Vec<C>,
     storage: T,
     phantom: PhantomData<C>,

@@ -6,9 +6,10 @@ pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
 pub use crate::gui::{Button, Rectangle};
 use crate::types::{*};
-use sdl2::mixer::Chunk;
-use sdl2::sys::SDL_Finger;
+
+
 use specs::prelude::*;
+use serde::{Serialize, Deserialize};
 use specs_derive::Component;
 use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
@@ -17,7 +18,6 @@ pub const MAX_LIFES: usize = 100usize;
 pub const ASTEROID_MAX_LIFES: usize = 100usize;
 pub const MAX_SHIELDS: usize = 100usize;
 pub const ENEMY_MAX_LIFES: usize = 20usize;
-pub const ENEMY_MAX_SHIELDS: usize = 20usize;
 
 
 pub const BULLET_SPEED_INIT: f32 = 0.5;
@@ -30,8 +30,18 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
-// TODO move in textBuffer or whatever
-pub struct TextVertNum(pub i32);
+#[derive(Debug)]
+pub struct Description {
+    pub player_ships_stats: Vec<ShipStats>,
+    pub enemies: Vec<EnemyKind>            
+}
+
+#[derive(Debug, Clone)]
+pub struct EnemyKind {
+    pub ai_kind: AIType,
+    pub gun_kind: GunKind,
+    pub image: Image,
+}
 
 #[derive(Clone, Copy)]
 pub enum EntityType {
@@ -88,7 +98,7 @@ pub enum InsertEvent {
     }
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct MenuChosedGun(pub Option<GunKind>);
 
 #[derive(Debug, Clone)]
@@ -106,7 +116,7 @@ pub type AvaliableUpgrades = Vec<UpgradeCard>;
 //     pub list: Vec<UpgradeCard>
 // }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum UpgradeType {
     AttackSpeed,
     BulletSpeed,
@@ -118,17 +128,14 @@ pub enum UpgradeType {
     HealthSize,
 }
 
-#[derive(Component, Debug, Clone, Copy)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum AIType {
     ShootAndFollow,
     Kamikadze
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct PlayerStats {
-    // pub attack_speed: f32,
-    pub bullet_speed: f32,
-    pub bullet_damage: f32,
+#[derive(Debug, Clone, Copy, Component, Serialize, Deserialize)]
+pub struct ShipStats {
     pub thrust_force: f32,
     pub torque: f32,
     pub health_regen: usize,
@@ -137,12 +144,9 @@ pub struct PlayerStats {
     pub max_shield: usize
 }
 
-impl Default for PlayerStats {
+impl Default for ShipStats {
     fn default() -> Self {
-        PlayerStats {
-            // attack_speed: 1f32,
-            bullet_speed: 0.5f32,
-            bullet_damage: 1f32,
+        Self {
             thrust_force: 0.003f32,
             torque: 0.2f32,
             health_regen: 1usize,
@@ -381,14 +385,14 @@ impl Lifetime {
 #[derive(Component, Debug, Clone)]
 pub struct AttachPosition(pub specs::Entity);
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum GunKind {
-    Blaster,
-    Lazer,
-    ShotGun
+    Blaster(Blaster),
+    Lazer(Lazer),
+    ShotGun(ShotGun)
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Lazer {
     pub damage: usize,
     pub active: bool,
@@ -443,23 +447,31 @@ pub trait Gun {
     ) -> Vec<InsertEvent>;
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct ShotGun {
     recharge_state: usize,
     pub recharge_time: usize,
     pub bullets_damage: usize,
     pub side_projectiles_number: usize,
     pub angle_shift: f32,
+    pub bullet_speed: f32,
 }
 
 impl ShotGun {
-    pub fn new(recharge_time: usize, bullets_damage: usize, side_projectiles_number: usize, angle_shift: f32) -> Self {
+    pub fn new(
+        recharge_time: usize, 
+        bullets_damage: usize, 
+        side_projectiles_number: usize, 
+        angle_shift: f32, 
+        bullet_speed: f32
+    ) -> Self {
         Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             side_projectiles_number: side_projectiles_number,
-            angle_shift: angle_shift
+            angle_shift: angle_shift,
+            bullet_speed: bullet_speed
         }
     }
 }
@@ -533,19 +545,21 @@ impl Gun for ShotGun {
 }
 
 /// gun reloading status and time
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct Blaster {
     recharge_state: usize,
     pub recharge_time: usize,
     pub bullets_damage: usize,
+    pub bullet_speed: f32,
 }
 
 impl Blaster {
-    pub fn new(recharge_time: usize, bullets_damage: usize) -> Self {
+    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32) -> Self {
         Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
-            bullets_damage: bullets_damage
+            bullets_damage: bullets_damage,
+            bullet_speed: bullet_speed,
         }
     }
 }
@@ -572,7 +586,6 @@ impl Gun for Blaster {
         ship_velocity: Vector2,
         owner: specs::Entity
     ) -> Vec<InsertEvent> {
-        let mut rng = thread_rng();
         let mut res = vec![];
         {
             let position = isometry.translation.vector;

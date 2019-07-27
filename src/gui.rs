@@ -1,9 +1,4 @@
 use crate::types::{*};
-use rand::prelude::*;
-use std::fs::File;
-use std::io::{BufReader, Error as IOError};
-use specs::prelude::*;
-use specs_derive::Component;
 use crate::components::{*};
 use crate::run::FINGER_NUMBER;
 
@@ -14,8 +9,8 @@ fn check_in(x:f32, a: f32, b: f32) -> bool {
 #[derive(Default)]
 pub struct IngameUI {
     // mouse controls
-    hover_id: Option<usize>,
-    pressed_id: Option<usize>,
+    _hover_id: Option<usize>,
+    _pressed_id: Option<usize>,
     // touch controls
     // for each finger we have id of pressed widget
     widget_finger: [Option<usize>; FINGER_NUMBER],
@@ -28,7 +23,7 @@ pub struct VecController {
     position: Point2, // screen position, center
     radius: f32,
     stick_radius: f32,
-    circle_image: Image,
+    _circle_image: Image,
     controller_geometry: Primitive,
 }
 
@@ -48,7 +43,7 @@ impl VecController {
             position: position,
             radius: radius,
             stick_radius: stick_radius,
-            circle_image: circle_image,
+            _circle_image: circle_image,
             controller_geometry: controller_geometry,
         }
     }
@@ -60,13 +55,11 @@ impl VecController {
             let previously_attached = 
                 ingame_ui.widget_finger[touch_id].is_some() && 
                 ingame_ui.widget_finger[touch_id].unwrap() == id;
-            let mut interacted = false;
             match touch {
                 Some(touch) => {
                     if self.is_in(touch) || previously_attached {
-                        interacted = true;
                         let mut new_pos = Point2::new(touch.x_o, touch.y_o);
-                        let mut dir = (new_pos - self.position);
+                        let mut dir = new_pos - self.position;
                         if dir.norm() > self.radius {
                             dir = dir.normalize() * self.radius;
                         }
@@ -79,10 +72,11 @@ impl VecController {
                         return Some(self.get_rad(new_pos))
                     };
                 }
-                _ => ()
-            }
-            if !interacted && previously_attached  {
-                ingame_ui.widget_finger[touch_id] = None;
+                None => {
+                    if previously_attached {
+                        ingame_ui.widget_finger[touch_id] = None;
+                    }
+                }
             }
         }
         ingame_ui.primitives.push(

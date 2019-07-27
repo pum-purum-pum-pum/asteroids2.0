@@ -1,11 +1,9 @@
 use crate::gfx::TextData;
-use glyph_brush::GlyphBrush;
+
 use super::*;
 use crate::gui::VecController;
-use glyph_brush::{BrushAction, BrushError, Section, rusttype::Scale, Layout, HorizontalAlign, VerticalAlign};
-use red::glow;
-use red::glow::Context;
-use red::shader::Texture;
+use glyph_brush::{Section, rusttype::Scale};
+
 
 pub struct MenuRenderingSystem {
     reader: ReaderId<Primitive>,
@@ -21,26 +19,9 @@ impl MenuRenderingSystem {
 
 impl<'a> System<'a> for MenuRenderingSystem {
     type SystemData = (
-     (
-        Entities<'a>,
-        ReadStorage<'a, Isometry>,
-        ReadStorage<'a, Velocity>,
-        ReadStorage<'a, PhysicsComponent>,
-        ReadStorage<'a, CharacterMarker>,
-        ReadStorage<'a, ShipMarker>,
-        ReadStorage<'a, AsteroidMarker>,
-        ReadStorage<'a, LightMarker>,
-        ReadStorage<'a, NebulaMarker>,
-        ReadStorage<'a, Projectile>,
         ReadStorage<'a, ThreadPin<ImageData>>,
-        ReadStorage<'a, Image>,
-        ReadStorage<'a, Geometry>,
-        ReadStorage<'a, Size>,
-        ReadStorage<'a, Polygon>,
         ReadExpect<'a, ThreadPin<red::GL>>,
-    ),
         WriteExpect<'a, Canvas>,
-        Read<'a, World<f32>>,
         ReadExpect<'a, red::Viewport>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
@@ -54,31 +35,14 @@ impl<'a> System<'a> for MenuRenderingSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            (
-                entities,
-                isometries,
-                velocities,
-                physics,
-                character_markers,
-                ship_markers,
-                asteroid_markers,
-                light_markers,
-                nebulas,
-                projectiles,
-                image_datas,
-                image_ids,
-                geometries,
-                sizes,
-                polygons,
-                gl,
-            ),
-            mut canvas,
-            world,
+            image_datas,
+            gl,
+            canvas,
             viewport,
             mut primitives_channel,
             mut ui,
             mut insert_channel,
-            mut preloaded_images,
+            preloaded_images,
             mouse,
             mut app_state,
             // text_data
@@ -94,7 +58,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
 
         let (button_w, button_h) = (w/4f32, h/4f32);
         let lazer_button = Button::new(
-            Point2::new(0f32, h - button_h),
+            Point2::new(0f32, button_h / 2f32),
             button_w,
             button_h,
             Point3::new(0f32, 0f32, 0f32),
@@ -103,7 +67,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             "Lazer gun".to_string()
         );
         let blaster_button = Button::new(
-            Point2::new(button_w + 0.1, h - button_h),
+            Point2::new(button_w + 0.1, button_h / 2f32),
             button_w,
             button_h,
             Point3::new(0f32, 0f32, 0f32),
@@ -113,7 +77,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         );
 
         let shotgun_button = Button::new(
-            Point2::new(2.0 * button_w + 0.1, h - button_h),
+            Point2::new(2.0 * button_w + 0.1, button_h / 2f32),
             button_w,
             button_h,
             Point3::new(0f32, 0f32, 0f32),
@@ -121,18 +85,17 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Some(Image(preloaded_images.shotgun)),
             "Lazer gun".to_string()
         );
-        
         if lazer_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(GunKind::Lazer)
+            chosed_gun.0 = Some(GunKind::Lazer(Lazer::new(1usize, 8f32)))
         }
         if blaster_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(GunKind::Blaster)
+            chosed_gun.0 = Some(GunKind::Blaster(Blaster::new(12usize, 10usize, 0.5)))
         }
         if shotgun_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(GunKind::ShotGun)
+            chosed_gun.0 = Some(GunKind::ShotGun(ShotGun::new(30usize, 10usize, 1, 0.25, 0.5)))
         }
         let button = Button::new(
-            Point2::new(w/2.0 - button_w / 2.0, 0f32), 
+            Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
             // Point2::new(0f32, 0f32),
             button_w, 
             button_h, 
@@ -205,31 +168,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
                         ..Section::default()
                     });
                 }
-                _ => ()
             }
         }
-        // target.finish().unwrap();
-
-        // text_data.glyph_brush.queue(Section {
-        //     text: &"texttexttexttexttexttexttexttexttexttexttexttexttexttexttexttexttext",
-        //     scale,
-        //     screen_position: (0.0, 0.0),
-        //     bounds: (w /3.15, h),
-        //     color: [0.9, 0.3, 0.3, 1.0],
-        //     ..Section::default()
-        // });
-        // text_data.glyph_brush.queue(Section {
-        //     text: &"text",
-        //     scale,
-        //     screen_position: (w / 2.0, h / 2.0),
-        //     bounds: (w / 3.15, h),
-        //     color: [0.3, 0.9, 0.3, 1.0],
-        //     layout: Layout::default()
-        //         .h_align(HorizontalAlign::Center)
-        //         .v_align(VerticalAlign::Center),
-        //     ..Section::default()
-        // });
-
         canvas.render_text(
             &mut text_data,
             &viewport,
@@ -254,16 +194,14 @@ impl<'a> System<'a> for GUISystem {
         ReadStorage<'a, Shield>,
         WriteStorage<'a, Spin>,
         WriteStorage<'a, Blaster>,
+        WriteStorage<'a, ShipStats>,
         ReadExpect<'a, red::Viewport>,
-        WriteExpect<'a, Canvas>,
-        // ReadExpect<'a, PreloadedParticles>,
         Write<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         Read<'a, Progress>,
         Write<'a, AppState>,
         Read<'a, Mouse>,
-        Write<'a, PlayerStats>,
         WriteExpect<'a, PreloadedImages>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, Touches>,
@@ -284,29 +222,27 @@ impl<'a> System<'a> for GUISystem {
             lifes,
             shields,
             mut spins,
-            mut guns,
+            mut blasters,
+            mut ships_stats,
             viewport,
-            mut canvas,
             // preloaded_particles,
             mut world,
-            mut primitives_channel,
+            _primitives_channel,
             mut ingame_ui,
             progress,
             mut app_state,
             mouse,
-            mut player_stats,
-            mut preloaded_images,
+            preloaded_images,
             preloaded_sounds,
-            mut touches,
+            touches,
             mut sounds_channel,
             mut insert_channel,
             avaliable_upgrades,
             mut spawned_upgrades,
         ) = data;
-        let (character, _) = (&entities, &character_markers).join().next().unwrap();
+        let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
-        let dims = (dims.0 as u32, dims.1 as u32);
         
         //contorls
         let stick_size = w / 80.0;
@@ -339,16 +275,14 @@ impl<'a> System<'a> for GUISystem {
                     (*character_body.position(), *character_body.velocity())
                 };
 
-
-                for (entity, iso, _vel, spin, _char_marker) in (
-                    &entities,
+                for (iso, _vel, spin, _char_marker) in (
                     &isometries,
                     &mut velocities,
                     &mut spins,
                     &character_markers,
                 ).join()
                 {
-                    let player_torque = dt
+                    let player_torque = DT
                         * calculate_player_ship_spin_for_aim(
                             dir,
                             iso.rotation(),
@@ -360,7 +294,7 @@ impl<'a> System<'a> for GUISystem {
 
                 // let rotation = isometries.get(character).unwrap().0.rotation;
                 // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
-                let thrust = player_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
+                let thrust = ship_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
                 *character_velocity.as_vector_mut() += thrust;
                 let character_body = world
                     .rigid_body_mut(physics.get(character).unwrap().body_handle)
@@ -377,13 +311,13 @@ impl<'a> System<'a> for GUISystem {
         ) {
             Some(dir) => {
                 let dir = dir.normalize();
-                let gun = guns.get_mut(character);
-                if let Some(gun) = gun {
-                    if gun.shoot() {
+                let blaster = blasters.get_mut(character);
+                if let Some(blaster) = blaster {
+                    if blaster.shoot() {
                         let isometry = *isometries.get(character).unwrap();
                         let position = isometry.0.translation.vector;
                         // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                        let velocity_rel = player_stats.bullet_speed * dir;
+                        let velocity_rel = blaster.bullet_speed * dir;
                         let char_velocity = velocities.get(character).unwrap();
                         let projectile_velocity = Velocity::new(
                             char_velocity.0.x + velocity_rel.x,
@@ -395,7 +329,7 @@ impl<'a> System<'a> for GUISystem {
                             kind: EntityType::Player,
                             iso: Point3::new(position.x, position.y, rotation.angle()),
                             velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                            damage: gun.bullets_damage,
+                            damage: blaster.bullets_damage,
                             owner: character,
                         });
                     }
@@ -468,7 +402,6 @@ impl<'a> System<'a> for GUISystem {
         let mut choosed_upgrade = None;
         let (upgrade_button_w, upgrade_button_h) = ((w/4f32).min(h/2f32), (w/4f32).min(h/2f32));
         let shift = upgrade_button_h / 10f32;
-        let mut rng = thread_rng();
         match *app_state {
             AppState::Play(PlayState::Upgrade) => {
                 let upgrades = spawned_upgrades.last();
@@ -476,7 +409,7 @@ impl<'a> System<'a> for GUISystem {
                     let mut chosed = false;
                     for (i, upg_id) in upgrades.iter().enumerate() {
                         let upg = &avaliable_upgrades[*upg_id];
-                        let mut current_point = 
+                        let current_point = 
                             Point2::new(
                                 i as f32 * (upgrade_button_w + shift), 
                                 h - upgrade_button_h - shift
@@ -524,7 +457,7 @@ impl<'a> System<'a> for GUISystem {
             Some(choosed_upgrade) => {
                 match choosed_upgrade {
                     UpgradeType::AttackSpeed => {
-                        match guns.get_mut(character) {
+                        match blasters.get_mut(character) {
                             Some(gun) => {
                                 gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
                             }
@@ -532,25 +465,30 @@ impl<'a> System<'a> for GUISystem {
                         }
                     }
                     UpgradeType::ShipSpeed => {
-                        player_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
+                        ship_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
                     }
                     UpgradeType::ShipRotationSpeed => {
-                        player_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
+                        ship_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
                     }
                     UpgradeType::BulletSpeed => {
-                        player_stats.bullet_speed += 0.1 * BULLET_SPEED_INIT;
+                        match blasters.get_mut(character) {
+                            Some(gun) => {
+                                gun.bullet_speed += 0.1 * BULLET_SPEED_INIT;
+                            }
+                            None => ()
+                        }
                     }
                     UpgradeType::HealthRegen => {
-                        player_stats.health_regen += 1;
+                        ship_stats.health_regen += 1;
                     }
                     UpgradeType::ShieldRegen => {
-                        player_stats.shield_regen += 1;
+                        ship_stats.shield_regen += 1;
                     }
                     UpgradeType::HealthSize => {
-                        player_stats.max_health += 20;
+                        ship_stats.max_health += 20;
                     }
                     UpgradeType::ShieldSize => {
-                        player_stats.max_shield += 20;
+                        ship_stats.max_shield += 20;
                     }
                 }
             }
@@ -560,12 +498,6 @@ impl<'a> System<'a> for GUISystem {
         // lifes and shields bars
         for (isometry, life, shield, _ship) in (&isometries, &lifes, &shields, &ship_markers).join() {
             let position = isometry.0.translation.vector;
-            // let position = unproject_with_z(
-            //     canvas.observer(), 
-            //     &Point2::new(position.x, position.y), 
-            //     1f32, dims.0, dims.1
-            // );
-            // let position = ortho_unproject(dims.0, dims.1, Point2::new(position.x, position.y));
             let ship_lifes_bar = Rectangle {
                 position: Point2::new(position.x, position.y),
                 width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
@@ -667,11 +599,8 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Projectile>,
             ReadStorage<'a, ThreadPin<ImageData>>,
             ReadStorage<'a, Image>,
-            ReadStorage<'a, Geometry>,
             ReadStorage<'a, Size>,
             ReadStorage<'a, Polygon>,
-            ReadStorage<'a, Lifes>,
-            ReadStorage<'a, Shield>,
             ReadStorage<'a, Lazer>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
@@ -682,10 +611,6 @@ impl<'a> System<'a> for RenderingSystem {
         Read<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
-        Read<'a, Progress>,
-        Write<'a, AppState>,
-        Read<'a, Mouse>,
-        // ReadExpect<'a, ThreadPin<TextData>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -703,11 +628,8 @@ impl<'a> System<'a> for RenderingSystem {
                 projectiles,
                 image_datas,
                 image_ids,
-                geometries,
                 sizes,
                 polygons,
-                lifes,
-                shields,
                 lazers,
                 mut particles_datas,
             ),
@@ -718,13 +640,7 @@ impl<'a> System<'a> for RenderingSystem {
             world,
             mut primitives_channel,
             mut ingame_ui,
-            progress,
-            mut app_state,
-            mouse,
-            // text_data
         ) = data;
-        let dims = viewport.dimensions();
-        let dims = (dims.0 as u32, dims.1 as u32);
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
         frame.clear_color();
@@ -797,7 +713,7 @@ impl<'a> System<'a> for RenderingSystem {
                 match **particles_data {
                     ParticlesData::Engine(ref mut particles) => {
                         let mut direction = Vector3::new(0f32, 1f32, 0f32);
-                        direction = (char_iso * direction);
+                        direction = char_iso * direction;
                         if particles.update(
                             Vector2::new(char_pos.x, char_pos.y),
                             Vector2::new(char_vel.x, char_vel.y),
@@ -862,17 +778,6 @@ impl<'a> System<'a> for RenderingSystem {
                 }
                 _ => panic!(),
             };
-            // canvas
-            //     .render_geometry(
-            //         &gl,
-            //         &viewport,
-            //         &mut frame,
-            //         &vao,
-            //         &geom_data,
-            //         &Isometry3::identity(),
-            //         true,
-            //     )
-            //     .unwrap();
         }
 
          for (_entity, iso, image, size, _projectile) in
@@ -888,21 +793,11 @@ impl<'a> System<'a> for RenderingSystem {
                     size.0,
                     false
                 );
-            // canvas
-            //     .render(
-            //         &display,
-            //         &mut target,
-            //         &image_datas.get(image.0).unwrap(),
-            //         &iso.0,
-            //         size.0,
-            //         false,
-            //     );
         }
         for (_entity, iso, image, size, _light) in
             (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
         {
-            let mut translation_vec = iso.0.translation.vector;
-            // translation_vec.z = canvas.get_z_shift();
+            let translation_vec = iso.0.translation.vector;
             let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             canvas
                 .render(
@@ -933,9 +828,6 @@ impl<'a> System<'a> for RenderingSystem {
                         size.0,
                         false,
                     )
-                // canvas
-                //     .render(&display, &mut target, &image_datas.get(image.0).unwrap(), &iso, size.0, true)
-                //     .unwrap();
         }
         for (_entity, iso, _image, _size, polygon, _asteroid) in (
             &entities,
@@ -950,7 +842,6 @@ impl<'a> System<'a> for RenderingSystem {
             let triangulation = polygon.triangulate();
             let geom_data =
                 GeometryData::new(&gl, &triangulation.points, &triangulation.indicies).unwrap();
-            // dbg!("{:?}", triangulation);
             canvas
                 .render_geometry(
                     &gl, &viewport, 
@@ -965,10 +856,8 @@ impl<'a> System<'a> for RenderingSystem {
                 let w = 0.05f32;
                 let positions = [
                     Point2::new(-w / 2.0, 0f32),
-                    // Point2::new(-w / 2.0, -h),
-                    // Point2::new(w / 2.0, -h),
                     Point2::new(w / 2.0, 0f32),
-                    Point2::new(0.0, -h)
+                    Point2::new(0.0, -h) // hmmmmm, don't know why minus
                 ];
                 // let indices = [0u16, 1, 2, 2, 3, 0];
                 let indices = [0u16, 1, 2];
@@ -1017,23 +906,12 @@ impl<'a> System<'a> for RenderingSystem {
                     }
                 }
                 Primitive {
-                    kind: PrimitiveKind::Text(text),
+                    kind: PrimitiveKind::Text(_text),
                     with_projection: _,
                     image: _
                 } => {
-                    let scale = 30f32;
-                    let orthographic = orthographic(dims.0, dims.1).to_homogeneous();
-                    let view = get_view(canvas.observer()).to_homogeneous();
-                    let model = Translation::from(Vector3::new(text.position.x, text.position.y, -1f32))
-                        .to_homogeneous();
-                    let mut scaler = scale * Matrix4::identity();
-                    let scale_len = scaler.len();
-                    scaler[scale_len - 1] = 1.0;
-                    let matrix = orthographic * model * scaler;
-                    // let text = glium_text_rusttype::TextDisplay::new(&text_data.text_system, &text_data.font, &text.text);
-                    // glium_text_rusttype::draw(&text, &text_data.text_system, &mut target, matrix, (1.0, 1.0, 1.0, 1.0));
+
                 }
-                _ => ()
             }
         }
     }

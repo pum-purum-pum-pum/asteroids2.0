@@ -4,9 +4,6 @@ use crate::nalgebra::Rotation2;
 use crate::types::{*};
 use sdl2::mixer::{InitFlag, AUDIO_S16LSB, DEFAULT_CHANNELS};
 use std::path::Path;
-use std::str::FromStr;
-use std::collections::HashMap;
-use std::io::{Write, Read};
 
 #[test]
 fn rotation() {
@@ -50,105 +47,105 @@ fn sound() -> Result<(), String> {
 
 
 
-fn is_precision(word: &str) -> bool {
-    let precision = vec![
-        "vec2",
-        "vec4",
-        "vec3",
-        "mat2",
-        "mat3",
-        "mat4",
-        "mat5",
-        "float",
-    ];
-    for p in precision.iter() {
-        if word == *p {
-            return true;
-        }
-    }
-    false
-}
+// fn is_precision(word: &str) -> bool {
+//     let precision = vec![
+//         "vec2",
+//         "vec4",
+//         "vec3",
+//         "mat2",
+//         "mat3",
+//         "mat4",
+//         "mat5",
+//         "float",
+//     ];
+//     for p in precision.iter() {
+//         if word == *p {
+//             return true;
+//         }
+//     }
+//     false
+// }
 
-#[derive(PartialEq)]
-pub enum ShaderType {
-    Vertex,
-    Fragment
-}
+// #[derive(PartialEq)]
+// pub enum ShaderType {
+//     Vertex,
+//     Fragment
+// }
 
-pub enum Version {
-    V300,
-    V100,
-}
+// pub enum Version {
+//     V300,
+//     V100,
+// }
 
-pub fn glesit(src: &str, shader_type: ShaderType, to_version: Version) -> String {
-    let lines: Vec<_> = src.split("\n").collect();
-    let mut find_and_replace = match to_version {
-        Version::V300 => {
-            match shader_type {
-                ShaderType::Vertex => {
-                    vec![("#version 130", "#version 300 es")]
-                }
-                ShaderType::Fragment => {
-                    vec![
-                        ("#version 130", "#version 300 es\nout mediump vec4  astro_FragColor;"),
-                        ("gl_FragColor", "astro_FragColor")
-                    ]
-                }
-            }
-        }
-        Version::V100 => {
-            let mut res = vec![("#version 130", "#version 100")];
-            match shader_type {
-                ShaderType::Fragment => {
-                    res.push(("texture(", "texture2D("));
-                }
-                ShaderType::Vertex => ()
-            };
-            res
-        }
-    };
-    let mut subst = HashMap::new();
-    match to_version {
-        Version::V100 => {
-            match shader_type {
-                ShaderType::Vertex => {
-                    subst.insert("in", "attribute");
-                }
-                ShaderType::Fragment => {
-                    subst.insert("in", "varying");
-                }
-            }
-            subst.insert("out", "varying");
-        }
-        Version::V300 => {}
-    };
-    let mut new_lines = vec!();
-    for line in lines.iter() {
-        let words: Vec<_> = line.split(" ").collect();
-        let mut new_words = vec![];
-        let mut last_word = String::new();
-        for w in words.iter() {
-            if is_precision(w) && (last_word != "in".to_string() || shader_type == ShaderType::Fragment) {
-                new_words.push("mediump".to_string());
-            }
-            match subst.get(w) {
-                Some(&new_word) => {
-                    new_words.push(String::from_str(new_word).unwrap())
-                }
-                None => {
-                    new_words.push(String::from_str(w).unwrap())
-                }
-            }
-            last_word = String::from_str(w).unwrap();
-        }
-        let mut new_line = new_words.join(" ");
-        for (f, r) in find_and_replace.iter() {
-            new_line = new_line.replace(f, r);
-        }
-        new_lines.push(new_line)
-    }
-    new_lines.join("\n")
-}
+// pub fn glesit(src: &str, shader_type: ShaderType, to_version: Version) -> String {
+//     let lines: Vec<_> = src.split("\n").collect();
+//     let mut find_and_replace = match to_version {
+//         Version::V300 => {
+//             match shader_type {
+//                 ShaderType::Vertex => {
+//                     vec![("#version 130", "#version 300 es")]
+//                 }
+//                 ShaderType::Fragment => {
+//                     vec![
+//                         ("#version 130", "#version 300 es\nout mediump vec4  astro_FragColor;"),
+//                         ("gl_FragColor", "astro_FragColor")
+//                     ]
+//                 }
+//             }
+//         }
+//         Version::V100 => {
+//             let mut res = vec![("#version 130", "#version 100")];
+//             match shader_type {
+//                 ShaderType::Fragment => {
+//                     res.push(("texture(", "texture2D("));
+//                 }
+//                 ShaderType::Vertex => ()
+//             };
+//             res
+//         }
+//     };
+//     let mut subst = HashMap::new();
+//     match to_version {
+//         Version::V100 => {
+//             match shader_type {
+//                 ShaderType::Vertex => {
+//                     subst.insert("in", "attribute");
+//                 }
+//                 ShaderType::Fragment => {
+//                     subst.insert("in", "varying");
+//                 }
+//             }
+//             subst.insert("out", "varying");
+//         }
+//         Version::V300 => {}
+//     };
+//     let mut new_lines = vec!();
+//     for line in lines.iter() {
+//         let words: Vec<_> = line.split(" ").collect();
+//         let mut new_words = vec![];
+//         let mut last_word = String::new();
+//         for w in words.iter() {
+//             if is_precision(w) && (last_word != "in".to_string() || shader_type == ShaderType::Fragment) {
+//                 new_words.push("mediump".to_string());
+//             }
+//             match subst.get(w) {
+//                 Some(&new_word) => {
+//                     new_words.push(String::from_str(new_word).unwrap())
+//                 }
+//                 None => {
+//                     new_words.push(String::from_str(w).unwrap())
+//                 }
+//             }
+//             last_word = String::from_str(w).unwrap();
+//         }
+//         let mut new_line = new_words.join(" ");
+//         for (f, r) in find_and_replace.iter() {
+//             new_line = new_line.replace(f, r);
+//         }
+//         new_lines.push(new_line)
+//     }
+//     new_lines.join("\n")
+// }
 
 // #[test]
 // fn gles() {

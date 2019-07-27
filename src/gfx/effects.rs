@@ -221,7 +221,7 @@ impl Engine {
     pub fn update(
         &mut self, 
         ship_position: Vector2,
-        ship_velocity: Vector2,
+        _ship_velocity: Vector2,
         ship_direction: Vector2,
     ) -> bool {
         let instanced = self.instancing_data.per_instance.map_array().unwrap();
