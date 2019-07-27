@@ -1,0 +1,47 @@
+(
+    player_ships_stats: [],
+    enemies: [
+        (
+            ai_kind: Kamikadze,
+            gun_kind: Blaster((
+                recharge_state: 0,
+                recharge_time: 12,
+                bullets_damage: 10,
+                bullet_speed: 0.5,
+            )),
+            image_name: "enemy2",
+        ),
+        (
+            ai_kind: ShootAndFollow,
+            gun_kind: Lazer((
+                damage: 1,
+                active: false,
+                distance: 8,
+                current_distance: 8,
+            )),
+            image_name: "enemy4",
+        ),
+        (
+            ai_kind: ShootAndFollow,
+            gun_kind: ShotGun((
+                recharge_state: 0,
+                recharge_time: 30,
+                bullets_damage: 10,
+                side_projectiles_number: 5,
+                angle_shift: 0.35,
+                bullet_speed: 0.5,
+            )),
+            image_name: "enemy3",
+        ),
+        (
+            ai_kind: ShootAndFollow,
+            gun_kind: Blaster((
+                recharge_state: 0,
+                recharge_time: 12,
+                bullets_damage: 10,
+                bullet_speed: 0.5,
+            )),
+            image_name: "enemy1",
+        ),
+    ],
+)

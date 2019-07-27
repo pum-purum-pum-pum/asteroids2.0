@@ -1,0 +1,50 @@
+[
+    (
+        upgrade_type: AttackSpeed,
+        image: "attack_speed",
+        name: "Attack speed",
+        description: "+ X% attack speed",
+    ),
+    (
+        upgrade_type: BulletSpeed,
+        image: "bullet_speed",
+        name: "Bullet speed",
+        description: "+ X% bullet speed. Also by law of physics bullets go futher",
+    ),
+    (
+        upgrade_type: ShipSpeed,
+        image: "ship_speed",
+        name: "Ship speed",
+        description: "+ X% attack speed",
+    ),
+    (
+        upgrade_type: ShipRotationSpeed,
+        image: "rotation_speed",
+        name: "Ship rotation speed",
+        description: "Improves rotation speed by X%",
+    ),
+    (
+        upgrade_type: ShieldRegen,
+        image: "shield_regen",
+        name: "Shield reneration",
+        description: "+ 60 hp per sec",
+    ),
+    (
+        upgrade_type: HealthRegen,
+        image: "health_regen",
+        name: "Health regeneration",
+        description: "+ 60 hp per sec",
+    ),
+    (
+        upgrade_type: ShieldSize,
+        image: "shield_size",
+        name: "Shield size",
+        description: "More shield",
+    ),
+    (
+        upgrade_type: HealthSize,
+        image: "health_size",
+        name: "Health size",
+        description: "More health",
+    ),
+]
