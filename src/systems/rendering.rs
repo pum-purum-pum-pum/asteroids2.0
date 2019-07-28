@@ -38,7 +38,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (
             image_datas,
             gl,
-            canvas,
+            mut canvas,
             viewport,
             mut primitives_channel,
             mut ui,
@@ -116,72 +116,97 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 chosed_gun.0 = None;
             }
         }
-        let scale = Scale::uniform((0.3 * mouse.hdpi as f32).round());
         primitives_channel.iter_write(ui.primitives.drain(..));
-        for primitive in primitives_channel.read(&mut self.reader) {
-            match primitive {
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(rectangle),
-                    with_projection,
-                    image
-                } => {
-                    let (model, points, indicies) = rectangle.get_geometry();
-                    let geom_data =
-                        GeometryData::new(&gl, &points, &indicies).unwrap();
-                    match image {
-                        Some(image) => {
-                            canvas
-                                .render_primitive_texture(
-                                    &gl, 
-                                    &viewport,
-                                    &mut frame, 
-                                    image_datas.get(image.0).unwrap(),
-                                    &model, 
-                                    *with_projection, 
-                                    rectangle.height
-                                );
-                        }
-                        None => {
-                            let fill_color = rectangle.color;
-                            canvas.render_primitive(
-                                &gl,
-                                &viewport,
-                                &mut frame,
-                                &geom_data,
-                                &model,
-                                (fill_color.x, fill_color.y, fill_color.z),
-                                *with_projection
-                            );
-                            // canvas
-                            //     .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
-                            //     .unwrap();
-
-                        }
-                    }
-                }
-                Primitive {
-                    kind: PrimitiveKind::Text(text),
-                    with_projection: _,
-                    image: _
-                } => {
-                    text_data.glyph_brush.queue(Section {
-                        text: &text.text,
-                        scale,
-                        screen_position: (text.position.x, text.position.y),
-                        bounds: (w /3.15, h),
-                        color: [1.0, 1.0, 1.0, 1.0],
-                        ..Section::default()
-                    });
-                }
-            }
-        }
-        canvas.render_text(
-            &mut text_data,
+        render_primitives(
+            &mouse,
+            &mut self.reader,
+            &mut frame,
+            &image_datas,
+            &gl,
+            &mut canvas,
             &viewport,
-            &mut frame
+            &mut primitives_channel,
+            &mut text_data,
         );
     }
+}
 
+pub fn render_primitives<'a>(
+    mouse: &Read<'a, Mouse>,
+    reader: &mut ReaderId<Primitive>,
+    frame: &mut red::Frame,
+    image_datas: &ReadStorage<'a, ThreadPin<ImageData>>,
+    gl: &ReadExpect<'a, ThreadPin<red::GL>>,
+    canvas: &mut WriteExpect<'a, Canvas>,
+    viewport: &ReadExpect<'a, red::Viewport>,
+    primitives_channel: &mut Write<'a, EventChannel<Primitive>>,
+    text_data: &mut WriteExpect<'a, ThreadPin<TextData<'static>>>,
+) {
+    let dims = viewport.dimensions();
+    let (w, h) = (dims.0 as f32, dims.1 as f32);
+    let scale = Scale::uniform((0.3 * mouse.hdpi as f32).round());
+    for primitive in primitives_channel.read(reader) {
+        match primitive {
+            Primitive {
+                kind: PrimitiveKind::Rectangle(rectangle),
+                with_projection,
+                image
+            } => {
+                let (model, points, indicies) = rectangle.get_geometry();
+                let geom_data =
+                    GeometryData::new(&gl, &points, &indicies).unwrap();
+                match image {
+                    Some(image) => {
+                        canvas
+                            .render_primitive_texture(
+                                &gl, 
+                                &viewport,
+                                frame, 
+                                image_datas.get(image.0).unwrap(),
+                                &model, 
+                                *with_projection, 
+                                rectangle.height
+                            );
+                    }
+                    None => {
+                        let fill_color = rectangle.color;
+                        canvas.render_primitive(
+                            &gl,
+                            &viewport,
+                            frame,
+                            &geom_data,
+                            &model,
+                            (fill_color.x, fill_color.y, fill_color.z),
+                            *with_projection
+                        );
+                        // canvas
+                        //     .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
+                        //     .unwrap();
+
+                    }
+                }
+            }
+            Primitive {
+                kind: PrimitiveKind::Text(text),
+                with_projection: _,
+                image: _
+            } => {
+                text_data.glyph_brush.queue(Section {
+                    text: &text.text,
+                    scale,
+                    screen_position: (text.position.x, text.position.y),
+                    bounds: (w /3.15, h),
+                    color: [1.0, 1.0, 1.0, 1.0],
+                    ..Section::default()
+                });
+            }
+        }
+    }
+    canvas.render_text(
+        text_data,
+        &viewport,
+        frame
+    );
 }
 
 #[derive(Default)]
@@ -214,6 +239,7 @@ impl<'a> System<'a> for GUISystem {
         Write<'a, EventChannel<InsertEvent>>,
         Read<'a, AvaliableUpgrades>,
         Write<'a, SpawnedUpgrades>,
+        WriteExpect<'a, ChoosedUpgrade>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -244,6 +270,7 @@ impl<'a> System<'a> for GUISystem {
             mut insert_channel,
             avaliable_upgrades,
             mut spawned_upgrades,
+            mut choosed_upgrade
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -439,14 +466,14 @@ impl<'a> System<'a> for GUISystem {
         // };
 
         // upgrade UI
-        let mut choosed_upgrade = None;
+        let mut current_upgrade = None;
         let (upgrade_button_w, upgrade_button_h) = ((w/4f32).min(h/2f32), (w/4f32).min(h/2f32));
+        let (choose_button_w, choose_button_h) = (w/6f32, h/12f32);
         let shift = upgrade_button_h / 10f32;
         match *app_state {
             AppState::Play(PlayState::Upgrade) => {
                 let upgrades = spawned_upgrades.last();
                 if let Some(upgrades) = upgrades {
-                    let mut chosed = false;
                     for (i, upg_id) in upgrades.iter().enumerate() {
                         let upg = &avaliable_upgrades[*upg_id];
                         let current_point = 
@@ -463,21 +490,30 @@ impl<'a> System<'a> for GUISystem {
                             upg.name.clone()
                         );
                         if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
-                            choosed_upgrade = Some(upg.upgrade_type);
-                            *app_state = AppState::Play(PlayState::Action);
+                            // choosed_upgrade = Some(upg.upgrade_type);
+                            choosed_upgrade.0 = *upg_id;
+                            // *app_state = AppState::Play(PlayState::Action);
                             // with multytouch things it's not cheatable
-                            chosed = true;
                         }
                     }
-                    if chosed {
-                        spawned_upgrades.pop();
-                    }
+                }
+                let select_upgrade = Button::new(
+                    Point2::new(w / 2.0, choose_button_h),
+                    choose_button_w, choose_button_h, 
+                    white_color.clone(), 
+                    false,
+                    None,
+                    "Upgrade!".to_string()
+                );
+
+                if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
+                    current_upgrade = Some(avaliable_upgrades[choosed_upgrade.0].upgrade_type);
+                    spawned_upgrades.pop();
                 }
 
-
                 let done_button = Button::new(
-                    Point2::new(w / 2.0, 0.0),
-                    upgrade_button_w, upgrade_button_h, 
+                    Point2::new(w / 2.0, 2.0 * choose_button_w),
+                    choose_button_w, choose_button_h, 
                     white_color.clone(), 
                     false,
                     None,
@@ -493,7 +529,7 @@ impl<'a> System<'a> for GUISystem {
             _ => ()
         }
 
-        match choosed_upgrade {
+        match current_upgrade {
             Some(choosed_upgrade) => {
                 match choosed_upgrade {
                     UpgradeType::AttackSpeed => {
@@ -614,6 +650,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Lazer>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
+        Read<'a, Mouse>,
         ReadExpect<'a, ThreadPin<red::GL>>,
         ReadExpect<'a, red::Viewport>,
         WriteExpect<'a, Canvas>,
@@ -621,6 +658,7 @@ impl<'a> System<'a> for RenderingSystem {
         Read<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
+        WriteExpect<'a, ThreadPin<TextData<'static>>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -643,6 +681,7 @@ impl<'a> System<'a> for RenderingSystem {
                 lazers,
                 mut particles_datas,
             ),
+            mouse,
             gl,
             viewport,
             mut canvas,
@@ -650,6 +689,7 @@ impl<'a> System<'a> for RenderingSystem {
             world,
             mut primitives_channel,
             mut ingame_ui,
+            mut text_data
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
@@ -884,45 +924,16 @@ impl<'a> System<'a> for RenderingSystem {
             }
         };
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
-        for primitive in primitives_channel.read(&mut self.reader) {
-            match primitive {
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(rectangle),
-                    with_projection,
-                    image
-                } => {
-                    let (model, points, indicies) = rectangle.get_geometry();
-                    let geom_data =
-                        GeometryData::new(&gl, &points, &indicies).unwrap();
-                    match image {
-                        Some(image) => {
-                            canvas
-                                .render_primitive_texture(
-                                    &gl, 
-                                    &viewport,
-                                    &mut frame, 
-                                    image_datas.get(image.0).unwrap(),
-                                    &model, 
-                                    *with_projection, 
-                                    rectangle.width
-                                );
-                        }
-                        None => {
-                            let fill_color = (rectangle.color.x, rectangle.color.y, rectangle.color.z);
-                            canvas
-                                .render_primitive(&gl, &viewport, &mut frame, &geom_data, &model, fill_color, *with_projection);
-
-                        }
-                    }
-                }
-                Primitive {
-                    kind: PrimitiveKind::Text(_text),
-                    with_projection: _,
-                    image: _
-                } => {
-
-                }
-            }
-        }
+        render_primitives(
+            &mouse,
+            &mut self.reader,
+            &mut frame,
+            &image_datas,
+            &gl,
+            &mut canvas,
+            &viewport,
+            &mut primitives_channel,
+            &mut text_data,
+        );
     }
 }

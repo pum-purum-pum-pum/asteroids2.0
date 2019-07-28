@@ -96,6 +96,7 @@ pub fn run() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     let touches: Touches = [None; FINGER_NUMBER];
     let spawned_upgrades: SpawnedUpgrades = vec![];
+    specs_world.add_resource(ChoosedUpgrade(0usize));
     specs_world.add_resource(text_data);
     // specs_world.add_resource(glyph_brush);
     specs_world.add_resource(glyph_texture);

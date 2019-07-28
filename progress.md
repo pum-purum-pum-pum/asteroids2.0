@@ -1,9 +1,10 @@
 * add text \/
-* move enemies,all stats, guns and ships etc into file for tweaking 
-* * balance enemies and player stats
-* circle enemies around
+* move enemies,all stats, guns and ships etc into file for tweaking \/
+* * balance enemies and player stats \+-/
+* circle enemies around \easier do it with forces/
 * redo gui
 * * button selection
+* * skills information
 * * add score table
 
 * try move camera according to gun direction

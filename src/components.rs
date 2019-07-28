@@ -27,6 +27,8 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
+pub struct ChoosedUpgrade(pub usize);
+
 #[derive(Debug)]
 pub struct Description {
     pub player_ships_stats: Vec<ShipStats>,

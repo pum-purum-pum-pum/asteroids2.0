@@ -174,7 +174,7 @@ impl<'a> System<'a> for PhysicsSystem {
                 ).unwrap();
             (*body.position(), *isometry)
         };
-        {   // Reactive enemies
+        {   // Reactive enemies O(n^2)
             use nphysics2d::algebra::ForceType;
             use nphysics2d::algebra::Force2;
             let mut enemies_entities = vec![];
