@@ -14,10 +14,7 @@ use specs_derive::Component;
 use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
 
-pub const MAX_LIFES: usize = 100usize;
 pub const ASTEROID_MAX_LIFES: usize = 100usize;
-pub const MAX_SHIELDS: usize = 100usize;
-pub const ENEMY_MAX_LIFES: usize = 20usize;
 
 
 pub const BULLET_SPEED_INIT: f32 = 0.5;
@@ -33,6 +30,7 @@ pub type SpawnedUpgrades = Vec<[usize; 2]>;
 #[derive(Debug)]
 pub struct Description {
     pub player_ships_stats: Vec<ShipStats>,
+    pub player_guns: Vec<GunKind>,
     pub enemies: Vec<EnemyKind>            
 }
 
@@ -40,6 +38,7 @@ pub struct Description {
 pub struct EnemyKind {
     pub ai_kind: AIType,
     pub gun_kind: GunKind,
+    pub ship_stats: ShipStats,
     pub image: Image,
 }
 
@@ -52,7 +51,8 @@ pub enum EntityType {
 #[derive(Clone)]
 pub enum InsertEvent {
     Character {
-        gun_kind: GunKind
+        gun_kind: GunKind,
+        ship_stats: ShipStats
     },
     Asteroid {
         iso: Point3,
@@ -67,6 +67,7 @@ pub enum InsertEvent {
         spin: f32,
         gun_kind: GunKind,
         kind: AIType,
+        ship_stats: ShipStats,
         image: Image
     },
     Bullet {
@@ -144,18 +145,18 @@ pub struct ShipStats {
     pub max_shield: usize
 }
 
-impl Default for ShipStats {
-    fn default() -> Self {
-        Self {
-            thrust_force: 0.003f32,
-            torque: 0.2f32,
-            health_regen: 1usize,
-            shield_regen: 1usize,
-            max_health: MAX_LIFES,
-            max_shield: MAX_SHIELDS
-        }
-    }
-}
+// impl Default for ShipStats {
+//     fn default() -> Self {
+//         Self {
+//             thrust_force: 0.003f32,
+//             torque: 0.2f32,
+//             health_regen: 1usize,
+//             shield_regen: 1usize,
+//             max_health: MAX_LIFES,
+//             max_shield: MAX_SHIELDS
+//         }
+//     }
+// }
 
 #[derive(Debug, Clone, Copy)]
 pub enum PlayState {

@@ -31,6 +31,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Write<'a, AppState>,
         Write<'a, MenuChosedGun>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
+        ReadExpect<'a, Description>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -47,7 +48,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mut app_state,
             // text_data
             mut chosed_gun,
-            mut text_data
+            mut text_data,
+            description,
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
@@ -86,13 +88,13 @@ impl<'a> System<'a> for MenuRenderingSystem {
             "Lazer gun".to_string()
         );
         if lazer_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(GunKind::Lazer(Lazer::new(1usize, 8f32)))
+            chosed_gun.0 = Some(description.player_guns[0])
         }
         if blaster_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(GunKind::Blaster(Blaster::new(12usize, 10usize, 0.5)))
+            chosed_gun.0 = Some(description.player_guns[1])
         }
         if shotgun_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(GunKind::ShotGun(ShotGun::new(30usize, 10usize, 1, 0.25, 0.5)))
+            chosed_gun.0 = Some(description.player_guns[2])
         }
         let button = Button::new(
             Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
@@ -107,7 +109,10 @@ impl<'a> System<'a> for MenuRenderingSystem {
         if let Some(gun) = chosed_gun.0 {
             if button.place_and_check(&mut ui, &*mouse) {
                 *app_state = AppState::Play(PlayState::Action);
-                insert_channel.single_write(InsertEvent::Character{ gun_kind: gun });
+                insert_channel.single_write(InsertEvent::Character{ 
+                    gun_kind: gun, 
+                    ship_stats: description.player_ships_stats[0]
+                });
                 chosed_gun.0 = None;
             }
         }
@@ -240,10 +245,13 @@ impl<'a> System<'a> for GUISystem {
             avaliable_upgrades,
             mut spawned_upgrades,
         ) = data;
-        let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
-        
+        let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
+        let shield_color = Point3::new(0.0, 0.1, 0.6); 
+        let experience_color = Point3::new(0.8, 0.8, 0.8);
+        let white_color = Point3::new(1.0, 1.0, 1.0);
+
         //contorls
         let stick_size = w / 80.0;
         let ctrl_size = stick_size * 10.0;
@@ -259,7 +267,39 @@ impl<'a> System<'a> for GUISystem {
             stick_size,
             Image(preloaded_images.circle)
         );
+
+        // lifes and shields bars
+        for (isometry, life, shield, ship_stats, _ship) in (&isometries, &lifes, &shields, &ships_stats, &ship_markers).join() {
+            let position = isometry.0.translation.vector;
+            let ship_lifes_bar = Rectangle {
+                position: Point2::new(position.x, position.y),
+                width: (life.0 as f32/ ship_stats.max_health as f32) * 1.5,
+                height: 0.1,
+                color: life_color.clone()
+            };
+            let ship_shield_bar = Rectangle {
+                position: Point2::new(position.x, position.y - 1.0),
+                width: (shield.0 as f32/ ship_stats.max_shield as f32) * 1.5,
+                height: 0.1,
+                color: shield_color.clone()
+            };
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(ship_lifes_bar),
+                    with_projection: true,
+                    image: None
+                }
+            );
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(ship_shield_bar),
+                    with_projection: true,
+                    image: None
+                }
+            )
+        }
         
+        let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
         // move controller
         match move_controller.set(
             0,
@@ -358,10 +398,6 @@ impl<'a> System<'a> for GUISystem {
         let (character, _) = (&entities, &character_markers).join().next().unwrap();
         // "UI" things
         // experience and level bars
-        let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
-        let shield_color = Point3::new(0.0, 0.1, 0.6); 
-        let experience_color = Point3::new(0.8, 0.8, 0.8);
-        let white_color = Point3::new(1.0, 1.0, 1.0);
         let experiencebar_w = w / 5.0;
         let experiencebar_h = h / 100.0;
         let experience_position = Point2::new(w/2.0 - experiencebar_w / 2.0, h - h / 20.0);
@@ -495,48 +531,18 @@ impl<'a> System<'a> for GUISystem {
             None => ()
         }
 
-        // lifes and shields bars
-        for (isometry, life, shield, _ship) in (&isometries, &lifes, &shields, &ship_markers).join() {
-            let position = isometry.0.translation.vector;
-            let ship_lifes_bar = Rectangle {
-                position: Point2::new(position.x, position.y),
-                width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
-                height: 0.1,
-                color: life_color.clone()
-            };
-            let ship_shield_bar = Rectangle {
-                position: Point2::new(position.x, position.y - 1.0),
-                width: (shield.0 as f32/ MAX_SHIELDS as f32) * 1.5,
-                height: 0.1,
-                color: shield_color.clone()
-            };
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(ship_lifes_bar),
-                    with_projection: true,
-                    image: None
-                }
-            );
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(ship_shield_bar),
-                    with_projection: true,
-                    image: None
-                }
-            )
-        }
 
         for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
             let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
             let lifes_bar = Rectangle {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
-                width: (life.0 as f32 / MAX_LIFES as f32) * lifebar_w,
+                width: (life.0 as f32 / ship_stats.max_health as f32) * lifebar_w,
                 height: lifebar_h,
                 color: life_color.clone()
             };
             let shields_bar = Rectangle {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
-                width: (shield.0 as f32 / MAX_SHIELDS as f32) * lifebar_w,
+                width: (shield.0 as f32 / ship_stats.max_shield as f32) * lifebar_w,
                 height: lifebar_h,
                 color: Point3::new(0.0, 0.1, 0.6)
             };

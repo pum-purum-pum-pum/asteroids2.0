@@ -1,5 +1,36 @@
 (
-    player_ships_stats: [],
+    player_ships_stats: [
+        (
+            thrust_force: 0.003,
+            torque: 0.2,
+            health_regen: 1,
+            shield_regen: 1,
+            max_health: 1000,
+            max_shield: 500
+        )
+    ],
+    player_guns: [
+        Lazer((
+            damage: 7,
+            active: false,
+            distance: 3,
+            current_distance: 8,
+        )),
+        Blaster((
+            recharge_state: 0,
+            recharge_time: 12,
+            bullets_damage: 10,
+            bullet_speed: 0.5,
+        )),
+        ShotGun((
+            recharge_state: 0,
+            recharge_time: 30,
+            bullets_damage: 10,
+            side_projectiles_number: 1,
+            angle_shift: 0.25,
+            bullet_speed: 0.3,
+        )),
+    ],
     enemies: [
         (
             ai_kind: Kamikadze,
@@ -9,16 +40,32 @@
                 bullets_damage: 10,
                 bullet_speed: 0.5,
             )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0
+            ),
             image_name: "enemy2",
         ),
         (
             ai_kind: ShootAndFollow,
             gun_kind: Lazer((
-                damage: 1,
+                damage: 7,
                 active: false,
-                distance: 8,
+                distance: 3,
                 current_distance: 8,
             )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0
+            ),
             image_name: "enemy4",
         ),
         (
@@ -31,6 +78,14 @@
                 angle_shift: 0.35,
                 bullet_speed: 0.5,
             )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0
+            ),
             image_name: "enemy3",
         ),
         (
@@ -41,6 +96,14 @@
                 bullets_damage: 10,
                 bullet_speed: 0.5,
             )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0
+            ),
             image_name: "enemy1",
         ),
     ],

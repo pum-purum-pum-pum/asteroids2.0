@@ -659,14 +659,17 @@ impl<'a> System<'a> for InsertSystem {
         let mut reinsert = vec!();
         for insert in insert_channel.read(&mut self.reader) {
             match insert {
-                InsertEvent::Character {gun_kind} => {
+                InsertEvent::Character {
+                    gun_kind,
+                    ship_stats
+                } => {
                     *progress = Progress::default();
                     let char_size = 0.4f32;
                     let character_shape = Geometry::Circle { radius: char_size };
                     let enemy_size = 0.4f32;
                     let _enemy_shape = Geometry::Circle { radius: enemy_size };
-                    let life = Lifes(MAX_LIFES);
-                    let shield = Shield(MAX_SHIELDS);
+                    let life = Lifes(ship_stats.max_health);
+                    let shield = Shield(ship_stats.max_shield);
                     let character = match gun_kind {
                         GunKind::Blaster(blaster) => {
                             entities.build_entity()
@@ -692,7 +695,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Spin::default(), &mut spins)
                         .with(character_shape, &mut geometries)
                         .with(Size(char_size), &mut sizes)
-                        .with(ShipStats::default(), &mut ships_stats)
+                        .with(*ship_stats, &mut ships_stats)
                         .build();
                     let character_physics_shape = ncollide2d::shape::Ball::new(char_size);
 
@@ -788,6 +791,7 @@ impl<'a> System<'a> for InsertSystem {
                     spin: _,
                     kind,
                     gun_kind,
+                    ship_stats,
                     image,
                 } => {
                     let size = 0.4f32;
@@ -830,7 +834,8 @@ impl<'a> System<'a> for InsertSystem {
                         .with(EnemyMarker::default(), &mut enemies)
                         .with(ShipMarker::default(), &mut ships)
                         .with(*image, &mut images)
-                        .with(Lifes(ENEMY_MAX_LIFES), &mut lifes)
+                        .with(Lifes(ship_stats.max_health), &mut lifes)
+                        .with(*ship_stats, &mut ships_stats)
                         // .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
                         .with(*kind, &mut ai_types)
                         .with(Spin::default(), &mut spins)
@@ -1111,81 +1116,13 @@ impl<'a> System<'a> for GamePlaySystem {
                     spin: 0f32,
                     kind: enemy.ai_kind,
                     gun_kind: enemy.gun_kind,
+                    ship_stats: enemy.ship_stats,
                     image: enemy.image
                 }
             };
-            // let ships: Vec<InsertEvent> = ships.iter().map(
-            //     |enemy| {
-            //         ships2insert(spawn_pos, enemy.clone())
-            //     }
-            // ).collect();
-
-            // let ships = [
-            //     InsertEvent::Ship {
-            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-            //         light_shape: ship_shape,
-            //         spin: 0f32,
-            //         kind: AIType::Kamikadze,
-            //         gun_kind: GunKind::Blaster(Blaster::new(12usize, 10usize, 0.5)),
-            //         image: Image(preloaded_images.enemy2)
-            //     },
-            //     InsertEvent::Ship {
-            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-            //         light_shape: ship_shape,
-            //         spin: 0f32,
-            //         kind: AIType::ShootAndFollow,
-            //         gun_kind: GunKind::Lazer(Lazer::new(1usize, 8f32)),
-            //         image: Image(preloaded_images.enemy4)
-            //     },
-            //     InsertEvent::Ship {
-            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-            //         light_shape: ship_shape,
-            //         spin: 0f32,
-            //         kind: AIType::ShootAndFollow,
-            //         gun_kind: GunKind::ShotGun(ShotGun::new(30usize, 10usize, 5, 0.35, 0.5)),
-            //         image: Image(preloaded_images.enemy3)
-            //     },
-            //     InsertEvent::Ship {
-            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-            //         light_shape: ship_shape,
-            //         spin: 0f32,
-            //         kind: AIType::ShootAndFollow,
-            //         gun_kind: GunKind::Blaster(Blaster::new(12usize, 10usize, 0.5)),
-            //         image: Image(preloaded_images.enemy)
-            //     },
-            // ];
             let ship_id = rng.gen_range(0, ships.len());
             insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
-            // if v {
-            //     insert_channel.single_write(InsertEvent::Ship {
-            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-            //         light_shape: ship_shape,
-            //         spin: 0f32,
-            //         kind: AIType::Kamikadze,
-            //         gun_kind: GunKind::Blaster,
-            //         image: Image(preloaded_images.enemy2)
-            //     })
-            // } else {
-            //     insert_channel.single_write(InsertEvent::Ship {
-            //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-            //         light_shape: ship_shape,
-            //         spin: 0f32,
-            //         kind: AIType::ShootAndFollow,
-            //         gun_kind: GunKind::Lazer,
-            //         image: Image(preloaded_images.enemy3)
-            //     })
-            // }
         };
-        // for _ in 0..add_cnt {
-        //     let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
-        //     insert_channel.single_write(InsertEvent::Ship {
-        //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-        //         light_shape: ship_shape,
-        //         spin: 0f32,
-        //         kind: AIType::ShootAndFollow,
-        //         image: Image(preloaded_images.enemy)
-        //     })
-        // }
         let cnt = nebulas.count();
         let add_cnt = if NEBULA_MIN_NUMBER > cnt {
             NEBULA_MIN_NUMBER - cnt

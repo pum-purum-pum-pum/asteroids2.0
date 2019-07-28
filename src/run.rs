@@ -195,6 +195,7 @@ pub fn run() -> Result<(), String> {
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
             player_ships_stats: Vec<ShipStats>,
+            player_guns: Vec<GunKind>,
             enemies: Vec<EnemyKindSave>
         }
   
@@ -204,6 +205,7 @@ pub fn run() -> Result<(), String> {
         ) -> Description {
             Description {
                 player_ships_stats: description_save.player_ships_stats,
+                player_guns: description_save.player_guns,
                 enemies: description_save.enemies.iter().map(
                     |enemy| {
                         load_enemy(enemy, name_to_image)
@@ -216,6 +218,7 @@ pub fn run() -> Result<(), String> {
             EnemyKind {
                 ai_kind: enemy_save.ai_kind,
                 gun_kind: enemy_save.gun_kind,
+                ship_stats: enemy_save.ship_stats,
                 image: Image(name_to_image[&enemy_save.image_name])
             }
         }
@@ -223,6 +226,7 @@ pub fn run() -> Result<(), String> {
         pub struct EnemyKindSave {
             pub ai_kind: AIType,
             pub gun_kind: GunKind,
+            pub ship_stats: ShipStats,
             pub image_name: String,
         };
         let file = File::open("desc.ron").unwrap();
