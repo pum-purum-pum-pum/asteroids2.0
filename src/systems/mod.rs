@@ -148,6 +148,7 @@ impl<'a> System<'a> for PhysicsSystem {
         WriteStorage<'a, Velocity>,
         ReadStorage<'a, PhysicsComponent>,
         ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, EnemyMarker>,
         Write<'a, World<f32>>,
         Read<'a, AppState>,
     );
@@ -159,6 +160,7 @@ impl<'a> System<'a> for PhysicsSystem {
             mut velocities, 
             physics, 
             character_markers,
+            enemies,
             mut world, 
             app_state
         ) = data;
@@ -172,6 +174,42 @@ impl<'a> System<'a> for PhysicsSystem {
                 ).unwrap();
             (*body.position(), *isometry)
         };
+        {   // Reactive enemies
+            use nphysics2d::algebra::ForceType;
+            use nphysics2d::algebra::Force2;
+            let mut enemies_entities = vec![];
+            for (entity, phys, _enemy) in (&entities, &physics, &enemies).join() {
+                enemies_entities.push(entity);
+            }
+            for e1 in enemies_entities.iter() {
+                for e2 in enemies_entities.iter() {
+                    if e1 == e2 {
+                        break
+                    }
+                    let phys1 = physics.get(*e1).unwrap();
+                    let phys2 = physics.get(*e2).unwrap();
+                    let (force1, force2, distance) = {
+                        let body1 = world.rigid_body(phys1.body_handle).unwrap();
+                        let body2 = world.rigid_body(phys2.body_handle).unwrap();
+                        let position1 = body1.position().translation.vector;
+                        let position2 = body2.position().translation.vector;
+                        let distance = (position1 - position2).norm();
+                        let center = (position1 + position2) / 2.0;
+                        (
+                            Force2::new(0.004 * (position1 - center).normalize(), 0.0), 
+                            Force2::new(0.004 * (position2 - center).normalize(), 0.0),
+                            distance
+                        )
+                    };
+                    if distance < 5f32 {
+                        world.rigid_body_mut(phys1.body_handle).unwrap()
+                            .apply_force(0, &force1, ForceType::Force, true);
+                        world.rigid_body_mut(phys2.body_handle).unwrap()
+                            .apply_force(0, &force2, ForceType::Force, true);
+                    }
+                }
+            }
+        }
         for (isometry, ()) in (&mut isometries, !&physics).join() {
             let char_vec = character_position.translation.vector;
             let prev_vec = character_prev_position.0.translation.vector;
@@ -1157,23 +1195,25 @@ impl<'a> System<'a> for GamePlaySystem {
 }
 
 /// returns true if killed
-fn process_damage(life: &mut Lifes, mut shield: Option<&mut Shield>, projectile_damage: usize) -> bool {
+fn process_damage(life: &mut Lifes, mut shield: Option<&mut Shield>, mut projectile_damage: usize) -> bool {
     match shield {
         Some(ref mut shield) if shield.0 > 0usize => {
             if shield.0 > projectile_damage {
-                shield.0 -= projectile_damage
+                shield.0 -= projectile_damage;
+                projectile_damage = 0;
             } else {
-                shield.0 = 0
+                shield.0 = 0;
+                projectile_damage -= shield.0;
             }
         }
         _ => {
-            if life.0 > projectile_damage {
-                life.0 -= projectile_damage
-            } else {
-                return true;
-            }
         }
     };
+    if life.0 > projectile_damage {
+        life.0 -= projectile_damage
+    } else {
+        return true;
+    }
     false
 }
 
@@ -1187,11 +1227,7 @@ impl<'a> System<'a> for CollisionSystem {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, Isometry>,
-        // WriteStorage<'a, Velocity>,
         ReadStorage<'a, PhysicsComponent>,
-        // WriteStorage<'a, Spin>,
-        // ReadStorage<'a, Geometry>,
-        // ReadStorage<'a, Projectile>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,

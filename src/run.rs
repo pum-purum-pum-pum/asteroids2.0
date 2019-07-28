@@ -188,7 +188,6 @@ pub fn run() -> Result<(), String> {
 
     {   // load .ron files with tweaks 
         use ron::de::from_reader;
-        use ron::ser::{PrettyConfig};
         use serde::{Serialize, Deserialize};
         use std::fs::File;
 

@@ -269,7 +269,9 @@ impl<'a> System<'a> for GUISystem {
         );
 
         // lifes and shields bars
-        for (isometry, life, shield, ship_stats, _ship) in (&isometries, &lifes, &shields, &ships_stats, &ship_markers).join() {
+        for (entity, isometry, life, ship_stats, _ship) in (&entities, &isometries, &lifes, &ships_stats, &ship_markers).join() {
+            let shield = shields.get(entity);
+            // dbg!("draw lifes and shields");
             let position = isometry.0.translation.vector;
             let ship_lifes_bar = Rectangle {
                 position: Point2::new(position.x, position.y),
@@ -277,12 +279,21 @@ impl<'a> System<'a> for GUISystem {
                 height: 0.1,
                 color: life_color.clone()
             };
-            let ship_shield_bar = Rectangle {
-                position: Point2::new(position.x, position.y - 1.0),
-                width: (shield.0 as f32/ ship_stats.max_shield as f32) * 1.5,
-                height: 0.1,
-                color: shield_color.clone()
-            };
+            if let Some(shield) = shield  {
+                let ship_shield_bar = Rectangle {
+                    position: Point2::new(position.x, position.y - 1.0),
+                    width: (shield.0 as f32/ ship_stats.max_shield as f32) * 1.5,
+                    height: 0.1,
+                    color: shield_color.clone()
+                };
+                ingame_ui.primitives.push(
+                    Primitive {
+                        kind: PrimitiveKind::Rectangle(ship_shield_bar),
+                        with_projection: true,
+                        image: None
+                    }
+                )
+            }
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(ship_lifes_bar),
@@ -290,13 +301,6 @@ impl<'a> System<'a> for GUISystem {
                     image: None
                 }
             );
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(ship_shield_bar),
-                    with_projection: true,
-                    image: None
-                }
-            )
         }
         
         let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();

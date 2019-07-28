@@ -13,7 +13,7 @@
         Lazer((
             damage: 7,
             active: false,
-            distance: 3,
+            distance: 5,
             current_distance: 8,
         )),
         Blaster((
@@ -72,9 +72,9 @@
             ai_kind: ShootAndFollow,
             gun_kind: ShotGun((
                 recharge_state: 0,
-                recharge_time: 30,
-                bullets_damage: 10,
-                side_projectiles_number: 5,
+                recharge_time: 200,
+                bullets_damage: 200,
+                side_projectiles_number: 4,
                 angle_shift: 0.35,
                 bullet_speed: 0.5,
             )),
@@ -93,8 +93,8 @@
             gun_kind: Blaster((
                 recharge_state: 0,
                 recharge_time: 12,
-                bullets_damage: 10,
-                bullet_speed: 0.5,
+                bullets_damage: 100,
+                bullet_speed: 0.8,
             )),
             ship_stats: (
                 thrust_force: 0.003,

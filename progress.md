@@ -1,6 +1,7 @@
 * add text \/
 * move enemies,all stats, guns and ships etc into file for tweaking 
 * * balance enemies and player stats
+* circle enemies around
 * redo gui
 * * button selection
 * * add score table
