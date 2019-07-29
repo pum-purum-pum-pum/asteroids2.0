@@ -289,6 +289,7 @@ impl<'a> System<'a> for SoundSystem {
                         &sounds.get(preloaded_sounds.lazer).unwrap().0,
                         -1
                     ).unwrap();
+                    music.menu_play = false; // hacky
                     loop_sound.player_lazer_channel = Some(channel);
                 }
             } else {
@@ -308,6 +309,7 @@ impl<'a> System<'a> for SoundSystem {
                 }
             }
             AppState::Menu => {
+                loop_sound.player_lazer_channel = None; // hacky
                 if let Some(_music_id) = music.current_battle {
                     sdl2::mixer::Music::halt();
                     music.current_battle = None;
@@ -318,7 +320,6 @@ impl<'a> System<'a> for SoundSystem {
                 }
             }
         }
-        // eprintln!("SOUNDS");
     }
 }
 
@@ -548,7 +549,7 @@ impl<'a> System<'a> for ControlSystem {
                         lazer.current_distance = min_d;
                         if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) {
                             if let Some(_) = lifes.get(*target_entity) {
-                                let explosion_size = 1;
+                                let mut explosion_size = 1;
                                 if process_damage(
                                     lifes.get_mut(*target_entity).unwrap(),
                                     shields.get_mut(*target_entity),
@@ -556,12 +557,6 @@ impl<'a> System<'a> for ControlSystem {
                                 ) {
                                     progress.kill(50usize, 50usize);
                                     if asteroid_markers.get(*target_entity).is_some() {
-                                        let effect = InsertEvent::Explosion {
-                                            position: Point2::new(position.x, position.y),
-                                            num: 10usize,
-                                            lifetime: 20usize,
-                                        };
-                                        insert_channel.single_write(effect);
                                         let asteroid = *target_entity;
                                         spawn_asteroids(
                                             isometries.get(asteroid).unwrap().0, 
@@ -569,6 +564,7 @@ impl<'a> System<'a> for ControlSystem {
                                             &mut insert_channel,
                                         );
                                     }
+                                    explosion_size = 20;
                                     sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                                     insert_channel.single_write(InsertEvent::Wobble(0.3f32));
                                     entities.delete(*target_entity).unwrap();
@@ -1600,6 +1596,9 @@ impl<'a> System<'a> for AISystem {
                     // TODO remove this hack with another AI mechanism?
                     let follow_area = if let Some(lazer) = lazers.get(entity) {lazer.distance * 0.95} else {SCREEN_AREA};
                     if diff.norm() > follow_area {
+                        if let Some(lazer) = lazers.get_mut(entity) {
+                            lazer.active = false;
+                        }
                         let pos = Point2::new(position.x, position.y);
                         let ray = Ray::new(pos, dir);
                         let all_groups = CollisionGroups::new();
@@ -1629,6 +1628,9 @@ impl<'a> System<'a> for AISystem {
                         };
                         *vel = Velocity::new(ai_vel.x, ai_vel.y);
                     } else {
+                        if let Some(lazer) = lazers.get_mut(entity) {
+                            lazer.active = true;
+                        }
                         let vel_vec = DAMPING_FACTOR * vel.0;
                         *vel = Velocity::new(vel_vec.x, vel_vec.y);
                     }
@@ -1667,7 +1669,6 @@ impl<'a> System<'a> for AISystem {
                         }
                     }
                     if let Some(lazer) = lazers.get_mut(entity) {
-                        lazer.active = true;
                         let ray = Ray::new(
                             Point2::new(position.x, position.y), 
                             Vector2::new(dir.x, dir.y)
