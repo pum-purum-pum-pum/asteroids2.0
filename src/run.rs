@@ -14,7 +14,7 @@ use crate::types::{*};
 use crate::components::*;
 use crate::gfx::{Canvas, GlyphVertex, TextVertexBuffer, TextData};
 use crate::physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
-use crate::sound::init_sound;
+use crate::sound::{init_sound, };
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
@@ -318,11 +318,17 @@ pub fn run() -> Result<(), String> {
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
-    let (preloaded_sounds, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    specs_world.add_resource(ThreadPin::new(music_data));
+    specs_world.add_resource(Music::default());
+    specs_world.add_resource(LoopSound::default());
     specs_world.add_resource(MenuChosedGun::default());
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
+    let mut sound_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(sound_system)
+        .build();
     let mut dispatcher = DispatcherBuilder::new()
         .with(control_system, "control_system", &[])
         .with(gameplay_sytem, "gameplay_system", &[])
@@ -342,7 +348,6 @@ pub fn run() -> Result<(), String> {
         .with_thread_local(gui_system)
         // .with_thread_local(insert_system)
         .with_thread_local(rendering_system)
-        .with_thread_local(sound_system)
         .build();
     let mut insert_dispatcher = DispatcherBuilder::new()
         .with_thread_local(insert_system)
@@ -453,6 +458,7 @@ pub fn run() -> Result<(), String> {
             }
         }
         insert_dispatcher.dispatch(&specs_world.res);
+        sound_dispatcher.dispatch(&specs_world.res);
         safe_maintain(&mut specs_world);
         for event in events_loop.poll_iter() {
             use sdl2::event::Event;

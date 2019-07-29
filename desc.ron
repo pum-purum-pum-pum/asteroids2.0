@@ -76,7 +76,7 @@
                 bullets_damage: 200,
                 side_projectiles_number: 4,
                 angle_shift: 0.35,
-                bullet_speed: 0.5,
+                bullet_speed: 0.08,
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -92,9 +92,9 @@
             ai_kind: ShootAndFollow,
             gun_kind: Blaster((
                 recharge_state: 0,
-                recharge_time: 12,
+                recharge_time: 17,
                 bullets_damage: 100,
-                bullet_speed: 0.8,
+                bullet_speed: 0.2,
             )),
             ship_stats: (
                 thrust_force: 0.003,

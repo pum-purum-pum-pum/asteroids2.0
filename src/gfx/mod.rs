@@ -1,5 +1,6 @@
 use crate::types::{*};
 use rand::prelude::*;
+use noise::{NoiseFn, Perlin, Seedable};
 
 use std::io::{BufReader, Error as IOError, Read};
 
@@ -216,6 +217,10 @@ pub struct Canvas {
     program_primitive_texture: red::Program,
     pub program_glyph: red::Program,
     observer: Point3,
+    perlin_x: Perlin,
+    perlin_y: Perlin,
+    perlin_time: f32,
+    camera_wobble: f32,
     // default_params: glium::DrawParameters<'a>,
     // stencil_check_params: glium::DrawParameters<'a>,
     // stencil_write_params: glium::DrawParameters<'a>,
@@ -236,12 +241,26 @@ impl Canvas {
             program_light: program_light,
             program_instancing: program_instancing,
             observer: Point3::new(0f32, 0f32, Z_FAR),
-            program_glyph: program_glyph
+            program_glyph: program_glyph,
+            perlin_x: Perlin::new().set_seed(0),
+            perlin_y: Perlin::new().set_seed(1),
+            perlin_time: 0.1f32,
+            camera_wobble: 0f32
         })
     }
 
     pub fn observer(&self) -> Point3 {
-        self.observer
+        // let mut rng = rand::thread_rng();
+        // let noise: Vector3 = 0.1 * Vector3::new(rng.gen(), rng.gen(), 0f32).normalize();
+        let time = self.perlin_time as f64;
+        let x = self.perlin_x.get([time, time]);
+        let y = self.perlin_y.get([time, time]);
+        let noise: Vector3 = self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32).normalize();
+        self.observer + noise
+    }
+
+    pub fn add_wobble(&mut self, wobble: f32) {
+        self.camera_wobble += wobble;
     }
 
     pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32) {
@@ -249,6 +268,8 @@ impl Canvas {
         self.observer.y = pos.y;
         self.observer.z = (1.0 - SPEED_EMA) * self.observer.z
             + SPEED_EMA * (Z_FAR + MAX_ADD_SPEED_Z * speed_ratio);
+        self.perlin_time += 0.1;
+        self.camera_wobble /= 2.0;
     }
 
     pub fn get_z_shift(&self) -> f32 {
@@ -360,7 +381,7 @@ impl Canvas {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
         let vao = &geometry_data.positions.vao;
         let program = &self.program_light;
         program.set_uniform("model", model);
@@ -391,7 +412,7 @@ impl Canvas {
         let dims = (dims.0 as u32, dims.1 as u32);
         let (projection, view) = if with_projection {
             let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-            let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
             (perspective, view)
         } else {
             let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
@@ -430,7 +451,7 @@ impl Canvas {
         // };
         let scales = image_data.dim_scales;
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
         let vao = &image_data.positions.vao;
         let program = &self.program;
         program.set_uniform("model", model);
@@ -462,7 +483,7 @@ impl Canvas {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
         let vao = &instancing_data.vertex_buffer.vao;
         let program = &self.program_instancing;
         program.set_uniform("model", model);
@@ -496,7 +517,7 @@ impl Canvas {
         let program = &self.program_primitive_texture;
         let (projection, view) = if with_projection {
             let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-            let view: [[f32; 4]; 4] = get_view(self.observer).to_homogeneous().into();
+            let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
             (perspective, view)
         } else {
             let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();

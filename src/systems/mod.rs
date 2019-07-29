@@ -20,7 +20,7 @@ use crate::components::*;
 use crate::geometry::{generate_convex_polygon, Polygon, TriangulateFromCenter, EPS};
 use crate::gfx::{GeometryData, Engine, ParticlesData, Explosion};
 use crate::physics::CollisionId;
-use crate::sound::{PreloadedSounds, SoundData};
+use crate::sound::{PreloadedSounds, SoundData, MusicData};
 use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};
 
 mod rendering;
@@ -252,14 +252,71 @@ impl SoundSystem {
 impl<'a> System<'a> for SoundSystem {
     type SystemData = (
         ReadStorage<'a, ThreadPin<SoundData>>,
+        ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, Lazer>,
         WriteExpect<'a, ThreadPin<TimerSubsystem>>,
+        ReadExpect<'a, PreloadedSounds>,
         Write<'a, EventChannel<Sound>>,
+        Write<'a, LoopSound>,
+        ReadExpect<'a, ThreadPin<MusicData<'static>>>,
+        Write<'a, Music>,
+        Read<'a, AppState>
     );
 
     fn run(&mut self, data: Self::SystemData) {
-        let (sounds, _timer, sounds_channel) = data;
+        let (
+            sounds, 
+            character_markers,
+            lazers,
+            _timer, 
+            preloaded_sounds,
+            sounds_channel,
+            mut loop_sound,
+            music_data,
+            mut music,
+            app_state
+        ) = data;
         for s in sounds_channel.read(&mut self.reader) {
-            sdl2::mixer::Channel::all().play(&sounds.get(s.0).unwrap().0, 0).unwrap();
+            sdl2::mixer::Channel::all().play(
+                &sounds.get(s.0).unwrap().0, 
+                0
+            ).unwrap();
+        }
+        for (lazer, _character) in (&lazers, &character_markers).join() {
+            if lazer.active {
+                if loop_sound.player_lazer_channel.is_none() {
+                    let channel = sdl2::mixer::Channel::all().play(
+                        &sounds.get(preloaded_sounds.lazer).unwrap().0,
+                        -1
+                    ).unwrap();
+                    loop_sound.player_lazer_channel = Some(channel);
+                }
+            } else {
+                if let Some(lazer) = loop_sound.player_lazer_channel {
+                    lazer.halt();
+                    loop_sound.player_lazer_channel = None;
+                }
+            }
+        }
+        match *app_state {
+            AppState::Play(_) => {
+                if music.current_battle.is_none() {
+                    let mut rng = thread_rng();
+                    let music_id = rng.gen_range(0, music_data.battle_music.len());
+                    music_data.battle_music[music_id].play(-1).unwrap();
+                    music.current_battle = Some(music_id);
+                }
+            }
+            AppState::Menu => {
+                if let Some(_music_id) = music.current_battle {
+                    sdl2::mixer::Music::halt();
+                    music.current_battle = None;
+                }
+                if !music.menu_play {
+                    music_data.menu_music.play(-1).unwrap();
+                    music.menu_play = true;
+                }
+            }
         }
         // eprintln!("SOUNDS");
     }
@@ -497,7 +554,7 @@ impl<'a> System<'a> for ControlSystem {
                                     shields.get_mut(*target_entity),
                                     lazer.damage
                                 ) {
-                                    progress.experience += 50usize;
+                                    progress.kill(50usize, 50usize);
                                     if asteroid_markers.get(*target_entity).is_some() {
                                         let effect = InsertEvent::Explosion {
                                             position: Point2::new(position.x, position.y),
@@ -505,7 +562,6 @@ impl<'a> System<'a> for ControlSystem {
                                             lifetime: 20usize,
                                         };
                                         insert_channel.single_write(effect);
-                                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                                         let asteroid = *target_entity;
                                         spawn_asteroids(
                                             isometries.get(asteroid).unwrap().0, 
@@ -513,10 +569,9 @@ impl<'a> System<'a> for ControlSystem {
                                             &mut insert_channel,
                                         );
                                     }
+                                    sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                                    insert_channel.single_write(InsertEvent::Wobble(0.3f32));
                                     entities.delete(*target_entity).unwrap();
-                                    
-                                    
-                                    
                                 }
                                 let effect_position = position + dir * min_d;
                                 let effect = InsertEvent::Explosion {
@@ -653,6 +708,7 @@ impl<'a> System<'a> for InsertSystem {
         Write<'a, BodiesMap>,
         Write<'a, Progress>,
         Write<'a, EventChannel<InsertEvent>>,
+        WriteExpect<'a, Canvas>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -693,6 +749,7 @@ impl<'a> System<'a> for InsertSystem {
             mut bodies_map,
             mut progress,
             mut insert_channel,
+            mut canvas
         ) = data;
         let mut reinsert = vec!();
         for insert in insert_channel.read(&mut self.reader) {
@@ -997,6 +1054,10 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Size(40f32), &mut sizes)
                         .build();
                 }
+                InsertEvent::Wobble(wobble) => {
+                    canvas.add_wobble(*wobble)
+                }
+
             }
         }
         for i in reinsert.into_iter() {
@@ -1325,10 +1386,11 @@ impl<'a> System<'a> for CollisionSystem {
                     insert_channel.single_write(effect);
                 }
                 if asteroid_explosion {
+                    insert_channel.single_write(InsertEvent::Wobble(0.3f32));
                     let isometry = isometries.get(asteroid).unwrap().0;
                     let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
-                    let new_polygons = polygon.deconstruct();
+                    let new_polygons = polygon.deconstruct(); // TODO: add spawn asteroids here
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
                         num: 10usize,
@@ -1375,6 +1437,7 @@ impl<'a> System<'a> for CollisionSystem {
                         // delete character
                         entities.delete(ship).unwrap();
                     }
+                    insert_channel.single_write(InsertEvent::Wobble(0.1f32));
                     // let shield = shields.get_mut(ship).unwrap();
                     // let lifes = lifes.get_mut(ship).unwrap();
                     // if shield.0 > 0 {
@@ -1389,9 +1452,11 @@ impl<'a> System<'a> for CollisionSystem {
                         shields.get_mut(ship),
                         projectile_damage
                     ) {
-                        progress.experience += 50usize;
+                        progress.kill(50usize, 50usize);
                         entities.delete(ship).unwrap();
                         explosion_size = 20;
+                        insert_channel.single_write(InsertEvent::Wobble(0.3f32));
+                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                     }
                     let effect = InsertEvent::Explosion {
                         position: Point2::new(position.x, position.y),
@@ -1469,6 +1534,7 @@ impl<'a> System<'a> for AISystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, BodiesMap>,
         Write<'a, EventChannel<Sound>>,
+        Write<'a, AppState>,
         ReadExpect<'a, PreloadedSounds>,
     );
 
@@ -1494,6 +1560,7 @@ impl<'a> System<'a> for AISystem {
             mut insert_channel,
             bodies_map,
             mut sounds_channel,
+            mut app_state,
             preloaded_sounds,
         ) = data;
         let _rng = thread_rng();
@@ -1575,12 +1642,13 @@ impl<'a> System<'a> for AISystem {
                             let bullets = gun.spawn_bullets(
                                 EntityType::Enemy,
                                 isometry,
-                                0.05,
+                                gun.bullet_speed,
                                 gun.bullets_damage,
                                 Vector2::new(vel.0.x, vel.0.y),
                                 entity
                             );
                             insert_channel.iter_write(bullets.into_iter());
+                            sounds_channel.single_write(Sound(preloaded_sounds.enemy_blaster))
                         }
                     }
                     let shotgun = shotguns.get_mut(entity);
@@ -1589,12 +1657,13 @@ impl<'a> System<'a> for AISystem {
                             let bullets = shotgun.spawn_bullets(
                                 EntityType::Enemy,
                                 isometry,
-                                0.05,
+                                shotgun.bullet_speed,
                                 shotgun.bullets_damage,
                                 Vector2::new(vel.0.x, vel.0.y),
                                 entity
                             );
                             insert_channel.iter_write(bullets.into_iter());
+                            sounds_channel.single_write(Sound(preloaded_sounds.enemy_shotgun))
                         }
                     }
                     if let Some(lazer) = lazers.get_mut(entity) {
@@ -1634,11 +1703,12 @@ impl<'a> System<'a> for AISystem {
                                                 polygons.get(asteroid).unwrap(), 
                                                 &mut insert_channel,
                                             );
+                                            insert_channel.single_write(InsertEvent::Wobble(0.3f32));
                                         }
-                                        entities.delete(*target_entity).unwrap();
-                                        
-                                        
-                                        
+                                        if character_markers.get(*target_entity).is_some() {
+                                            *app_state = AppState::Menu;
+                                        }
+                                        entities.delete(*target_entity).unwrap();   
                                     }
                                     let effect_position = Vector2::new(position.x, position.y) + dir * min_d;
                                     let effect = InsertEvent::Explosion {

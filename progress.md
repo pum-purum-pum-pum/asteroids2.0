@@ -1,10 +1,13 @@
+* add screen shake (when just shooting to?)
+
+
 * add text \/
 * move enemies,all stats, guns and ships etc into file for tweaking \/
 * * balance enemies and player stats \+-/
 * circle enemies around \easier do it with forces/
 * redo gui
-* * button selection
-* * skills information
+* * button selection \/
+* * skills information \/
 * * add score table
 
 * try move camera according to gun direction
@@ -77,7 +80,6 @@ not ordered by priority
  <!-- * * ship speed boost for some time X -->
 <!-- * * "additional weapon"  -- trace like in bitblaster -->
 * once someone got shooted make it's sprite white for a second
-* add screen shake (when just shooting to?)
 * ship knockback?
 * sleep when killed enemy???
 * * money $$$ for buying ships and weapons
@@ -88,7 +90,7 @@ not ordered by priority
 * choose weapon and ship before start (it's saved from previous choise)
 * add rotation bullets gun
 * bullet trace like in nova drift looks awesome
-* lazer sound
+* lazer sound \/
 * ship sound
 * animations
 * explosions with animations
@@ -102,6 +104,10 @@ not ordered by priority
 * camera back when shooting (instead of screenshake?)
 * bigger explosions 
 * slow motion when dead
+
+* animations?
+* atlasses?
+
 
 Skills
 * Lazer

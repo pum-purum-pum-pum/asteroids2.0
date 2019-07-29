@@ -13,6 +13,7 @@ use serde::{Serialize, Deserialize};
 use specs_derive::Component;
 use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
+use sdl2::mixer::Channel;
 
 pub const ASTEROID_MAX_LIFES: usize = 100usize;
 
@@ -27,7 +28,19 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
+#[derive(Debug, Default)]
+pub struct Music {
+    pub current_battle: Option<usize>,
+    pub menu_play: bool,
+}
+
 pub struct ChoosedUpgrade(pub usize);
+
+#[derive(Debug, Default)]
+pub struct LoopSound {
+    pub player_lazer_channel: Option<Channel>,
+    pub player_engine_channel: Option<Channel>
+}
 
 #[derive(Debug)]
 pub struct Description {
@@ -98,7 +111,8 @@ pub enum InsertEvent {
     },
     Nebula {
         iso: Point3
-    }
+    },
+    Wobble(f32)
 }
 
 #[derive(Default, Clone)]
@@ -214,7 +228,8 @@ pub struct Damage(pub usize);
 #[derive(Default, Clone, Copy)]
 pub struct Progress {
     pub experience: usize,
-    pub level: usize
+    pub level: usize,
+    pub score: usize,
 }
 
 impl Progress {
@@ -225,6 +240,11 @@ impl Progress {
     pub fn level_up(&mut self) {
         self.experience %= self.current_max_experience();
         self.level += 1usize;
+    }
+
+    pub fn kill(&mut self, exp: usize, score: usize) {
+        self.experience += exp;
+        self.score += score;
     }
 }
 

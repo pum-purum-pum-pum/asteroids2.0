@@ -144,7 +144,7 @@ pub fn render_primitives<'a>(
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
-    let scale = Scale::uniform((0.3 * mouse.hdpi as f32).round());
+    let scale = Scale::uniform((w / 6000.0 * mouse.hdpi as f32).round());
     for primitive in primitives_channel.read(reader) {
         match primitive {
             Primitive {
@@ -278,6 +278,7 @@ impl<'a> System<'a> for GUISystem {
         let shield_color = Point3::new(0.0, 0.1, 0.6); 
         let experience_color = Point3::new(0.8, 0.8, 0.8);
         let white_color = Point3::new(1.0, 1.0, 1.0);
+        let grey_color = Point3::new(0.5, 0.5, 0.5);
 
         //contorls
         let stick_size = w / 80.0;
@@ -414,7 +415,21 @@ impl<'a> System<'a> for GUISystem {
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
-                    position: Point2::new(w/20.0, h - h / 20.0), 
+                    position: Point2::new(w - w/7.0, h / 20.0), 
+                    text: format!(
+                        "Score: {}", 
+                        progress.score
+                    ).to_string()
+                }),
+                with_projection: false,
+                image: None
+            }
+        );
+
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w/20.0, h / 20.0), 
                     text: format!(
                         "Experience: {} %, \n Level {}",
                         100 * progress.experience / progress.current_max_experience() as usize, 
@@ -478,8 +493,9 @@ impl<'a> System<'a> for GUISystem {
                         let upg = &avaliable_upgrades[*upg_id];
                         let current_point = 
                             Point2::new(
-                                i as f32 * (upgrade_button_w + shift), 
-                                h - upgrade_button_h - shift
+                                w / 2.0 - upgrade_button_w - shift 
+                                + i as f32 * (upgrade_button_w + shift), 
+                                shift
                             );
                         let upgrade_button = Button::new(
                             current_point,
@@ -498,23 +514,34 @@ impl<'a> System<'a> for GUISystem {
                     }
                 }
                 let select_upgrade = Button::new(
-                    Point2::new(w / 2.0, choose_button_h),
+                    Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
                     choose_button_w, choose_button_h, 
-                    white_color.clone(), 
+                    grey_color.clone(), 
                     false,
                     None,
                     "Upgrade!".to_string()
                 );
 
-                if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
-                    current_upgrade = Some(avaliable_upgrades[choosed_upgrade.0].upgrade_type);
-                    spawned_upgrades.pop();
+                if spawned_upgrades.len() > 0 {
+                    ingame_ui.primitives.push(
+                        Primitive {
+                            kind: PrimitiveKind::Text(Text {
+                                position: Point2::new(w/4.0, upgrade_button_h + shift),
+                                text: avaliable_upgrades[choosed_upgrade.0].description.clone()
+                            }),
+                            with_projection: false,
+                            image: None
+                        }
+                    );                    
+                    if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
+                        current_upgrade = Some(avaliable_upgrades[choosed_upgrade.0].upgrade_type);
+                        spawned_upgrades.pop();
+                    }
                 }
-
                 let done_button = Button::new(
-                    Point2::new(w / 2.0, 2.0 * choose_button_w),
+                    Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
                     choose_button_w, choose_button_h, 
-                    white_color.clone(), 
+                    grey_color.clone(), 
                     false,
                     None,
                     "Done".to_string()
@@ -522,12 +549,10 @@ impl<'a> System<'a> for GUISystem {
                 if done_button.place_and_check(&mut ingame_ui, &*mouse) {
                     *app_state = AppState::Play(PlayState::Action);
                 }
-
-
-
             }
             _ => ()
         }
+
 
         match current_upgrade {
             Some(choosed_upgrade) => {
@@ -692,7 +717,7 @@ impl<'a> System<'a> for RenderingSystem {
             mut text_data
         ) = data;
         let mut frame = red::Frame::new(&gl);
-        frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
+        frame.set_clear_color(0.015, 0.004, 0.0, 1.0);
         frame.clear_color();
         // target.clear_stencil(0i32);
         let (char_iso, char_pos, char_vel) = {
