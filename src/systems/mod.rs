@@ -40,14 +40,13 @@ const NEBULA_PLAYER_AREA: f32 = 90f32;
 const NEBULA_ACTIVE_AREA: f32 = 110f32;
 const NEBULA_MIN_NUMBER: usize = 20;
 
-const ASTEROIDS_MIN_NUMBER: usize = 10;
+const ASTEROIDS_MIN_NUMBER: usize = 25;
 const ASTEROID_MAX_RADIUS: f32 = 2.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
 
 const AI_COLLISION_DISTANCE: f32 = 3.5f32;
-
-const SHIPS_NUMBER: usize = 1 + 6; // character's ship counts
+const EXPLOSION_WOBBLE: f32 = 0.4;
 pub const DT: f32 =  1f32 / 60f32;
 
 pub fn initial_asteroid_velocity() -> Velocity2 {
@@ -178,7 +177,7 @@ impl<'a> System<'a> for PhysicsSystem {
             use nphysics2d::algebra::ForceType;
             use nphysics2d::algebra::Force2;
             let mut enemies_entities = vec![];
-            for (entity, phys, _enemy) in (&entities, &physics, &enemies).join() {
+            for (entity, _phys, _enemy) in (&entities, &physics, &enemies).join() {
                 enemies_entities.push(entity);
             }
             for e1 in enemies_entities.iter() {
@@ -566,7 +565,7 @@ impl<'a> System<'a> for ControlSystem {
                                     }
                                     explosion_size = 20;
                                     sounds_channel.single_write(Sound(preloaded_sounds.explosion));
-                                    insert_channel.single_write(InsertEvent::Wobble(0.3f32));
+                                    insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                                     entities.delete(*target_entity).unwrap();
                                 }
                                 let effect_position = position + dir * min_d;
@@ -905,7 +904,7 @@ impl<'a> System<'a> for InsertSystem {
                     match gun_kind {
                         GunKind::ShotGun(shotgun) => {
                             let side_num = 3usize;
-                            let shift = std::f32::consts::PI / (side_num as f32 + 1.0);
+                            let _shift = std::f32::consts::PI / (side_num as f32 + 1.0);
                             enemy = enemy
                                 .with(*shotgun, &mut shotguns)
                         }
@@ -1392,7 +1391,7 @@ impl<'a> System<'a> for CollisionSystem {
                     insert_channel.single_write(effect);
                 }
                 if asteroid_explosion {
-                    insert_channel.single_write(InsertEvent::Wobble(0.3f32));
+                    insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                     let isometry = isometries.get(asteroid).unwrap().0;
                     let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
@@ -1461,7 +1460,7 @@ impl<'a> System<'a> for CollisionSystem {
                         progress.kill(50usize, 50usize);
                         entities.delete(ship).unwrap();
                         explosion_size = 20;
-                        insert_channel.single_write(InsertEvent::Wobble(0.3f32));
+                        insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                         sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                     }
                     let effect = InsertEvent::Explosion {
@@ -1714,7 +1713,7 @@ impl<'a> System<'a> for AISystem {
                                                 polygons.get(asteroid).unwrap(), 
                                                 &mut insert_channel,
                                             );
-                                            insert_channel.single_write(InsertEvent::Wobble(0.3f32));
+                                            insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                                         }
                                         if character_markers.get(*target_entity).is_some() {
                                             *app_state = AppState::Menu;

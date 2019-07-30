@@ -330,6 +330,8 @@ pub type Touches = [Option<Finger>; FINGER_NUMBER];
 
 #[derive(Default, Debug)]
 pub struct Mouse {
+    pub x01: f32,
+    pub y01:f32,
     pub o_x: f32,
     pub o_y: f32,
     pub x: f32,
@@ -349,6 +351,8 @@ impl Mouse {
         // dpi already multiplyed
         let (x, y) = (x as f32, y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
+        self.x01 = x;
+        self.y01 = y;
         // with z=0f32 -- which is coordinate of our canvas in 3d space
         let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, y));
         self.o_x = ortho_point.x;

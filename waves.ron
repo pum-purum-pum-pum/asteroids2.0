@@ -38,5 +38,27 @@
 			boss: None,
 			iterations: 1
 		),
+		(
+			distribution: [
+				(0, 0.1),
+				(1, 0.2),
+				(2, 0.4),
+				(3, 0.3)
+			],
+			ships_number: 8,
+			boss: None,
+			iterations: 1
+		),
+		(
+			distribution: [
+				(0, 0.1),
+				(1, 0.2),
+				(2, 0.4),
+				(3, 0.3)
+			],
+			ships_number: 15,
+			boss: None,
+			iterations: 1
+		),
 	]
 )

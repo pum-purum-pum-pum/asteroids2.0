@@ -221,6 +221,8 @@ pub struct Canvas {
     perlin_y: Perlin,
     perlin_time: f32,
     camera_wobble: f32,
+    direction: Vector2,
+    direction_offset: Vector2
     // default_params: glium::DrawParameters<'a>,
     // stencil_check_params: glium::DrawParameters<'a>,
     // stencil_write_params: glium::DrawParameters<'a>,
@@ -245,7 +247,9 @@ impl Canvas {
             perlin_x: Perlin::new().set_seed(0),
             perlin_y: Perlin::new().set_seed(1),
             perlin_time: 0.1f32,
-            camera_wobble: 0f32
+            camera_wobble: 0f32,
+            direction: Vector2::new(0f32, 0f32),
+            direction_offset: Vector2::new(0f32, 0f32)
         })
     }
 
@@ -256,20 +260,22 @@ impl Canvas {
         let x = self.perlin_x.get([time, time]);
         let y = self.perlin_y.get([time, time]);
         let noise: Vector3 = self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32);
-        self.observer + noise
+        self.observer + noise + 2f32 * Vector3::new(self.direction_offset.x, self.direction_offset.y, 0f32)
     }
 
     pub fn add_wobble(&mut self, wobble: f32) {
         self.camera_wobble += wobble;
     }
 
-    pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32) {
+    pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32, direction: Vector2) {
         self.observer.x = pos.x;
         self.observer.y = pos.y;
         self.observer.z = (1.0 - SPEED_EMA) * self.observer.z
             + SPEED_EMA * (Z_FAR + MAX_ADD_SPEED_Z * speed_ratio);
         self.perlin_time += 0.1;
         self.camera_wobble /= 2.0;
+        self.direction = direction;
+        self.direction_offset = self.direction_offset * 0.99 + 0.01 * direction;
     }
 
     pub fn get_z_shift(&self) -> f32 {

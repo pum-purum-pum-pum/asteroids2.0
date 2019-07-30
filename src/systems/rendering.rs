@@ -748,6 +748,7 @@ impl<'a> System<'a> for RenderingSystem {
                 canvas.update_observer(
                     Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
                     vel.0.norm() / VELOCITY_MAX,
+                    Vector2::new(mouse.x01, mouse.y01).normalize()
                 );
                 opt_iso = Some(iso);
                 opt_vel = Some(vel);
