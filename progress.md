@@ -1,6 +1,6 @@
 * waves \/
 * Sample only usefull upgrades
-
+* collisions \/
 
 * add screen shake (when just shooting to?) \/
 
@@ -14,7 +14,7 @@
 * * skills information \/
 * * add score table
 
-* try move camera according to gun direction
+* try move camera according to gun direction \/
 
 
 TODO LIST

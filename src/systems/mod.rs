@@ -1389,6 +1389,9 @@ impl<'a> System<'a> for CollisionSystem {
                         lifetime: 20usize,
                     };
                     insert_channel.single_write(effect);
+                    if character_markers.get(ship).is_some() {
+                        sounds_channel.single_write(Sound(preloaded_sounds.collision));
+                    }
                 }
                 if asteroid_explosion {
                     insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
@@ -1487,7 +1490,8 @@ impl<'a> System<'a> for CollisionSystem {
                         }
                         None => ()
                     }
-                    entities.delete(other_ship).unwrap();
+                    // entities.delete(other_ship).unwrap();
+                    sounds_channel.single_write(Sound(preloaded_sounds.collision));
                 }
             }
         }
