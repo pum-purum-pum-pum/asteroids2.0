@@ -1,0 +1,42 @@
+(
+	[
+		(
+			distribution: [
+				(0, 1.0),
+			],
+			ships_number: 3,
+			boss: None,
+			iterations: 1
+		),
+		(
+			distribution: [
+				(0, 0.5),
+				(1, 0.5)
+			],
+			ships_number: 3,
+			boss: None,
+			iterations: 1
+		),
+		(
+			distribution: [
+				(0, 0.1),
+				(1, 0.5),
+				(2, 0.4)
+			],
+			ships_number: 5,
+			boss: None,
+			iterations: 1
+		),
+		(
+			distribution: [
+				(0, 0.1),
+				(1, 0.2),
+				(2, 0.4),
+				(3, 0.3)
+			],
+			ships_number: 4,
+			boss: None,
+			iterations: 1
+		),
+	]
+)

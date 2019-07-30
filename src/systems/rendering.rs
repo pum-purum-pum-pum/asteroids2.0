@@ -214,18 +214,20 @@ pub struct GUISystem;
 
 impl<'a> System<'a> for GUISystem {
     type SystemData = (
-        Entities<'a>,
-        ReadStorage<'a, Isometry>,
-        WriteStorage<'a, Velocity>,
-        ReadStorage<'a, PhysicsComponent>,
-        ReadStorage<'a, CharacterMarker>,
-        ReadStorage<'a, ShipMarker>,
-        ReadStorage<'a, Lifes>,
-        ReadStorage<'a, Shield>,
-        WriteStorage<'a, Spin>,
-        WriteStorage<'a, Blaster>,
-        WriteStorage<'a, ShipStats>,
-        ReadExpect<'a, red::Viewport>,
+        (
+            Entities<'a>,
+            ReadStorage<'a, Isometry>,
+            WriteStorage<'a, Velocity>,
+            ReadStorage<'a, PhysicsComponent>,
+            ReadStorage<'a, CharacterMarker>,
+            ReadStorage<'a, ShipMarker>,
+            ReadStorage<'a, Lifes>,
+            ReadStorage<'a, Shield>,
+            WriteStorage<'a, Spin>,
+            WriteStorage<'a, Blaster>,
+            WriteStorage<'a, ShipStats>,
+            ReadExpect<'a, red::Viewport>,
+        ),
         Write<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
@@ -240,22 +242,25 @@ impl<'a> System<'a> for GUISystem {
         Read<'a, AvaliableUpgrades>,
         Write<'a, SpawnedUpgrades>,
         WriteExpect<'a, ChoosedUpgrade>,
+        Read<'a, CurrentWave>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
           let (
-            entities,
-            isometries,
-            mut velocities,
-            physics,
-            character_markers,
-            ship_markers,
-            lifes,
-            shields,
-            mut spins,
-            mut blasters,
-            mut ships_stats,
-            viewport,
+            (
+                entities,
+                isometries,
+                mut velocities,
+                physics,
+                character_markers,
+                ship_markers,
+                lifes,
+                shields,
+                mut spins,
+                mut blasters,
+                mut ships_stats,
+                viewport,
+            ),
             // preloaded_particles,
             mut world,
             _primitives_channel,
@@ -270,7 +275,8 @@ impl<'a> System<'a> for GUISystem {
             mut insert_channel,
             avaliable_upgrades,
             mut spawned_upgrades,
-            mut choosed_upgrade
+            mut choosed_upgrade,
+            current_wave
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -425,6 +431,21 @@ impl<'a> System<'a> for GUISystem {
                 image: None
             }
         );
+
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w - w/7.0, h / 7.0 + h / 20.0), 
+                    text: format!(
+                        "Wave: {}", 
+                        current_wave.id
+                    ).to_string()
+                }),
+                with_projection: false,
+                image: None
+            }
+        );
+
 
         ingame_ui.primitives.push(
             Primitive {

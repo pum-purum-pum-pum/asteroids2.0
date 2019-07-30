@@ -15,7 +15,7 @@ use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
 
-pub const ASTEROID_MAX_LIFES: usize = 100usize;
+pub const ASTEROID_MAX_LIFES: usize = 1000usize;
 
 
 pub const BULLET_SPEED_INIT: f32 = 0.5;
@@ -27,6 +27,23 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
+
+#[derive(Debug, Default)]
+pub struct CurrentWave{
+    pub id: usize,
+    pub iteration: usize
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct Waves (pub Vec<Wave>);
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+pub struct Wave {
+    pub distribution: Vec<(usize, f32)>,
+    pub ships_number: usize,
+    pub boss: Option<usize>,
+    pub iterations: usize
+}
 
 #[derive(Debug, Default)]
 pub struct Music {

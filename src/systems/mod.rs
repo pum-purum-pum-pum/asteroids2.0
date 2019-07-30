@@ -1098,6 +1098,8 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, SpawnedUpgrades>,
         Read<'a, AvaliableUpgrades>,
         ReadExpect<'a, Description>,
+        Write<'a, CurrentWave>,
+        Read<'a, Waves>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1124,14 +1126,16 @@ impl<'a> System<'a> for GamePlaySystem {
                 ships_stats,
             ),
             _stat,
-            preloaded_images,
+            _preloaded_images,
             _world,
             _bodies_map,
             mut insert_channel,
             mut progress,
             mut spawned_upgrades,
             avaliable_upgrades,
-            description
+            description,
+            mut current_wave,
+            waves
         ) = data;
         for (shield, life, ship_stats, _character) in (&mut shields, &mut lifes, &ships_stats, &character_markers).join() {
             shield.0 = (shield.0 + ship_stats.shield_regen).min(ship_stats.max_shield);
@@ -1191,11 +1195,17 @@ impl<'a> System<'a> for GamePlaySystem {
             });
         }
         let cnt = ships.count();
-        let add_cnt = if SHIPS_NUMBER > cnt {
-            SHIPS_NUMBER - cnt
+        let wave = &waves.0[current_wave.id];
+        let add_cnt = if cnt == 1 {
+            current_wave.iteration += 1;
+            wave.ships_number - cnt + 1
         } else {
             0
         };
+        if current_wave.iteration > wave.iterations {
+            current_wave.iteration = 0;
+            current_wave.id = (waves.0.len() - 1).min(current_wave.id + 1);
+        }
         let mut rng = thread_rng();
         for _ in 0..add_cnt {
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
@@ -1215,7 +1225,7 @@ impl<'a> System<'a> for GamePlaySystem {
                     image: enemy.image
                 }
             };
-            let ship_id = rng.gen_range(0, ships.len());
+            let ship_id = wave.distribution.choose_weighted(&mut rng, |item| item.1).unwrap().0;
             insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
         };
         let cnt = nebulas.count();

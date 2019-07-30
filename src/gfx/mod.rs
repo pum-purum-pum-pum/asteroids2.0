@@ -255,7 +255,7 @@ impl Canvas {
         let time = self.perlin_time as f64;
         let x = self.perlin_x.get([time, time]);
         let y = self.perlin_y.get([time, time]);
-        let noise: Vector3 = self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32).normalize();
+        let noise: Vector3 = self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32);
         self.observer + noise
     }
 

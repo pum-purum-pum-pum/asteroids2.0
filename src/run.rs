@@ -240,6 +240,7 @@ pub fn run() -> Result<(), String> {
         };
         let desc = process_description(desc, &name_to_image);
         specs_world.add_resource(desc);
+
         #[derive(Debug, Serialize, Deserialize)]
         pub struct UpgradeCardSave {
             upgrade_type: UpgradeType,
@@ -268,6 +269,17 @@ pub fn run() -> Result<(), String> {
         ).collect();
         let avaliable_upgrades = upgrades;
         specs_world.add_resource(avaliable_upgrades);
+
+        let file = File::open("waves.ron").unwrap();
+        let waves: Waves = match from_reader(file) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("Failed to load config: {}", e);
+                std::process::exit(1);
+            }
+        };
+        specs_world.add_resource(waves);
+        specs_world.add_resource(CurrentWave::default());
     }
 
     let preloaded_images = PreloadedImages {

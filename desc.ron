@@ -51,6 +51,24 @@
             image_name: "enemy2",
         ),
         (
+        ai_kind: ShootAndFollow,
+            gun_kind: Blaster((
+                recharge_state: 0,
+                recharge_time: 17,
+                bullets_damage: 100,
+                bullet_speed: 0.2,
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0
+            ),
+            image_name: "enemy1",
+        ),
+        (
             ai_kind: ShootAndFollow,
             gun_kind: Lazer((
                 damage: 7,
@@ -87,24 +105,6 @@
                 max_shield: 0
             ),
             image_name: "enemy3",
-        ),
-        (
-            ai_kind: ShootAndFollow,
-            gun_kind: Blaster((
-                recharge_state: 0,
-                recharge_time: 17,
-                bullets_damage: 100,
-                bullet_speed: 0.2,
-            )),
-            ship_stats: (
-                thrust_force: 0.003,
-                torque: 0.2,
-                health_regen: 0,
-                shield_regen: 0,
-                max_health: 100,
-                max_shield: 0
-            ),
-            image_name: "enemy1",
         ),
     ],
 )

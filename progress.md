@@ -1,4 +1,8 @@
-* add screen shake (when just shooting to?)
+* waves
+* Sample only usefull upgrades
+
+
+* add screen shake (when just shooting to?) \/
 
 
 * add text \/
@@ -33,7 +37,6 @@ ws bullets around
 * Lazer add skilss
 * * Lazer length
 
-* Sample only usefull upgrades
 
 * upgrades from files
 
