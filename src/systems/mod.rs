@@ -780,6 +780,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
                         .with(Velocity::new(0f32, 0f32), &mut velocities)
                         .with(CharacterMarker::default(), &mut character_markers)
+                        .with(Damage(ship_stats.damage), &mut damages)
                         .with(ShipMarker::default(), &mut ships)
                         .with(Image(preloaded_images.character), &mut images)
                         .with(Spin::default(), &mut spins)
@@ -924,6 +925,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(EnemyMarker::default(), &mut enemies)
                         .with(ShipMarker::default(), &mut ships)
                         .with(*image, &mut images)
+                        .with(Damage(ship_stats.damage), &mut damages)
                         .with(Lifes(ship_stats.max_health), &mut lifes)
                         .with(*ship_stats, &mut ships_stats)
                         // .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
@@ -1221,7 +1223,7 @@ impl<'a> System<'a> for GamePlaySystem {
                     kind: enemy.ai_kind,
                     gun_kind: enemy.gun_kind,
                     ship_stats: enemy.ship_stats,
-                    image: enemy.image
+                    image: enemy.image,
                 }
             };
             let ship_id = wave.distribution.choose_weighted(&mut rng, |item| item.1).unwrap().0;
@@ -1484,14 +1486,24 @@ impl<'a> System<'a> for CollisionSystem {
                 if character_markers.get(ship1).is_some() {
                     let character_ship = ship1;
                     let other_ship = ship2;
-                    match damages.get(other_ship) {
-                        Some(damage) => {
-                            lifes.get_mut(character_ship).unwrap().0 -= damage.0;
-                        }
-                        None => ()
-                    }
                     // entities.delete(other_ship).unwrap();
                     sounds_channel.single_write(Sound(preloaded_sounds.collision));
+                    if process_damage(
+                        lifes.get_mut(other_ship).unwrap(),
+                        shields.get_mut(other_ship),
+                        damages.get(character_ship).unwrap().0
+                    ) {
+                        entities.delete(other_ship).unwrap();
+                    }
+                    if process_damage(
+                        lifes.get_mut(character_ship).unwrap(),
+                        shields.get_mut(character_ship),
+                        damages.get(other_ship).unwrap().0
+                    ) {
+                        *app_state = AppState::Menu;
+                        // delete character
+                        entities.delete(character_ship).unwrap();
+                    }
                 }
             }
         }

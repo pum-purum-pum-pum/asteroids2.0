@@ -6,7 +6,8 @@
             health_regen: 1,
             shield_regen: 1,
             max_health: 1000,
-            max_shield: 500
+            max_shield: 500,
+            damage: 10
         )
     ],
     player_guns: [
@@ -46,7 +47,8 @@
                 health_regen: 0,
                 shield_regen: 0,
                 max_health: 100,
-                max_shield: 0
+                max_shield: 0,
+                damage: 50
             ),
             image_name: "enemy2",
         ),
@@ -64,7 +66,8 @@
                 health_regen: 0,
                 shield_regen: 0,
                 max_health: 100,
-                max_shield: 0
+                max_shield: 0,
+                damage: 10
             ),
             image_name: "enemy1",
         ),
@@ -82,7 +85,8 @@
                 health_regen: 0,
                 shield_regen: 0,
                 max_health: 100,
-                max_shield: 0
+                max_shield: 0,
+                damage: 10
             ),
             image_name: "enemy4",
         ),
@@ -102,7 +106,8 @@
                 health_regen: 0,
                 shield_regen: 0,
                 max_health: 100,
-                max_shield: 0
+                max_shield: 0,
+                damage: 10
             ),
             image_name: "enemy3",
         ),

@@ -1,4 +1,5 @@
 use crate::gfx::TextData;
+use std::collections::{HashMap};
 
 use super::*;
 use crate::gui::VecController;
@@ -32,6 +33,9 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Write<'a, MenuChosedGun>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
         ReadExpect<'a, Description>,
+        Read<'a, Vec<UpgradeCardRaw>>,
+        Write<'a, Vec<UpgradeCard>>,
+        Read<'a, HashMap<String, specs::Entity>>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -50,6 +54,9 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mut chosed_gun,
             mut text_data,
             description,
+            upgrade_cards_raw,
+            mut avaliable_upgrades,
+            name_to_image,
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
@@ -114,6 +121,11 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     ship_stats: description.player_ships_stats[0]
                 });
                 chosed_gun.0 = None;
+                *avaliable_upgrades = get_avaliable_cards(
+                    &upgrade_cards_raw,
+                    &gun,
+                    &name_to_image
+                );
             }
         }
         primitives_channel.iter_write(ui.primitives.drain(..));

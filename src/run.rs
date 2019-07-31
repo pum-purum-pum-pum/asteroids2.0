@@ -240,16 +240,8 @@ pub fn run() -> Result<(), String> {
         };
         let desc = process_description(desc, &name_to_image);
         specs_world.add_resource(desc);
-
-        #[derive(Debug, Serialize, Deserialize)]
-        pub struct UpgradeCardSave {
-            upgrade_type: UpgradeType,
-            image: String,
-            name: String,
-            description: String            
-        }
         let file = File::open("upgrades.ron").unwrap();
-        let mut upgrades: Vec<UpgradeCardSave> = match from_reader(file) {
+        let upgrades_all: Vec<UpgradeCardRaw> = match from_reader(file) {
             Ok(x) => x,
             Err(e) => {
                 println!("Failed to load config: {}", e);
@@ -257,13 +249,13 @@ pub fn run() -> Result<(), String> {
                 std::process::exit(1);
             }
         };
-        let upgrades: Vec<UpgradeCard> = upgrades.drain(..).map(
+        let upgrades: Vec<UpgradeCard> = upgrades_all.iter().map(
             |upgrade| {
                 UpgradeCard {
                     upgrade_type: upgrade.upgrade_type,
                     image: Image(name_to_image[&upgrade.image]),
-                    name: upgrade.name,
-                    description: upgrade.description
+                    name: upgrade.name.clone(),
+                    description: upgrade.description.clone()
                 }
             }
         ).collect();
@@ -279,6 +271,7 @@ pub fn run() -> Result<(), String> {
             }
         };
         specs_world.add_resource(waves);
+        specs_world.add_resource(upgrades_all);
         specs_world.add_resource(CurrentWave::default());
     }
 
@@ -331,6 +324,7 @@ pub fn run() -> Result<(), String> {
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
     let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
     specs_world.add_resource(LoopSound::default());

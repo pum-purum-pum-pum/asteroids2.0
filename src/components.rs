@@ -1,4 +1,5 @@
 use std::ops::AddAssign;
+use std::collections::{HashMap};
 
 pub use crate::geometry::Polygon;
 pub use crate::physics::{BodiesMap, PhysicsComponent};
@@ -100,7 +101,7 @@ pub enum InsertEvent {
         gun_kind: GunKind,
         kind: AIType,
         ship_stats: ShipStats,
-        image: Image
+        image: Image,
     },
     Bullet {
         kind: EntityType,
@@ -175,7 +176,8 @@ pub struct ShipStats {
     pub health_regen: usize,
     pub shield_regen: usize,
     pub max_health: usize,
-    pub max_shield: usize
+    pub max_shield: usize,
+    pub damage: usize,
 }
 
 // impl Default for ShipStats {
@@ -423,6 +425,62 @@ impl Lifetime {
     pub fn delete(&self) -> bool {
         self.life_state >= self.life_time
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum GunKindMarker {
+    Blaster,
+    Lazer,
+    ShotGun
+}
+
+impl Into<GunKindMarker> for &GunKind {
+    fn into(self) -> GunKindMarker {
+        match self {
+            GunKind::Blaster(_) => GunKindMarker::Blaster,
+            GunKind::ShotGun(_) => GunKindMarker::ShotGun,
+            GunKind::Lazer(_) => GunKindMarker::Lazer
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize)]
+pub enum Assigned {
+    General,
+    ToGun(GunKindMarker),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct UpgradeCardRaw {
+    pub upgrade_type: UpgradeType,
+    pub image: String,
+    pub name: String,
+    pub description: String,
+    pub assigned: Vec<Assigned>
+}
+
+pub fn get_avaliable_cards(
+    cards: &[UpgradeCardRaw], 
+    gun: &GunKind,
+    name_to_image: &HashMap<String, specs::Entity>
+) -> Vec<UpgradeCard> {
+    let gun_marker: GunKindMarker = gun.into();
+    let avaliable_cards: Vec<UpgradeCard> = cards.iter().filter(
+        |raw_card| {
+            raw_card.assigned.contains(&Assigned::General) ||
+            raw_card.assigned.contains(&Assigned::ToGun(gun_marker))
+        }
+    ).map(
+        |upgrade| {
+            UpgradeCard {
+                upgrade_type: upgrade.upgrade_type,
+                image: Image(name_to_image[&upgrade.image]),
+                name: upgrade.name.clone(),
+                description: upgrade.description.clone()
+            }
+        }
+    ).collect();
+    avaliable_cards
 }
 
 /// attach entity positions to some other entity position
