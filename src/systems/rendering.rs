@@ -1,10 +1,11 @@
 use crate::gfx::TextData;
 use std::collections::{HashMap};
-
+use std::cmp::Ordering::Equal;
 use super::*;
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
-
+use crate::geometry::LightningPolygon;
+const LIGHT_RECTANGLE_SIZE: f32 = 10f32;
 
 pub struct MenuRenderingSystem {
     reader: ReaderId<Primitive>,
@@ -706,6 +707,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Size>,
             ReadStorage<'a, Polygon>,
             ReadStorage<'a, Lazer>,
+            ReadStorage<'a, Geometry>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
         Read<'a, Mouse>,
@@ -737,6 +739,7 @@ impl<'a> System<'a> for RenderingSystem {
                 sizes,
                 polygons,
                 lazers,
+                geometries,
                 mut particles_datas,
             ),
             mouse,
@@ -751,8 +754,8 @@ impl<'a> System<'a> for RenderingSystem {
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.015, 0.004, 0.0, 1.0);
-        frame.clear_color();
-        // target.clear_stencil(0i32);
+        frame.set_clear_stencil(0);
+        frame.clear_color_and_stencil();
         let (char_iso, char_pos, char_vel) = {
             let mut opt_iso = None;
             let mut opt_vel = None;
@@ -785,38 +788,47 @@ impl<'a> System<'a> for RenderingSystem {
                         false
                 );
         };
-        // {
-        //     let rectangle = (
-        //         char_pos.x - LIGHT_RECTANGLE_SIZE,
-        //         char_pos.y - LIGHT_RECTANGLE_SIZE,
-        //         char_pos.x + LIGHT_RECTANGLE_SIZE,
-        //         char_pos.y + LIGHT_RECTANGLE_SIZE,
-        //     );
-        //     let mut light_poly = LightningPolygon::new_rectangle(
-        //         rectangle.0,
-        //         rectangle.1,
-        //         rectangle.2,
-        //         rectangle.3,
-        //         Point2::new(char_pos.x, char_pos.y),
-        //     );
-        //     // TODO fix lights to be able to use without sorting
-        //     let mut data = (&entities, &isometries, &geometries, &asteroid_markers)
-        //         .join()
-        //         .collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
-        //     let distance = |a: &Isometry| (char_pos - a.0.translation.vector).norm();
-        //     data.sort_by(|&a, &b| (distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal)));
-        //     // UNCOMMENT TO ADD LIGHTS
-        //     for (_entity, iso, geom, _) in data.iter() {
-        //         let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
-        //         if pos.x > rectangle.0
-        //             && pos.x < rectangle.2
-        //             && pos.y > rectangle.1
-        //             && pos.y < rectangle.3
-        //         {
-        //             light_poly.clip_one(**geom, pos);
-        //         }
-        //     }
-        //     let triangulation = light_poly.triangulate();
+        {
+            let rectangle = (
+                char_pos.x - LIGHT_RECTANGLE_SIZE,
+                char_pos.y - LIGHT_RECTANGLE_SIZE,
+                char_pos.x + LIGHT_RECTANGLE_SIZE,
+                char_pos.y + LIGHT_RECTANGLE_SIZE,
+            );
+            let mut light_poly = LightningPolygon::new_rectangle(
+                rectangle.0,
+                rectangle.1,
+                rectangle.2,
+                rectangle.3,
+                Point2::new(char_pos.x, char_pos.y),
+            );
+            // TODO fix lights to be able to use without sorting
+            let mut data = (&entities, &isometries, &geometries, &asteroid_markers)
+                .join()
+                .collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
+            let distance = |a: &Isometry| (char_pos - a.0.translation.vector).norm();
+            data.sort_by(|&a, &b| (distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal)));
+            // UNCOMMENT TO ADD LIGHTS
+            for (_entity, iso, geom, _) in data.iter() {
+                let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
+                if pos.x > rectangle.0
+                    && pos.x < rectangle.2
+                    && pos.y > rectangle.1
+                    && pos.y < rectangle.3
+                {
+                    light_poly.clip_one(**geom, pos);
+                }
+            }
+            let triangulation = light_poly.triangulate();
+            let light_geom_data = GeometryData::new(&gl, &triangulation.points, &triangulation.indicies).unwrap();
+            canvas
+                .render_geometry(
+                    &gl, &viewport, 
+                    &mut frame, 
+                    &light_geom_data, 
+                    &Isometry3::new(Vector3::new(0f32, 0f32, 0f32), Vector3::new(0f32, 0f32, 0f32)),
+                    true
+                );
         //     let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
             for (entity, particles_data) in (&entities, &mut particles_datas).join() {
                 match **particles_data {
@@ -863,7 +875,7 @@ impl<'a> System<'a> for RenderingSystem {
                     _ => ()
                 };
             }
-        // }
+        }
 
         for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
             let translation_vec = iso.0.translation.vector;
@@ -900,7 +912,7 @@ impl<'a> System<'a> for RenderingSystem {
                     &image_datas.get(image.0).unwrap(),
                     &iso.0,
                     size.0,
-                    false
+                    true
                 );
         }
         for (_entity, iso, image, size, _light) in
@@ -935,7 +947,7 @@ impl<'a> System<'a> for RenderingSystem {
                         &image_data,
                         &iso,
                         size.0,
-                        false,
+                        true,
                     )
         }
         for (_entity, iso, _image, _size, polygon, _asteroid) in (
@@ -956,7 +968,8 @@ impl<'a> System<'a> for RenderingSystem {
                     &gl, &viewport, 
                     &mut frame, 
                     &geom_data, 
-                    &iso.0, 
+                    &iso.0,
+                    false
                 )
         }
         for (iso, lazer) in (&isometries, &lazers).join() {
@@ -978,7 +991,8 @@ impl<'a> System<'a> for RenderingSystem {
                     &viewport,
                     &mut frame,
                     &geometry_data,
-                    &iso.0
+                    &iso.0,
+                    false
                 );
             }
         };

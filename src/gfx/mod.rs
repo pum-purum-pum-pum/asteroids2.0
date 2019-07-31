@@ -22,6 +22,7 @@ use glyph_brush::{
 };
 use red::shader::Texture;
 use red::data::{*};
+use red::{DrawParams, DrawType, Stencil, StencilTest, Operation};
 
 mod effects;
 pub use effects::*;
@@ -381,7 +382,7 @@ impl Canvas {
         frame: &mut red::Frame,
         geometry_data: &GeometryData,
         model: &Isometry3,
-        // stencil: bool,
+        stencil: bool,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -394,12 +395,26 @@ impl Canvas {
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
-        let draw_type = red::DrawType::Standart;
+        let draw_params = if stencil {
+            red::DrawParams{
+                draw_type: DrawType::Standart,
+                stencil: Some(Stencil {
+                    ref_value: 1,
+                    mask: 0xFF,
+                    test: StencilTest::AlwaysPass,
+                    pass_operation: Some(Operation::Replace)
+                }),
+                color_mask: (false, false, false, false),
+                ..Default::default()
+            }
+        } else {
+            red::DrawParams::default()
+        };
         frame.draw(
             vao, 
             Some(&geometry_data.index_buffer), 
             &program, 
-            &draw_type
+            &draw_params
         );
     }
 
@@ -432,8 +447,8 @@ impl Canvas {
         program.set_uniform("projection", projection);
         program.set_uniform("fill_color", fill_color);
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
-        let draw_type = red::DrawType::Standart;
-        frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_type)
+        let draw_params = DrawParams::default();
+        frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_params);
     }
 
     pub fn render(
@@ -444,7 +459,7 @@ impl Canvas {
         image_data: &ImageData,
         model: &Isometry3,
         scale: f32,
-        _with_lights: bool,
+        with_lights: bool,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -467,12 +482,25 @@ impl Canvas {
         program.set_uniform("tex", texture.clone());
         program.set_uniform("scale", scale);
         program.set_layout(&gl, vao, &[&image_data.positions]);
-        let draw_type = red::DrawType::Standart;
+        let draw_params = if with_lights {
+            red::DrawParams{
+                draw_type: DrawType::Standart,
+                stencil: Some(Stencil {
+                    ref_value: 1,
+                    mask: 0xFF,
+                    test: StencilTest::Equal,
+                    pass_operation: None
+                }),
+                ..Default::default()
+            }
+        } else {
+            DrawParams::default()
+        };
         frame.draw(
             vao, 
             Some(&image_data.indices), 
             &program, 
-            &draw_type
+            &draw_params
         );
     }
 
@@ -498,11 +526,16 @@ impl Canvas {
         program.set_uniform("transparency", 1f32);
         program.set_layout(&gl, vao, &[&instancing_data.vertex_buffer, &instancing_data.per_instance]);
         let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len.unwrap());
+        let draw_params = red::DrawParams {
+            stencil: None,
+            draw_type: draw_type,
+            ..Default::default()
+        };
         frame.draw(
             vao, 
             Some(&instancing_data.indices),
             &program, 
-            &draw_type
+            &draw_params
         );
     }
 
@@ -537,11 +570,10 @@ impl Canvas {
         program.set_uniform("size", size);
         program.set_layout(&gl, vao, &[&image_data.positions]);
 
-        let draw_type = red::DrawType::Standart;
-        frame.draw(vao, Some(&image_data.indices), &program, &draw_type);
+        let draw_params = DrawParams::default();
+        frame.draw(vao, Some(&image_data.indices), &program, &draw_params);
     }
 }
-
 
 pub fn _orthographic_from_zero(width: u32, height: u32) -> Orthographic3<f32> {
     Orthographic3::new(0f32, width as f32, 0f32, height as f32, -0.9, 0.0)

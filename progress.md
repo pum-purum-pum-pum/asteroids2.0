@@ -1,5 +1,5 @@
 * damage ship \/
-* Sample only usefull upgrades
+* Sample only usefull upgrades \/
 * try shadows again
 * animations
 * explosions with animations
