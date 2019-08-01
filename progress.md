@@ -1,7 +1,7 @@
 * damage ship \/
 * Sample only usefull upgrades \/
-* try shadows again
-* animations
+* try shadows again \/
+* animations \/
 * explosions with animations
 * add boss1
 * enemies
@@ -10,7 +10,9 @@
 * * lazer beams around and rotating
 * add boss2
 * add score table
+* correct shadows
 
+* circular style? circular pixel art?
 
 * new projectiles
 * * rocketes

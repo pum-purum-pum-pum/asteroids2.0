@@ -549,6 +549,7 @@ impl<'a> System<'a> for ControlSystem {
                         if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) {
                             if let Some(_) = lifes.get(*target_entity) {
                                 let mut explosion_size = 1;
+                                let mut with_animation = false;
                                 if process_damage(
                                     lifes.get_mut(*target_entity).unwrap(),
                                     shields.get_mut(*target_entity),
@@ -564,6 +565,7 @@ impl<'a> System<'a> for ControlSystem {
                                         );
                                     }
                                     explosion_size = 20;
+                                    with_animation = true;
                                     sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                                     insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                                     entities.delete(*target_entity).unwrap();
@@ -573,6 +575,7 @@ impl<'a> System<'a> for ControlSystem {
                                     position: Point2::new(effect_position.x, effect_position.y),
                                     num: explosion_size,
                                     lifetime: 50usize,
+                                    with_animation
                                 };
                                 insert_channel.single_write(effect);
                             }
@@ -691,11 +694,12 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Projectile>,
             WriteStorage<'a, NebulaMarker>,
             WriteStorage<'a, AttachPosition>,
+            WriteStorage<'a, Animation>,
         ),
-            WriteStorage<'a, LightMarker>,
-            WriteStorage<'a, CharacterMarker>,
-            WriteStorage<'a, ThreadPin<ParticlesData>>,
-            WriteStorage<'a, ShipStats>,
+        WriteStorage<'a, LightMarker>,
+        WriteStorage<'a, CharacterMarker>,
+        WriteStorage<'a, ThreadPin<ParticlesData>>,
+        WriteStorage<'a, ShipStats>,
         ReadExpect<'a, ThreadPin<red::GL>>,
         Write<'a, Stat>,
         WriteExpect<'a, PreloadedImages>,
@@ -732,6 +736,7 @@ impl<'a> System<'a> for InsertSystem {
                 mut projectiles,
                 mut nebulas,
                 mut attach_positions,
+                mut animations
             ),
             mut lights,
             mut character_markers,
@@ -1008,7 +1013,19 @@ impl<'a> System<'a> for InsertSystem {
                     position,
                     num,
                     lifetime,
+                    with_animation
                 } => {
+                    let iso = Isometry::new(position.x, position.y, 0f32);
+                    if *with_animation {
+                        let _animation_entity = entities
+                            .build_entity()
+                            .with(iso, &mut isometries)
+                            .with(preloaded_images.explosion.clone(), &mut animations)
+                            .with(Lifetime::new(100usize), &mut lifetimes)
+                            .with(Size(4f32), &mut sizes)        
+                            .build();            
+                    }
+                    // particles of explosion                        
                     let explosion_particles = ThreadPin::new(ParticlesData::Explosion(Explosion::new(
                         &gl,
                         *position,
@@ -1389,6 +1406,7 @@ impl<'a> System<'a> for CollisionSystem {
                         position: Point2::new(position.x, position.y),
                         num: 3usize,
                         lifetime: 20usize,
+                        with_animation: false
                     };
                     insert_channel.single_write(effect);
                     if character_markers.get(ship).is_some() {
@@ -1405,6 +1423,7 @@ impl<'a> System<'a> for CollisionSystem {
                         position: Point2::new(position.x, position.y),
                         num: 10usize,
                         lifetime: 20usize,
+                        with_animation: true
                     };
                     insert_channel.single_write(effect);
                     sounds_channel.single_write(Sound(preloaded_sounds.explosion));
@@ -1457,6 +1476,7 @@ impl<'a> System<'a> for CollisionSystem {
                     // }
                 } else {
                     let mut explosion_size = 2usize;
+                    let mut with_animation = false;
                     if process_damage(
                         lifes.get_mut(ship).unwrap(),
                         shields.get_mut(ship),
@@ -1465,6 +1485,7 @@ impl<'a> System<'a> for CollisionSystem {
                         progress.kill(50usize, 50usize);
                         entities.delete(ship).unwrap();
                         explosion_size = 20;
+                        with_animation = true;
                         insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                         sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                     }
@@ -1472,6 +1493,7 @@ impl<'a> System<'a> for CollisionSystem {
                         position: Point2::new(position.x, position.y),
                         num: explosion_size,
                         lifetime: 50usize,
+                        with_animation: with_animation
                     };
                     insert_channel.single_write(effect);
                 }
@@ -1709,7 +1731,6 @@ impl<'a> System<'a> for AISystem {
                             if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) { 
                                                 // TODO REFACTOR. almost copy paste (except removed progress)
                                 if let Some(_) = lifes.get(*target_entity) {
-                                    let explosion_size = 1;
                                     if process_damage(
                                         lifes.get_mut(*target_entity).unwrap(),
                                         shields.get_mut(*target_entity),
@@ -1720,6 +1741,7 @@ impl<'a> System<'a> for AISystem {
                                                 position: Point2::new(position.x, position.y),
                                                 num: 10usize,
                                                 lifetime: 20usize,
+                                                with_animation: true
                                             };
                                             insert_channel.single_write(effect);
                                             sounds_channel.single_write(Sound(preloaded_sounds.explosion));
@@ -1739,8 +1761,9 @@ impl<'a> System<'a> for AISystem {
                                     let effect_position = Vector2::new(position.x, position.y) + dir * min_d;
                                     let effect = InsertEvent::Explosion {
                                         position: Point2::new(effect_position.x, effect_position.y),
-                                        num: explosion_size,
+                                        num: 1,
                                         lifetime: 50usize,
+                                        with_animation: false
                                     };
                                     insert_channel.single_write(effect);
                                 }

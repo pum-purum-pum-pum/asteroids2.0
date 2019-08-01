@@ -6,6 +6,7 @@ pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
 pub use crate::gui::{Button, Rectangle};
+pub use crate::gfx::animation::{Animation, AnimationFrame};
 use crate::types::{*};
 
 
@@ -121,6 +122,7 @@ pub enum InsertEvent {
         position: Point2,
         num: usize,
         lifetime: usize,
+        with_animation: bool
     },
     Engine {
         position: Point2,
@@ -292,6 +294,7 @@ pub struct PreloadedImages {
     pub lazer: specs::Entity,
     pub blaster: specs::Entity,
     pub shotgun: specs::Entity,
+    pub explosion: Animation
 }
 
 pub struct PreloadedParticles {

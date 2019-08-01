@@ -24,8 +24,10 @@ use red::shader::Texture;
 use red::data::{*};
 use red::{DrawParams, DrawType, Stencil, StencilTest, Operation};
 
-mod effects;
+pub mod effects;
 pub use effects::*;
+pub mod animation;
+pub use animation::*;
 
 const Z_CANVAS: f32 = 0f32;
 const Z_FAR: f32 = 10f32;

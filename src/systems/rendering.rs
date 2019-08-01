@@ -704,6 +704,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Projectile>,
             ReadStorage<'a, ThreadPin<ImageData>>,
             ReadStorage<'a, Image>,
+            WriteStorage<'a, Animation>,
             ReadStorage<'a, Size>,
             ReadStorage<'a, Polygon>,
             ReadStorage<'a, Lazer>,
@@ -736,6 +737,7 @@ impl<'a> System<'a> for RenderingSystem {
                 projectiles,
                 image_datas,
                 image_ids,
+                mut animations,
                 sizes,
                 polygons,
                 lazers,
@@ -790,9 +792,9 @@ impl<'a> System<'a> for RenderingSystem {
         };
         {
             let rectangle = (
-                char_pos.x - LIGHT_RECTANGLE_SIZE,
+                char_pos.x - 1.5 * LIGHT_RECTANGLE_SIZE,
                 char_pos.y - LIGHT_RECTANGLE_SIZE,
-                char_pos.x + LIGHT_RECTANGLE_SIZE,
+                char_pos.x + 1.5 * LIGHT_RECTANGLE_SIZE,
                 char_pos.y + LIGHT_RECTANGLE_SIZE,
             );
             let mut light_poly = LightningPolygon::new_rectangle(
@@ -901,7 +903,9 @@ impl<'a> System<'a> for RenderingSystem {
             };
         }
 
-         for (_entity, iso, image, size, _projectile) in
+
+
+        for (_entity, iso, image, size, _projectile) in
             (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
         {
             canvas
@@ -995,6 +999,22 @@ impl<'a> System<'a> for RenderingSystem {
                     false
                 );
             }
+        };
+        for (iso, size, animation) in (&isometries, &sizes, &mut animations).join() {
+            let animation_frame = animation.next_frame();
+            if let Some(animation_frame) = animation_frame {
+                let image_data = image_datas.get(animation_frame.image.0).unwrap();
+                canvas
+                    .render(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        false
+                    )
+            };
         };
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
         render_primitives(

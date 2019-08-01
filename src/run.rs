@@ -10,6 +10,9 @@ use red::glow::RenderLoop;
 use backtrace::Backtrace;
 #[cfg(any(target_os = "android"))]
 use std::panic;
+use std::collections::{HashMap};
+use std::fs::{self, DirEntry};
+use std::path::Path;
 use crate::types::{*};
 use crate::components::*;
 use crate::gfx::{Canvas, GlyphVertex, TextVertexBuffer, TextData};
@@ -23,7 +26,6 @@ use crate::systems::{
 use glyph_brush::{*};
 use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
-use std::collections::{HashMap};
 
 const NEBULAS_NUM: usize = 3usize;
 pub const FINGER_NUMBER: usize = 20;
@@ -137,6 +139,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<AIType>();
     specs_world.register::<ThreadPin<ParticlesData>>();
     specs_world.register::<ShipStats>();
+    specs_world.register::<Animation>();
     let images = [
         "back",
         "player_new", 
@@ -164,6 +167,42 @@ pub fn run() -> Result<(), String> {
         "shotgun",
 
     ];
+    let mut name_to_animation = HashMap::new();
+    { // load animations
+        let animations = [
+            "explosion1"
+        ];
+        for animation_name in animations.iter() {
+            let animation_full = &format!("assets/{}", animation_name);
+            let animation_dir = Path::new(animation_full);
+            let mut frames = vec![];
+            for entry in fs::read_dir(animation_dir).unwrap() {
+                let name = entry
+                    .unwrap()
+                    .path().file_stem().unwrap()
+                    .to_os_string().into_string().unwrap();
+                let assets_path = format!("{}/{}", animation_name, name);
+                let image_data = ThreadPin::new(
+                    ImageData::new(&context, &assets_path).unwrap()
+                );
+                let image = specs_world
+                    .create_entity()
+                    .with(image_data)
+                    .build();        
+                let animation_frame = AnimationFrame {
+                    image: Image(image),
+                    ticks: 1
+                };
+                frames.push(animation_frame);
+            }
+            let animation = Animation::new(
+                frames,
+                1,
+                0
+            );
+            name_to_animation.insert(animation_name.to_string(), animation);
+        }
+    };
     let mut name_to_image = HashMap::new();
     for image_name in images.iter() {
         let image_data = ThreadPin::new(
@@ -296,6 +335,7 @@ pub fn run() -> Result<(), String> {
         lazer: name_to_image["lazer_gun"],
         blaster: name_to_image["blaster_gun"],
         shotgun: name_to_image["shotgun"],
+        explosion: name_to_animation["explosion1"].clone()
     };
 
 
