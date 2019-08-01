@@ -1,30 +1,4 @@
-// use crate::types::{*};
-use crate::components::*;
-// use rand::prelude::*;
-// use noise::{NoiseFn, Perlin, Seedable};
-
-// use std::io::{BufReader, Error as IOError, Read};
-
-
-// use nalgebra::geometry::Orthographic3;
-
-// use red;
-// use red::VertexAttribPointers;
-// use red::glow::Context;
-// use red::glow;
-
-// use image;
-
-// use sdl2::rwops::RWops;
-// use std::path::Path;
-// use glyph_brush::{
-//     BrushAction, BrushError, rusttype::{Rect, point}, GlyphBrush,
-//     DefaultSectionHasher
-// };
-// use red::shader::Texture;
-// use red::data::{*};
-// use red::{DrawParams, DrawType, Stencil, StencilTest, Operation};
-use specs::prelude::*;
+use crate::components::*;use specs::prelude::*;
 use specs_derive::Component;
 
 #[derive(Debug, Clone, Copy)]
