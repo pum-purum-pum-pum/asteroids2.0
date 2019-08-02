@@ -211,6 +211,47 @@ pub fn create_shader_program(gl: &red::GL, name: &str, glsl_version: &str) -> Re
     Ok(program)
 }
 
+pub enum RenderMode {
+    StencilWrite,
+    StencilCheck,
+    Draw
+}
+
+impl Into<DrawParams> for RenderMode {
+    fn into(self) -> DrawParams {
+        match self {
+            RenderMode::StencilWrite => {
+                red::DrawParams{
+                    draw_type: DrawType::Standart,
+                    stencil: Some(Stencil {
+                        ref_value: 1,
+                        mask: 0xFF,
+                        test: StencilTest::AlwaysPass,
+                        pass_operation: Some(Operation::Replace)
+                    }),
+                    color_mask: (false, false, false, false),
+                    ..Default::default()
+                }
+            }
+            RenderMode::Draw => {
+                red::DrawParams::default()
+            }
+            RenderMode::StencilCheck => {
+                red::DrawParams{
+                    draw_type: DrawType::Standart,
+                    stencil: Some(Stencil {
+                        ref_value: 1,
+                        mask: 0xFF,
+                        test: StencilTest::NotEqual,
+                        pass_operation: None
+                    }),
+                    ..Default::default()
+                }
+            }
+        }
+    }
+}
+
 /// 2D graphics
 pub struct Canvas {
     program: red::Program,       // @vlad TODO: we want to use many programs
@@ -384,7 +425,7 @@ impl Canvas {
         frame: &mut red::Frame,
         geometry_data: &GeometryData,
         model: &Isometry3,
-        stencil: bool,
+        render_mode: RenderMode,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -397,21 +438,7 @@ impl Canvas {
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
-        let draw_params = if stencil {
-            red::DrawParams{
-                draw_type: DrawType::Standart,
-                stencil: Some(Stencil {
-                    ref_value: 1,
-                    mask: 0xFF,
-                    test: StencilTest::AlwaysPass,
-                    pass_operation: Some(Operation::Replace)
-                }),
-                color_mask: (false, false, false, false),
-                ..Default::default()
-            }
-        } else {
-            red::DrawParams::default()
-        };
+        let draw_params = render_mode.into();
         frame.draw(
             vao, 
             Some(&geometry_data.index_buffer), 
@@ -429,6 +456,7 @@ impl Canvas {
         model: &Isometry3,
         fill_color: (f32, f32, f32),
         with_projection: bool,
+        render_mode: RenderMode
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -449,7 +477,7 @@ impl Canvas {
         program.set_uniform("projection", projection);
         program.set_uniform("fill_color", fill_color);
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
-        let draw_params = DrawParams::default();
+        let draw_params = render_mode.into();
         frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_params);
     }
 
@@ -490,7 +518,7 @@ impl Canvas {
                 stencil: Some(Stencil {
                     ref_value: 1,
                     mask: 0xFF,
-                    test: StencilTest::Equal,
+                    test: StencilTest::NotEqual,
                     pass_operation: None
                 }),
                 ..Default::default()

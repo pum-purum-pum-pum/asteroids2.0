@@ -219,8 +219,16 @@ pub struct Stat {
 }
 
 #[derive(Component, Debug, Clone, Copy)]
+pub struct BlockSegment {
+    pub point1: Point2, 
+    pub point2: Point2 
+}
+
+#[derive(Component, Debug, Clone)]
 pub enum Geometry {
     Circle { radius: f32 },
+    Segment(BlockSegment),
+    Polygon(Polygon),
 }
 
 #[derive(Component, Debug, Clone, Copy)]

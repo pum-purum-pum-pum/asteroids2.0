@@ -2,22 +2,24 @@
 * Sample only usefull upgrades \/
 * try shadows again \/
 * animations \/
-* explosions with animations
+* explosions with animations \/
+* android revisit
+* make gif (+ video) on #screenshot_saturday
 * add boss1
 * enemies
 * * constantly trhows slow bullets in spiral(while rotating)
 * * rarely throws super fast bullets
 * * lazer beams around and rotating
 * add boss2
+* correct shadows (hacked)
 * add score table
-* correct shadows
+* agressive only if noticed
 
 * circular style? circular pixel art?
 
 * new projectiles
 * * rocketes
 * * granades
-
 ws bullets around
 * * constantly trhows slow bullets in spiral(while rotating)
 

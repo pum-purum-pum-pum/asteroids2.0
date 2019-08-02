@@ -4,7 +4,7 @@
 			distribution: [
 				(0, 1.0),
 			],
-			ships_number: 3,
+			ships_number: 7,
 			boss: None,
 			iterations: 1
 		),
@@ -13,7 +13,7 @@
 				(0, 0.5),
 				(1, 0.5)
 			],
-			ships_number: 3,
+			ships_number: 7,
 			boss: None,
 			iterations: 1
 		),
@@ -23,7 +23,7 @@
 				(1, 0.5),
 				(2, 0.4)
 			],
-			ships_number: 5,
+			ships_number: 6,
 			boss: None,
 			iterations: 1
 		),

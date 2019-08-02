@@ -46,7 +46,7 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 0,
-                max_health: 100,
+                max_health: 20,
                 max_shield: 0,
                 damage: 50
             ),

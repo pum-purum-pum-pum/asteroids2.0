@@ -417,7 +417,8 @@ pub fn spawn_asteroids<'a>(
     if new_polygons.len() != 1 {
         for poly in new_polygons.iter() {
             let r = poly.min_r;
-            let asteroid_shape = Geometry::Circle { radius: r };
+            // let asteroid_shape = Geometry::Circle { radius: r };
+            let asteroid_shape = Geometry::Polygon(poly.clone());
             let mut rng = thread_rng();
             let insert_event = InsertEvent::Asteroid {
                 iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
@@ -848,7 +849,7 @@ impl<'a> System<'a> for InsertSystem {
                             .unwrap();
                     let asteroid = entities
                         .build_entity()
-                        .with(*light_shape, &mut geometries)
+                        .with(light_shape.clone(), &mut geometries)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
                         .with(Velocity::new(velocity.linear.x, velocity.linear.y), &mut velocities)
                         .with(Lifes((ASTEROID_MAX_LIFES as f32 * polygon.min_r / ASTEROID_MAX_RADIUS) as usize), &mut lifes)
@@ -1195,8 +1196,9 @@ impl<'a> System<'a> for GamePlaySystem {
             let mut rng = thread_rng();
             let size = rng.gen_range(ASTEROID_MIN_RADIUS, ASTEROID_MAX_RADIUS);
             let r = size;
-            let asteroid_shape = Geometry::Circle { radius: r };
+            // let asteroid_shape = Geometry::Circle { radius: r };
             let poly = generate_convex_polygon(10, r);
+            let asteroid_shape = Geometry::Polygon(poly.clone());
             let spin = rng.gen_range(-1E-2, 1E-2);
             // let ball = ncollide2d::shape::Ball::new(r);
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
@@ -1432,7 +1434,8 @@ impl<'a> System<'a> for CollisionSystem {
                     } else {
                         for poly in new_polygons.iter() {
                             let r = poly.min_r;
-                            let asteroid_shape = Geometry::Circle { radius: r };
+                            // let asteroid_shape = Geometry::Circle { radius: r };
+                            let asteroid_shape = Geometry::Polygon(poly.clone());
                             let mut rng = thread_rng();
                             let insert_event = InsertEvent::Asteroid {
                                 iso: Point3::new(position.x, position.y, isometry.rotation.angle()),

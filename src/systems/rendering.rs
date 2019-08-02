@@ -1,10 +1,10 @@
-use crate::gfx::TextData;
+use crate::gfx::{TextData, RenderMode};
 use std::collections::{HashMap};
 use std::cmp::Ordering::Equal;
 use super::*;
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
-use crate::geometry::LightningPolygon;
+use crate::geometry::{shadow_geometry};
 const LIGHT_RECTANGLE_SIZE: f32 = 10f32;
 
 pub struct MenuRenderingSystem {
@@ -190,7 +190,8 @@ pub fn render_primitives<'a>(
                             &geom_data,
                             &model,
                             (fill_color.x, fill_color.y, fill_color.z),
-                            *with_projection
+                            *with_projection,
+                            RenderMode::Draw
                         );
                         // canvas
                         //     .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
@@ -315,40 +316,41 @@ impl<'a> System<'a> for GUISystem {
             Image(preloaded_images.circle)
         );
 
+            // UNCOMMENT TO ADD LIFE BARS
         // lifes and shields bars
-        for (entity, isometry, life, ship_stats, _ship) in (&entities, &isometries, &lifes, &ships_stats, &ship_markers).join() {
-            let shield = shields.get(entity);
-            // dbg!("draw lifes and shields");
-            let position = isometry.0.translation.vector;
-            let ship_lifes_bar = Rectangle {
-                position: Point2::new(position.x, position.y),
-                width: (life.0 as f32/ ship_stats.max_health as f32) * 1.5,
-                height: 0.1,
-                color: life_color.clone()
-            };
-            if let Some(shield) = shield  {
-                let ship_shield_bar = Rectangle {
-                    position: Point2::new(position.x, position.y - 1.0),
-                    width: (shield.0 as f32/ ship_stats.max_shield as f32) * 1.5,
-                    height: 0.1,
-                    color: shield_color.clone()
-                };
-                ingame_ui.primitives.push(
-                    Primitive {
-                        kind: PrimitiveKind::Rectangle(ship_shield_bar),
-                        with_projection: true,
-                        image: None
-                    }
-                )
-            }
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(ship_lifes_bar),
-                    with_projection: true,
-                    image: None
-                }
-            );
-        }
+        // for (entity, isometry, life, ship_stats, _ship) in (&entities, &isometries, &lifes, &ships_stats, &ship_markers).join() {
+        //     let shield = shields.get(entity);
+        //     // dbg!("draw lifes and shields");
+        //     let position = isometry.0.translation.vector;
+        //     let ship_lifes_bar = Rectangle {
+        //         position: Point2::new(position.x, position.y),
+        //         width: (life.0 as f32/ ship_stats.max_health as f32) * 1.5,
+        //         height: 0.1,
+        //         color: life_color.clone()
+        //     };
+            // if let Some(shield) = shield  {
+            //     let ship_shield_bar = Rectangle {
+            //         position: Point2::new(position.x, position.y - 1.0),
+            //         width: (shield.0 as f32/ ship_stats.max_shield as f32) * 1.5,
+            //         height: 0.1,
+            //         color: shield_color.clone()
+            //     };
+            //     ingame_ui.primitives.push(
+            //         Primitive {
+            //             kind: PrimitiveKind::Rectangle(ship_shield_bar),
+            //             with_projection: true,
+            //             image: None
+            //         }
+            //     )
+            // }
+            // ingame_ui.primitives.push(
+            //     Primitive {
+            //         kind: PrimitiveKind::Rectangle(ship_lifes_bar),
+            //         with_projection: true,
+            //         image: None
+            //     }
+            // );
+        // }
         
         let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
         // move controller
@@ -776,6 +778,34 @@ impl<'a> System<'a> for RenderingSystem {
                 opt_vel.unwrap().0
             )
         };
+        for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
+            let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
+            // light_poly.clip_one((*geom).clone(), pos);
+            let rotation = iso.0.rotation.euler_angles().2;
+            let rotation = Rotation2::new(rotation);
+            let shadow_triangulation = shadow_geometry(
+                Point2::new(char_pos.x, char_pos.y),
+                (*geom).clone(),
+                pos,
+                rotation
+            );
+            if let Some(shadow_triangulation) = shadow_triangulation {
+                let geometry_data =  GeometryData::new(
+                    &gl, 
+                    &shadow_triangulation.points, 
+                    &shadow_triangulation.indicies)
+                .unwrap();
+                let iso = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
+                canvas
+                    .render_geometry(
+                        &gl, &viewport,
+                        &mut frame,
+                        &geometry_data,
+                        &iso,
+                        RenderMode::StencilWrite
+                    );
+            }
+        }
         for (_entity, iso, image, size, _nebula) in
             (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
             let image_data = image_datas.get(image.0).unwrap();
@@ -791,47 +821,6 @@ impl<'a> System<'a> for RenderingSystem {
                 );
         };
         {
-            let rectangle = (
-                char_pos.x - 1.5 * LIGHT_RECTANGLE_SIZE,
-                char_pos.y - LIGHT_RECTANGLE_SIZE,
-                char_pos.x + 1.5 * LIGHT_RECTANGLE_SIZE,
-                char_pos.y + LIGHT_RECTANGLE_SIZE,
-            );
-            let mut light_poly = LightningPolygon::new_rectangle(
-                rectangle.0,
-                rectangle.1,
-                rectangle.2,
-                rectangle.3,
-                Point2::new(char_pos.x, char_pos.y),
-            );
-            // TODO fix lights to be able to use without sorting
-            let mut data = (&entities, &isometries, &geometries, &asteroid_markers)
-                .join()
-                .collect::<Vec<_>>(); // TODO move variable to field  to avoid allocations
-            let distance = |a: &Isometry| (char_pos - a.0.translation.vector).norm();
-            data.sort_by(|&a, &b| (distance(b.1).partial_cmp(&distance(a.1)).unwrap_or(Equal)));
-            // UNCOMMENT TO ADD LIGHTS
-            for (_entity, iso, geom, _) in data.iter() {
-                let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
-                if pos.x > rectangle.0
-                    && pos.x < rectangle.2
-                    && pos.y > rectangle.1
-                    && pos.y < rectangle.3
-                {
-                    light_poly.clip_one(**geom, pos);
-                }
-            }
-            let triangulation = light_poly.triangulate();
-            let light_geom_data = GeometryData::new(&gl, &triangulation.points, &triangulation.indicies).unwrap();
-            canvas
-                .render_geometry(
-                    &gl, &viewport, 
-                    &mut frame, 
-                    &light_geom_data, 
-                    &Isometry3::new(Vector3::new(0f32, 0f32, 0f32), Vector3::new(0f32, 0f32, 0f32)),
-                    true
-                );
-        //     let geom_data = GeometryData::new(&display, &triangulation.points, &triangulation.indicies);
             for (entity, particles_data) in (&entities, &mut particles_datas).join() {
                 match **particles_data {
                     ParticlesData::Engine(ref mut particles) => {
@@ -973,7 +962,7 @@ impl<'a> System<'a> for RenderingSystem {
                     &mut frame, 
                     &geom_data, 
                     &iso.0,
-                    false
+                    RenderMode::Draw
                 )
         }
         for (iso, lazer) in (&isometries, &lazers).join() {
@@ -996,7 +985,7 @@ impl<'a> System<'a> for RenderingSystem {
                     &mut frame,
                     &geometry_data,
                     &iso.0,
-                    false
+                    RenderMode::Draw
                 );
             }
         };

@@ -54,12 +54,14 @@ pub fn run() -> Result<(), String> {
     let video = sdl_context.video().unwrap();
     let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
         let gl_attr = video.gl_attr();
+    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]        
     let glsl_version = "#version 130";
+    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    let glsl_version = "#version 100";
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
     {
         gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
         gl_attr.set_context_version(2, 0);
-        glsl_version = "#version 100"
     }
     #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
     {
@@ -227,9 +229,9 @@ pub fn run() -> Result<(), String> {
     }
 
     {   // load .ron files with tweaks 
-        use ron::de::from_reader;
+        use ron::de::{from_str};
         use serde::{Serialize, Deserialize};
-        use std::fs::File;
+        
 
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
@@ -268,8 +270,9 @@ pub fn run() -> Result<(), String> {
             pub ship_stats: ShipStats,
             pub image_name: String,
         };
-        let file = File::open("desc.ron").unwrap();
-        let desc: DescriptionSave = match from_reader(file) {
+        // let file = File::open("desc.ron").unwrap();
+        let file = include_str!("../desc.ron");
+        let desc: DescriptionSave = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
                 println!("Failed to load config: {}", e);
@@ -279,8 +282,8 @@ pub fn run() -> Result<(), String> {
         };
         let desc = process_description(desc, &name_to_image);
         specs_world.add_resource(desc);
-        let file = File::open("upgrades.ron").unwrap();
-        let upgrades_all: Vec<UpgradeCardRaw> = match from_reader(file) {
+        let file = include_str!("../upgrades.ron");
+        let upgrades_all: Vec<UpgradeCardRaw> = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
                 println!("Failed to load config: {}", e);
@@ -301,8 +304,9 @@ pub fn run() -> Result<(), String> {
         let avaliable_upgrades = upgrades;
         specs_world.add_resource(avaliable_upgrades);
 
-        let file = File::open("waves.ron").unwrap();
-        let waves: Waves = match from_reader(file) {
+        // let file = File::open("waves.ron").unwrap();
+        let file = include_str!("../waves.ron");
+        let waves: Waves = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
                 println!("Failed to load config: {}", e);
