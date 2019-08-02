@@ -1,6 +1,7 @@
 use nphysics2d::world::World;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
+use sdl2::rwops::RWops;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
@@ -12,6 +13,7 @@ use backtrace::Backtrace;
 use std::panic;
 use std::collections::{HashMap};
 use std::fs::{self, DirEntry};
+use std::io::{BufReader};
 use std::path::Path;
 use crate::types::{*};
 use crate::components::*;
@@ -55,18 +57,18 @@ pub fn run() -> Result<(), String> {
     let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
         let gl_attr = video.gl_attr();
     #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]        
-    let glsl_version = "#version 130";
+    let glsl_version = "#version 330";
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-    let glsl_version = "#version 100";
+    let glsl_version = "#version 300 es";
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
     {
         gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
-        gl_attr.set_context_version(2, 0);
+        gl_attr.set_context_version(3, 0);
     }
     #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
     {
         gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-        gl_attr.set_context_version(3, 2);
+        gl_attr.set_context_version(3, 3);
     }
     let window = video
         .window("Asteroids 2.0", window_w, window_h)
@@ -175,27 +177,26 @@ pub fn run() -> Result<(), String> {
             "explosion1"
         ];
         for animation_name in animations.iter() {
-            let animation_full = &format!("assets/{}", animation_name);
-            let animation_dir = Path::new(animation_full);
+            // let animation_full = &format!("assets/{}", animation_name);
             let mut frames = vec![];
-            for entry in fs::read_dir(animation_dir).unwrap() {
-                let name = entry
-                    .unwrap()
-                    .path().file_stem().unwrap()
-                    .to_os_string().into_string().unwrap();
-                let assets_path = format!("{}/{}", animation_name, name);
-                let image_data = ThreadPin::new(
-                    ImageData::new(&context, &assets_path).unwrap()
-                );
-                let image = specs_world
-                    .create_entity()
-                    .with(image_data)
-                    .build();        
-                let animation_frame = AnimationFrame {
-                    image: Image(image),
-                    ticks: 1
-                };
-                frames.push(animation_frame);
+            for i in 1..100 {
+                let animation_file = format!("assets/{}/{}.png", animation_name, i);
+                if let Ok(_rw) = RWops::from_file(Path::new(&animation_file), "r") { 
+                    // TODO: Rewrite -- Hacky, what if it's different error?...
+                    let animation_file_relative = format!("{}/{}", animation_name, i);
+                    let image_data = ThreadPin::new(
+                        ImageData::new(&context, &animation_file_relative).unwrap()
+                    );
+                    let image = specs_world
+                        .create_entity()
+                        .with(image_data)
+                        .build();        
+                    let animation_frame = AnimationFrame {
+                        image: Image(image),
+                        ticks: 1
+                    };
+                    frames.push(animation_frame);
+                } else {break};
             }
             let animation = Animation::new(
                 frames,
@@ -494,6 +495,15 @@ pub fn run() -> Result<(), String> {
                                 None => ()
                             }
                         }
+                    }
+                }
+                let mut touches = specs_world.write_resource::<Touches>();
+                for t in (*touches).iter_mut() {
+                    match t {
+                        Some(ref mut t) => {
+                            t.y = dims.1 as f32 - t.y
+                        }
+                        None => ()
                     }
                 }
             }

@@ -295,7 +295,7 @@ impl<'a> System<'a> for GUISystem {
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
-        let shield_color = Point3::new(0.0, 0.1, 0.6); 
+        let _shield_color = Point3::new(0.0, 0.1, 0.6); 
         let experience_color = Point3::new(0.8, 0.8, 0.8);
         let white_color = Point3::new(1.0, 1.0, 1.0);
         let grey_color = Point3::new(0.5, 0.5, 0.5);
@@ -304,13 +304,13 @@ impl<'a> System<'a> for GUISystem {
         let stick_size = w / 80.0;
         let ctrl_size = stick_size * 10.0;
         let move_controller = VecController::new(
-            Point2::new(ctrl_size, ctrl_size),
+            Point2::new(ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
             Image(preloaded_images.circle)
         );
         let attack_controller = VecController::new(
-            Point2::new(w - ctrl_size, ctrl_size),
+            Point2::new(w - ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
             Image(preloaded_images.circle)

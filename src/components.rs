@@ -323,7 +323,7 @@ impl Finger {
     pub fn new(id: usize, x: f32, y: f32, observer: Point3, pressure: f32, width_u: u32, height_u: u32) -> Self {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
-        let (x, y) = (x as f32, y as f32);
+        let (x, y) = (x as f32, height_u as f32 - y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
         let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));

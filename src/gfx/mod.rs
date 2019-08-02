@@ -180,14 +180,16 @@ impl ImageData {
 
 pub fn read_file(filename: &str) -> Result<String, IOError> {
     let mut result_str = String::new();
-    let mut rw = RWops::from_file(Path::new(filename), "r").unwrap();
+    let mut rw = RWops::from_file(Path::new(filename), "r")
+        .expect(&format!("failed to load {}", filename).to_string());
     rw.read_to_string(&mut result_str)?;
     Ok(result_str)
 }
 
 pub fn load_texture(gl: &red::GL, name: &str) -> red::shader::Texture {
     let path_str = format!("assets/{}.png", name);
-    let texture_file = RWops::from_file(Path::new(&path_str), "r").unwrap();
+    let texture_file = RWops::from_file(Path::new(&path_str), "r")
+        .expect(&format!("failed to load {}", &path_str).to_string());
     let reader = BufReader::new(texture_file);
     let image = image::load(reader, image::PNG).unwrap().to_rgba();
     let image_dimensions = image.dimensions();

@@ -91,7 +91,8 @@ pub fn init_sound<'a>(
         for name in names.iter() {
             let file = format!("assets/music/{}.ogg", name);
             let path = Path::new(&file);
-            let music = sdl2::mixer::Music::from_file(path).unwrap();
+            let music = sdl2::mixer::Music::from_file(path)
+                .expect(&format!("failed to load {}", &name).to_string());
             name_to_music.insert(name.to_string(), music);
         }
     }
