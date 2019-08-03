@@ -48,7 +48,8 @@ pub fn run() -> Result<(), String> {
     }));
     #[cfg(any(target_os = "android"))]
     android_log::init("MyApp").unwrap();
-    let (window_w, window_h) = (1024u32, 769);
+    // let (window_w, window_h) = (1024u32, 769);
+    let (window_w, window_h) = (1920u32, 1080);
     let viewport = red::Viewport::for_window(window_w as i32, window_h as i32);
     let mut phys_world: World<f32> = World::new();
     phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
@@ -102,7 +103,7 @@ pub fn run() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     let touches: Touches = [None; FINGER_NUMBER];
     let spawned_upgrades: SpawnedUpgrades = vec![];
-    specs_world.add_resource(ChoosedUpgrade(0usize));
+    specs_world.add_resource(ChoosedUpgrade(None));
     specs_world.add_resource(text_data);
     // specs_world.add_resource(glyph_brush);
     specs_world.add_resource(glyph_texture);
@@ -495,15 +496,6 @@ pub fn run() -> Result<(), String> {
                                 None => ()
                             }
                         }
-                    }
-                }
-                let mut touches = specs_world.write_resource::<Touches>();
-                for t in (*touches).iter_mut() {
-                    match t {
-                        Some(ref mut t) => {
-                            t.y = dims.1 as f32 - t.y
-                        }
-                        None => ()
                     }
                 }
             }

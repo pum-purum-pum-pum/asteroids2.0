@@ -354,82 +354,85 @@ impl<'a> System<'a> for GUISystem {
         
         let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
         // move controller
-        match move_controller.set(
-            0,
-            &mut ingame_ui,
-            &touches
-        ) {
-            Some(dir) => {
-                let (character, _) = (&entities, &character_markers).join().next().unwrap();
-                let (_character_isometry, mut character_velocity) = {
-                    let character_body = world
-                        .rigid_body(physics.get(character).unwrap().body_handle)
-                        .unwrap();
-                    (*character_body.position(), *character_body.velocity())
-                };
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        {  
+            match move_controller.set(
+                0,
+                &mut ingame_ui,
+                &touches
+            ) {
+                Some(dir) => {
+                    let (character, _) = (&entities, &character_markers).join().next().unwrap();
+                    let (_character_isometry, mut character_velocity) = {
+                        let character_body = world
+                            .rigid_body(physics.get(character).unwrap().body_handle)
+                            .unwrap();
+                        (*character_body.position(), *character_body.velocity())
+                    };
 
-                for (iso, _vel, spin, _char_marker) in (
-                    &isometries,
-                    &mut velocities,
-                    &mut spins,
-                    &character_markers,
-                ).join()
-                {
-                    let player_torque = DT
-                        * calculate_player_ship_spin_for_aim(
-                            dir,
-                            iso.rotation(),
-                            spin.0,
-                        );
-                    spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
-                }
-
-
-                // let rotation = isometries.get(character).unwrap().0.rotation;
-                // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
-                let thrust = ship_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
-                *character_velocity.as_vector_mut() += thrust;
-                let character_body = world
-                    .rigid_body_mut(physics.get(character).unwrap().body_handle)
-                    .unwrap();
-                character_body.set_velocity(character_velocity);
-            }
-            None => ()
-        }
-
-        match attack_controller.set(
-            1,
-            &mut ingame_ui,
-            &touches
-        ) {
-            Some(dir) => {
-                let dir = dir.normalize();
-                let blaster = blasters.get_mut(character);
-                if let Some(blaster) = blaster {
-                    if blaster.shoot() {
-                        let isometry = *isometries.get(character).unwrap();
-                        let position = isometry.0.translation.vector;
-                        // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                        let velocity_rel = blaster.bullet_speed * dir;
-                        let char_velocity = velocities.get(character).unwrap();
-                        let projectile_velocity = Velocity::new(
-                            char_velocity.0.x + velocity_rel.x,
-                            char_velocity.0.y + velocity_rel.y,
-                        ) ;
-                        sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                        let rotation = Rotation2::rotation_between(&Vector2::new(0.0, 1.0), &dir);
-                        insert_channel.single_write(InsertEvent::Bullet {
-                            kind: EntityType::Player,
-                            iso: Point3::new(position.x, position.y, rotation.angle()),
-                            velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
-                            damage: blaster.bullets_damage,
-                            owner: character,
-                        });
+                    for (iso, _vel, spin, _char_marker) in (
+                        &isometries,
+                        &mut velocities,
+                        &mut spins,
+                        &character_markers,
+                    ).join()
+                    {
+                        let player_torque = DT
+                            * calculate_player_ship_spin_for_aim(
+                                dir,
+                                iso.rotation(),
+                                spin.0,
+                            );
+                        spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
                     }
-                }
 
+
+                    // let rotation = isometries.get(character).unwrap().0.rotation;
+                    // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
+                    let thrust = ship_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
+                    *character_velocity.as_vector_mut() += thrust;
+                    let character_body = world
+                        .rigid_body_mut(physics.get(character).unwrap().body_handle)
+                        .unwrap();
+                    character_body.set_velocity(character_velocity);
+                }
+                None => ()
             }
-            None => ()
+
+            match attack_controller.set(
+                1,
+                &mut ingame_ui,
+                &touches
+            ) {
+                Some(dir) => {
+                    let dir = dir.normalize();
+                    let blaster = blasters.get_mut(character);
+                    if let Some(blaster) = blaster {
+                        if blaster.shoot() {
+                            let isometry = *isometries.get(character).unwrap();
+                            let position = isometry.0.translation.vector;
+                            // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                            let velocity_rel = blaster.bullet_speed * dir;
+                            let char_velocity = velocities.get(character).unwrap();
+                            let projectile_velocity = Velocity::new(
+                                char_velocity.0.x + velocity_rel.x,
+                                char_velocity.0.y + velocity_rel.y,
+                            ) ;
+                            sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                            let rotation = Rotation2::rotation_between(&Vector2::new(0.0, 1.0), &dir);
+                            insert_channel.single_write(InsertEvent::Bullet {
+                                kind: EntityType::Player,
+                                iso: Point3::new(position.x, position.y, rotation.angle()),
+                                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                                damage: blaster.bullets_damage,
+                                owner: character,
+                            });
+                        }
+                    }
+
+                }
+                None => ()
+            }
         }
 
         // stats
@@ -543,7 +546,7 @@ impl<'a> System<'a> for GUISystem {
                         );
                         if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
                             // choosed_upgrade = Some(upg.upgrade_type);
-                            choosed_upgrade.0 = *upg_id;
+                            choosed_upgrade.0 = Some(*upg_id);
                             // *app_state = AppState::Play(PlayState::Action);
                             // with multytouch things it's not cheatable
                         }
@@ -559,19 +562,22 @@ impl<'a> System<'a> for GUISystem {
                 );
 
                 if spawned_upgrades.len() > 0 {
-                    ingame_ui.primitives.push(
-                        Primitive {
-                            kind: PrimitiveKind::Text(Text {
-                                position: Point2::new(w/4.0, upgrade_button_h + shift),
-                                text: avaliable_upgrades[choosed_upgrade.0].description.clone()
-                            }),
-                            with_projection: false,
-                            image: None
+                    if let Some(upgrade) = choosed_upgrade.0 {
+                        ingame_ui.primitives.push(
+                            Primitive {
+                                kind: PrimitiveKind::Text(Text {
+                                    position: Point2::new(w/4.0, upgrade_button_h + shift),
+                                    text: avaliable_upgrades[upgrade].description.clone()
+                                }),
+                                with_projection: false,
+                                image: None
+                            }
+                        );                    
+                        if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
+                            current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
+                            choosed_upgrade.0 = None;
+                            spawned_upgrades.pop();
                         }
-                    );                    
-                    if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
-                        current_upgrade = Some(avaliable_upgrades[choosed_upgrade.0].upgrade_type);
-                        spawned_upgrades.pop();
                     }
                 }
                 let done_button = Button::new(

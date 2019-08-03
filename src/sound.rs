@@ -100,7 +100,7 @@ pub fn init_sound<'a>(
         menu_music: name_to_music.remove("level2").unwrap(),
         battle_music: vec![name_to_music.remove("level5").unwrap()]
     };
-    sdl2::mixer::Channel::all().set_volume(12);
-    sdl2::mixer::Music::set_volume(30);
+    sdl2::mixer::Channel::all().set_volume(22);
+    sdl2::mixer::Music::set_volume(50);
     Ok((preloaded_sounds, music_data, audio, mixer_context, timer))
 }

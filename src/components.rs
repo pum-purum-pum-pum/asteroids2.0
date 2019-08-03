@@ -53,7 +53,7 @@ pub struct Music {
     pub menu_play: bool,
 }
 
-pub struct ChoosedUpgrade(pub usize);
+pub struct ChoosedUpgrade(pub Option<usize>);
 
 #[derive(Debug, Default)]
 pub struct LoopSound {

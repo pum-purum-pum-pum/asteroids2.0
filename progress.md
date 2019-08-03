@@ -3,8 +3,8 @@
 * try shadows again \/
 * animations \/
 * explosions with animations \/
-* android revisit
-* make gif (+ video) on #screenshot_saturday
+* android revisit \no stencil :O/
+* make gif (+ video) on #screenshot_saturday \/
 * add boss1
 * enemies
 * * constantly trhows slow bullets in spiral(while rotating)
