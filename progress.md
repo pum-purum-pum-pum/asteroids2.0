@@ -5,15 +5,21 @@
 * explosions with animations \/
 * android revisit \no stencil :O/
 * make gif (+ video) on #screenshot_saturday \/
+* correct shadows \/
+* add AI for enemies with aware of shadows \somehow/
+* asteroids spawn coins \/
+* collect conins with magneto \/
+* rewrite lazers logic and unify killing logic
+* Time to next wave (mb also add ability to add pauses between waves)
 * add boss1
 * enemies
 * * constantly trhows slow bullets in spiral(while rotating)
 * * rarely throws super fast bullets
 * * lazer beams around and rotating
 * add boss2
-* correct shadows (hacked)
 * add score table
 * agressive only if noticed
+* fix sounds??? seems ok
 
 * circular style? circular pixel art?
 
@@ -24,6 +30,10 @@ ws bullets around
 * * constantly trhows slow bullets in spiral(while rotating)
 
 * * rarely throws super fast bullets
+
+GRAPHICS:
+* Ship sield size draw dynamicly
+* 
 TODO LIST
 * Lazer add skilss
 * * Lazer length
@@ -35,7 +45,7 @@ TODO LIST
 * * damage
 * * accuracy (reduce bullets spread)
 * boosts from asteroids
-* once someone got shooted make it's sprite white for a momoent
+* once someone got shooted make it's sprite white for a moment
 * ship knockback?
 * sleep when killed enemy???
 * * money $$$ for buying ships and weapons

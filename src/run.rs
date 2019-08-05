@@ -132,6 +132,8 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<EnemyMarker>();
     specs_world.register::<LightMarker>();
     specs_world.register::<ShipMarker>();
+    specs_world.register::<Coin>();
+    specs_world.register::<Exp>();
     specs_world.register::<PhysicsComponent>();
     specs_world.register::<Polygon>();
     specs_world.register::<ThreadPin<sdl2::mixer::Chunk>>();
@@ -170,7 +172,8 @@ pub fn run() -> Result<(), String> {
         "lazer_gun",
         "blaster_gun",
         "shotgun",
-
+        "coin",
+        "exp"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -341,6 +344,8 @@ pub fn run() -> Result<(), String> {
         lazer: name_to_image["lazer_gun"],
         blaster: name_to_image["blaster_gun"],
         shotgun: name_to_image["shotgun"],
+        coin: name_to_image["coin"],
+        exp: name_to_image["exp"],
         explosion: name_to_animation["explosion1"].clone()
     };
 

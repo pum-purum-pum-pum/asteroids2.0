@@ -18,6 +18,8 @@ pub struct PreloadedSounds {
     pub enemy_blaster: specs::Entity,
     pub enemy_shotgun: specs::Entity,
     pub collision: specs::Entity,
+    pub coin: specs::Entity,
+    pub exp: specs::Entity,
 }
 
 pub struct MusicData<'a> {
@@ -57,6 +59,8 @@ pub fn init_sound<'a>(
             "collision",
             "shot2",
             "shot3",
+            "coin",
+            "exp"
         ];
         for name in names.iter() {
             let file = format!("assets/music/{}.wav", name);
@@ -79,8 +83,9 @@ pub fn init_sound<'a>(
         lazer: name_to_sound["lazer"],
         enemy_blaster: name_to_sound["shot2"],
         enemy_shotgun: name_to_sound["shot3"],
-        collision: name_to_sound["collision"]
-
+        collision: name_to_sound["collision"],
+        coin: name_to_sound["coin"],
+        exp: name_to_sound["exp"]
     };
     let mut name_to_music: HashMap<String, Music> = HashMap::new();
     {   // load music

@@ -717,6 +717,8 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Polygon>,
             ReadStorage<'a, Lazer>,
             ReadStorage<'a, Geometry>,
+            ReadStorage<'a, Coin>,
+            ReadStorage<'a, Exp>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
         ),
         Read<'a, Mouse>,
@@ -750,6 +752,8 @@ impl<'a> System<'a> for RenderingSystem {
                 polygons,
                 lazers,
                 geometries,
+                coins,
+                exps,
                 mut particles_datas,
             ),
             mouse,
@@ -969,6 +973,32 @@ impl<'a> System<'a> for RenderingSystem {
                     &geom_data, 
                     &iso.0,
                     RenderMode::Draw
+                )
+        }
+        for (iso, size, image, _coin) in (&isometries, &sizes, &image_ids, &coins).join() {
+            let image_data = image_datas.get(image.0).unwrap();
+            canvas
+                .render(
+                    &gl,
+                    &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        true
+                )
+        }
+        for (iso, size, image, _exps) in (&isometries, &sizes, &image_ids, &exps).join() {
+            let image_data = image_datas.get(image.0).unwrap();
+            canvas
+                .render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_data,
+                    &iso.0,
+                    size.0,
+                    true
                 )
         }
         for (iso, lazer) in (&isometries, &lazers).join() {

@@ -111,6 +111,14 @@ pub enum InsertEvent {
         damage: usize,
         owner: specs::Entity,
     },
+    Coin {
+        value: usize,
+        position: Point2
+    },
+    Exp {
+        value: usize,
+        position: Point2,
+    },
     // Lazer {
     //     kind: EntityType,
     //     iso: Isometry2,
@@ -302,7 +310,9 @@ pub struct PreloadedImages {
     pub lazer: specs::Entity,
     pub blaster: specs::Entity,
     pub shotgun: specs::Entity,
-    pub explosion: Animation
+    pub coin: specs::Entity,
+    pub exp: specs::Entity,
+    pub explosion: Animation,
 }
 
 pub struct PreloadedParticles {
@@ -414,6 +424,12 @@ pub struct LightMarker;
 pub struct Projectile {
     pub owner: specs::Entity,
 }
+
+#[derive(Component)]
+pub struct Coin(pub usize);
+
+#[derive(Component)]
+pub struct Exp(pub usize);
 
 #[derive(Component)]
 pub struct Lifetime {
