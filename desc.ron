@@ -91,7 +91,7 @@
             image_name: "lazer",
         ),
         (
-            ai_kind: AI(kinds:[ShootAndFollow]),
+            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: 200,

@@ -558,7 +558,6 @@ impl<'a> System<'a> for ControlSystem {
                 is_character: bool,
                 rotation,
             | {
-                lazer.active = true;
                 let body = world
                     .rigid_body(physics_component.body_handle)
                     .unwrap();
@@ -629,6 +628,9 @@ impl<'a> System<'a> for ControlSystem {
             for (entity, physics_component, multiple_lazers) in (&entities, &physics, &mut multiple_lazers).join() {
                 for (i, lazer) in multiple_lazers.lazers.iter_mut().enumerate() {
                     let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+                    if !lazer.active {
+                        continue
+                    }
                     process_lazer(
                         physics_component,
                         lazer,
@@ -1689,6 +1691,7 @@ impl<'a> System<'a> for AISystem {
         WriteStorage<'a, Blaster>,
         WriteStorage<'a, ShotGun>,
         WriteStorage<'a, Lazer>,
+        WriteStorage<'a, MultyLazer>,
         WriteStorage<'a, EnemyMarker>,
         WriteStorage<'a, Shield>,
         WriteStorage<'a, Lifes>,
@@ -1715,6 +1718,7 @@ impl<'a> System<'a> for AISystem {
             mut blasters,
             mut shotguns,
             mut lazers,
+            mut multy_lazers,
             enemies,
             mut shields,
             mut lifes,
@@ -1801,8 +1805,11 @@ impl<'a> System<'a> for AISystem {
                             }
                         }
                         if diff.norm() > follow_area {
-                            if character_noticed {
-                                if let Some(lazer) = lazers.get_mut(entity) {
+                            if let Some(lazer) = lazers.get_mut(entity) {
+                                lazer.active = false;
+                            }
+                            if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
+                                for lazer in multy_lazer.lazers.iter_mut() {
                                     lazer.active = false;
                                 }
                             }
@@ -1810,6 +1817,11 @@ impl<'a> System<'a> for AISystem {
                             if let Some(lazer) = lazers.get_mut(entity) {
                                 lazer.active = true;
                             }
+                                if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
+                                    for lazer in multy_lazer.lazers.iter_mut() {
+                                        lazer.active = true;
+                                    }
+                                }
                         }
 
                     }
