@@ -34,7 +34,7 @@
     ],
     enemies: [
         (
-            ai_kind: Kamikadze,
+            ai_kind: AI(kinds:[Kamikadze, Aim]),
             gun_kind: Blaster((
                 recharge_state: 0,
                 recharge_time: 12,
@@ -50,10 +50,10 @@
                 max_shield: 0,
                 damage: 50
             ),
-            image_name: "enemy2",
+            image_name: "kamikadze",
         ),
         (
-        ai_kind: ShootAndFollow,
+            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
             gun_kind: Blaster((
                 recharge_state: 0,
                 recharge_time: 17,
@@ -72,7 +72,7 @@
             image_name: "enemy1",
         ),
         (
-            ai_kind: ShootAndFollow,
+            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
             gun_kind: Lazer((
                 damage: 7,
                 active: false,
@@ -88,10 +88,10 @@
                 max_shield: 0,
                 damage: 10
             ),
-            image_name: "enemy4",
+            image_name: "lazer",
         ),
         (
-            ai_kind: ShootAndFollow,
+            ai_kind: AI(kinds:[ShootAndFollow]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: 200,
@@ -110,6 +110,47 @@
                 damage: 10
             ),
             image_name: "enemy3",
+        ),
+        (
+            ai_kind: AI(kinds:[Shoot, Follow, Rotate(0.1)]),
+            gun_kind: MultyLazer((
+                lazers: [
+                    Lazer(
+                        damage: 7,
+                        active: false,
+                        distance: 3,
+                        current_distance: 8,
+                    ),
+                    Lazer(
+                        damage: 7,
+                        active: false,
+                        distance: 3,
+                        current_distance: 8,
+                    ),
+                    Lazer(
+                        damage: 7,
+                        active: false,
+                        distance: 3,
+                        current_distance: 8,
+                    ),
+                    Lazer(
+                        damage: 7,
+                        active: false,
+                        distance: 3,
+                        current_distance: 8,
+                    ),
+                ]
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            image_name: "lazer_boss",
         ),
     ],
 )

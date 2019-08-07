@@ -9,17 +9,19 @@
 * add AI for enemies with aware of shadows \somehow/
 * asteroids spawn coins \/
 * collect conins with magneto \/
-* rewrite lazers logic and unify killing logic
-* Time to next wave (mb also add ability to add pauses between waves)
+* rewrite lazers logic and unify killing logic \/
+* exp coins and coins add real exp and real money. Killing -- not \/
+* Time to next wave (mb also add ability to add pauses between waves) -- \nope/
 * add boss1
 * enemies
 * * constantly trhows slow bullets in spiral(while rotating)
 * * rarely throws super fast bullets
-* * lazer beams around and rotating
+* * lazer beams around and rotating \/
 * add boss2
 * add score table
-* agressive only if noticed
+* agressive only if noticed \/
 * fix sounds??? seems ok
+* more gold for more level you are
 
 * circular style? circular pixel art?
 
@@ -30,6 +32,8 @@ ws bullets around
 * * constantly trhows slow bullets in spiral(while rotating)
 
 * * rarely throws super fast bullets
+
+* add collectable which will throw away a lot bullets (like ultimate in galaxy wars)
 
 GRAPHICS:
 * Ship sield size draw dynamicly
@@ -155,16 +159,16 @@ TECH AND TEST:
 * Android Joystick touch controls \/
 
 GAMEPLAY
-* collectables? (from killed enemies and asteroids probably)
-* enemies
-* ship upgrades?
+<!-- * collectables? (from killed enemies and asteroids probably) -->
+<!-- * enemies -->
+<!-- * ship upgrades? -->
 * asteroids parts
 
 MEDIA:
 * stars like here https://www.youtube.com/watch?v=s52YZMoHur0  (change background color according to how near we are)
 * screen shake with depth rotation so it looks like more 3d depth shake
 * sound effects
-* shadows intersection bug
+<!-- * shadows intersection bug -->
 * thrusters
 * parallax background
 * particles on movement

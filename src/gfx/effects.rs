@@ -20,7 +20,7 @@ impl Explosion {
         num: usize,
         lifetime: Option<usize>,
     ) -> Self {
-        let scale = 0.07f32;
+        let scale = 0.03f32;
         let positions = vec![
             [-scale, -scale],
             [-scale, scale],

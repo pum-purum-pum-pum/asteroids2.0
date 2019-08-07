@@ -70,7 +70,7 @@ pub struct Description {
 
 #[derive(Debug, Clone)]
 pub struct EnemyKind {
-    pub ai_kind: AIType,
+    pub ai_kind: AI,
     pub gun_kind: GunKind,
     pub ship_stats: ShipStats,
     pub image: Image,
@@ -100,7 +100,7 @@ pub enum InsertEvent {
         light_shape: Geometry,
         spin: f32,
         gun_kind: GunKind,
-        kind: AIType,
+        kind: AI,
         ship_stats: ShipStats,
         image: Image,
     },
@@ -173,8 +173,17 @@ pub enum UpgradeType {
     HealthSize,
 }
 
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct AI {
+    pub kinds: Vec<AIType>
+}
+
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum AIType {
+    Shoot,
+    Follow,
+    Aim,
+    Rotate(f32),
     ShootAndFollow,
     Kamikadze
 }
@@ -262,6 +271,11 @@ pub struct Shield(pub usize);
 #[derive(Component, Clone, Copy)]
 pub struct Damage(pub usize);
 
+#[derive(Clone)]
+pub struct MacroGame {
+    pub coins: usize,
+}
+
 #[derive(Default, Clone, Copy)]
 pub struct Progress {
     pub experience: usize,
@@ -279,8 +293,15 @@ impl Progress {
         self.level += 1usize;
     }
 
-    pub fn kill(&mut self, exp: usize, score: usize) {
+    // pub fn kill(&mut self, exp: usize, score: usize) {
+    //     self.experience += exp;
+    //     self.score += score;
+    // }
+    pub fn add_exp(&mut self, exp: usize) {
         self.experience += exp;
+    }
+
+    pub fn add_score(&mut self, score: usize) {
         self.score += score;
     }
 }
@@ -458,7 +479,8 @@ impl Lifetime {
 pub enum GunKindMarker {
     Blaster,
     Lazer,
-    ShotGun
+    ShotGun,
+    MultyLazer
 }
 
 impl Into<GunKindMarker> for &GunKind {
@@ -466,7 +488,8 @@ impl Into<GunKindMarker> for &GunKind {
         match self {
             GunKind::Blaster(_) => GunKindMarker::Blaster,
             GunKind::ShotGun(_) => GunKindMarker::ShotGun,
-            GunKind::Lazer(_) => GunKindMarker::Lazer
+            GunKind::Lazer(_) => GunKindMarker::Lazer,
+            GunKind::MultyLazer(_) => GunKindMarker::MultyLazer
         }
     }
 }
@@ -514,11 +537,17 @@ pub fn get_avaliable_cards(
 #[derive(Component, Debug, Clone)]
 pub struct AttachPosition(pub specs::Entity);
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum GunKind {
     Blaster(Blaster),
     Lazer(Lazer),
-    ShotGun(ShotGun)
+    ShotGun(ShotGun),
+    MultyLazer(MultyLazer)
+}
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct MultyLazer {
+    pub lazers: Vec<Lazer>
 }
 
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]

@@ -96,13 +96,13 @@ impl<'a> System<'a> for MenuRenderingSystem {
             "Lazer gun".to_string()
         );
         if lazer_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(description.player_guns[0])
+            chosed_gun.0 = Some(description.player_guns[0].clone())
         }
         if blaster_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(description.player_guns[1])
+            chosed_gun.0 = Some(description.player_guns[1].clone())
         }
         if shotgun_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(description.player_guns[2])
+            chosed_gun.0 = Some(description.player_guns[2].clone())
         }
         let button = Button::new(
             Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
@@ -114,17 +114,17 @@ impl<'a> System<'a> for MenuRenderingSystem {
             None, 
             "Play".to_string()
         );
-        if let Some(gun) = chosed_gun.0 {
+        if let Some(gun) = chosed_gun.0.clone() {
             if button.place_and_check(&mut ui, &*mouse) {
                 *app_state = AppState::Play(PlayState::Action);
                 insert_channel.single_write(InsertEvent::Character{ 
-                    gun_kind: gun, 
+                    gun_kind: gun.clone(), 
                     ship_stats: description.player_ships_stats[0]
                 });
                 chosed_gun.0 = None;
                 *avaliable_upgrades = get_avaliable_cards(
                     &upgrade_cards_raw,
-                    &gun,
+                    &gun.clone(),
                     &name_to_image
                 );
             }
@@ -720,6 +720,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Coin>,
             ReadStorage<'a, Exp>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
+            WriteStorage<'a, MultyLazer>,
         ),
         Read<'a, Mouse>,
         ReadExpect<'a, ThreadPin<red::GL>>,
@@ -755,6 +756,7 @@ impl<'a> System<'a> for RenderingSystem {
                 coins,
                 exps,
                 mut particles_datas,
+                mut multy_lazers,
             ),
             mouse,
             gl,
@@ -878,6 +880,23 @@ impl<'a> System<'a> for RenderingSystem {
             }
         }
 
+        for (_entity, iso, image, size, _light) in
+            (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
+        {
+            let translation_vec = iso.0.translation.vector;
+            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+            canvas
+                .render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_datas.get(image.0).unwrap(),
+                    &isometry,
+                    size.0,
+                    true,
+                );
+        }
+
         for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
             let translation_vec = iso.0.translation.vector;
             let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
@@ -916,22 +935,6 @@ impl<'a> System<'a> for RenderingSystem {
                     &iso.0,
                     size.0,
                     true
-                );
-        }
-        for (_entity, iso, image, size, _light) in
-            (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
-        {
-            let translation_vec = iso.0.translation.vector;
-            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
-            canvas
-                .render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_datas.get(image.0).unwrap(),
-                    &isometry,
-                    size.0,
-                    true,
                 );
         }
         for (_entity, physics_component, image, size, _ship) in
@@ -1001,16 +1004,23 @@ impl<'a> System<'a> for RenderingSystem {
                     true
                 )
         }
-        for (iso, lazer) in (&isometries, &lazers).join() {
+        let mut render_lazer = |
+            iso: &Isometry,
+            lazer: &Lazer,
+            rotation
+        | {
             if lazer.active {
                 let h = lazer.current_distance;
                 let w = 0.05f32;
-                let positions = [
-                    Point2::new(-w / 2.0, 0f32),
-                    Point2::new(w / 2.0, 0f32),
-                    Point2::new(0.0, -h) // hmmmmm, don't know why minus
+                let positions = vec![
+                    Vector2::new(-w / 2.0, 0f32),
+                    Vector2::new(w / 2.0, 0f32),
+                    Vector2::new(0.0, -h) // hmmmmm, don't know why minus
                 ];
-                // let indices = [0u16, 1, 2, 2, 3, 0];
+                let positions: Vec<Point2> = positions
+                    .into_iter()
+                    .map(|v: Vector2| Point2::from(rotation * v))
+                    .collect();
                 let indices = [0u16, 1, 2];
                 let geometry_data = GeometryData::new(
                     &gl, &positions, &indices
@@ -1024,6 +1034,16 @@ impl<'a> System<'a> for RenderingSystem {
                     RenderMode::Draw
                 );
             }
+        };
+        for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
+            for (i, lazer) in multy_lazer.lazers.iter().enumerate() {
+                let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+                render_lazer(iso, lazer, rotation);
+            }
+        };
+        let zero_rotation = Rotation2::new(0.0);
+        for (iso, lazer) in (&isometries, &lazers).join() {
+            render_lazer(iso, lazer, zero_rotation);
         };
         for (iso, size, animation) in (&isometries, &sizes, &mut animations).join() {
             let animation_frame = animation.next_frame();

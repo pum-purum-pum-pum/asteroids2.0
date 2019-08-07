@@ -124,6 +124,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Blaster>();
     specs_world.register::<ShotGun>();
     specs_world.register::<Lazer>();
+    specs_world.register::<MultyLazer>();
     specs_world.register::<Image>();
     specs_world.register::<Sound>();
     specs_world.register::<Geometry>();
@@ -143,22 +144,22 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
     specs_world.register::<Damage>();
-    specs_world.register::<AIType>();
+    specs_world.register::<AI>();
     specs_world.register::<ThreadPin<ParticlesData>>();
     specs_world.register::<ShipStats>();
     specs_world.register::<Animation>();
     let images = [
         "back",
-        "player_new", 
+        "player_ship1", 
         "asteroid",
         "light",
         "light_sea",
         "projectile",
         "enemy_projectile",
         "enemy1",
-        "enemy2",
+        "kamikadze",
         "enemy3",
-        "enemy4",
+        "lazer",
         "bullet_speed",
         "ship_speed",
         "attack_speed",
@@ -173,7 +174,8 @@ pub fn run() -> Result<(), String> {
         "blaster_gun",
         "shotgun",
         "coin",
-        "exp"
+        "exp",
+        "lazer_boss"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -262,15 +264,15 @@ pub fn run() -> Result<(), String> {
 
         fn load_enemy(enemy_save: &EnemyKindSave, name_to_image: &HashMap<String, specs::Entity>) -> EnemyKind {
             EnemyKind {
-                ai_kind: enemy_save.ai_kind,
-                gun_kind: enemy_save.gun_kind,
+                ai_kind: enemy_save.ai_kind.clone(),
+                gun_kind: enemy_save.gun_kind.clone(),
                 ship_stats: enemy_save.ship_stats,
                 image: Image(name_to_image[&enemy_save.image_name])
             }
         }
         #[derive(Debug, Serialize, Deserialize)]
         pub struct EnemyKindSave {
-            pub ai_kind: AIType,
+            pub ai_kind: AI,
             pub gun_kind: GunKind,
             pub ship_stats: ShipStats,
             pub image_name: String,
@@ -324,14 +326,14 @@ pub fn run() -> Result<(), String> {
     }
 
     let preloaded_images = PreloadedImages {
-        character: name_to_image["player_new"],
+        character: name_to_image["player_ship1"],
         projectile: name_to_image["projectile"],
         enemy_projectile: name_to_image["enemy_projectile"],
         asteroid: name_to_image["asteroid"],
         enemy: name_to_image["enemy1"],
-        enemy2: name_to_image["enemy2"],
+        enemy2: name_to_image["kamikadze"],
         enemy3: name_to_image["enemy3"],
-        enemy4: name_to_image["enemy4"],
+        enemy4: name_to_image["lazer"],
         background: name_to_image["back"],
         nebulas: nebula_images,
         ship_speed_upgrade: name_to_image["ship_speed"],
@@ -375,6 +377,7 @@ pub fn run() -> Result<(), String> {
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
     let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    specs_world.add_resource(MacroGame{coins: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
