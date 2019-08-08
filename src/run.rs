@@ -148,6 +148,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<ThreadPin<ParticlesData>>();
     specs_world.register::<ShipStats>();
     specs_world.register::<Animation>();
+    specs_world.register::<Charge>();
     // TODO: load all this imagea automagicly (assets pack?)
     let images = [
         "back",

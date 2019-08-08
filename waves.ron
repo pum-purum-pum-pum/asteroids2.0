@@ -2,7 +2,7 @@
 	[
 		(
 			distribution: [
-				("kamikadze", 1.0),
+				("coin", 1.0),
 			],
 			ships_number: 10,
 			const_distribution : [

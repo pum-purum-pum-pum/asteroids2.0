@@ -197,8 +197,8 @@ pub enum AIType {
     Follow,
     Aim,
     Rotate(f32),
-    ShootAndFollow,
-    Kamikadze
+    Kamikadze,
+    Charging(usize)
 }
 
 #[derive(Debug, Clone, Copy, Component, Serialize, Deserialize)]
@@ -259,6 +259,38 @@ pub enum Geometry {
     Circle { radius: f32 },
     Segment(BlockSegment),
     Polygon(Polygon),
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Charge {
+    pub recharge_state: usize,
+    pub recharge_time: usize,
+}
+
+impl Gun for Charge {
+    fn recharge_state(&self) -> usize {
+        self.recharge_state
+    }
+
+    fn set_recharge_state(&mut self, recharge_state: usize) {
+        self.recharge_state = recharge_state;
+    }
+
+    fn recharge_time(&self) -> usize {
+        self.recharge_time
+    }
+
+    fn spawn_bullets(
+        &self,
+        _entity_type: EntityType,
+        _isometry: Isometry3,
+        _bullet_speed: f32,
+        _bullet_damage: usize,
+        _ship_velocity: Vector2,
+        _owner: specs::Entity
+    ) -> Vec<InsertEvent> {
+        unimplemented!();
+    }
 }
 
 #[derive(Component, Debug, Clone, Copy)]

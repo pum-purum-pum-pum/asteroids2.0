@@ -19,6 +19,8 @@
 * * constantly trhows slow bullets in spiral(while rotating) \/
 * * rarely throws super fast bullets
 * * lazer beams around and rotating \/
+* * charging enemies \sort of/
+* * shotgun enemy
 * add boss2
 * add score table
 * agressive only if noticed \/

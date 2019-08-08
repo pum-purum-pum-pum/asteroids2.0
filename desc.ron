@@ -182,5 +182,24 @@
             size: 0.4,
             image_name: "random_ship",
         ),
+        (
+            ai_kind: AI(kinds:[Charging(70)]),
+            gun_kind: Blaster((
+                recharge_state: 0,
+                recharge_time: 3,
+                bullets_damage: 100,
+                bullet_speed: 0.1,
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            size: 0.4,
+            image_name: "coin",        )
     ],
 )

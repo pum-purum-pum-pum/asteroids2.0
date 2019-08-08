@@ -152,6 +152,7 @@ impl<'a> System<'a> for PhysicsSystem {
         ReadStorage<'a, PhysicsComponent>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, EnemyMarker>,
+        ReadStorage<'a, Charge>,
         Write<'a, World<f32>>,
         Read<'a, AppState>,
     );
@@ -163,6 +164,7 @@ impl<'a> System<'a> for PhysicsSystem {
             mut velocities, 
             physics, 
             character_markers,
+            chargings,
             enemies,
             mut world, 
             app_state
@@ -188,6 +190,9 @@ impl<'a> System<'a> for PhysicsSystem {
                 for e2 in enemies_entities.iter() {
                     if e1 == e2 {
                         break
+                    }
+                    if chargings.get(*e1).is_some() || chargings.get(*e2).is_some() {
+                        continue
                     }
                     let phys1 = physics.get(*e1).unwrap();
                     let phys2 = physics.get(*e2).unwrap();
@@ -754,6 +759,7 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Shield>,
             WriteStorage<'a, Lifetime>,
             WriteStorage<'a, AI>,
+            WriteStorage<'a, Charge>,
             WriteStorage<'a, AsteroidMarker>,
             WriteStorage<'a, EnemyMarker>,
             WriteStorage<'a, ShipMarker>,
@@ -799,6 +805,7 @@ impl<'a> System<'a> for InsertSystem {
                 mut shields,
                 mut lifetimes,
                 mut ais,
+                mut chargings,
                 mut asteroid_markers,
                 mut enemies,
                 mut ships,
@@ -1003,7 +1010,16 @@ impl<'a> System<'a> for InsertSystem {
                             enemy = enemy
                                 .with(multy_lazer.clone(), &mut multy_lazers)
                         }
-                    } 
+                    }
+                    for kind in kind.kinds.iter() {
+                        match kind {
+                            AIType::Charging(time) => {
+                                enemy = enemy
+                                    .with(Charge{recharge_state: 0, recharge_time: *time}, &mut chargings)
+                            }
+                            _ => ()
+                        }                        
+                    }
 
                     let enemy = enemy
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
@@ -1202,6 +1218,7 @@ impl<'a> System<'a> for GamePlaySystem {
             WriteStorage<'a, Spin>,
             WriteStorage<'a, Blaster>,
             WriteStorage<'a, ShotGun>,
+            WriteStorage<'a, Charge>,
             WriteStorage<'a, Lifetime>,
             WriteStorage<'a, AsteroidMarker>,
             ReadStorage<'a, CharacterMarker>,
@@ -1243,6 +1260,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 _spins,
                 mut blasters,
                 mut shotguns,
+                mut chargings,
                 mut lifetimes,
                 asteroid_markers,
                 character_markers,
@@ -1291,6 +1309,9 @@ impl<'a> System<'a> for GamePlaySystem {
         let char_isometry = char_isometry.clone(); // to avoid borrow
         let pos3d = char_isometry.0.translation.vector;
         let character_position = Point2::new(pos3d.x, pos3d.y);
+        for charge in (&mut chargings).join() {
+            charge.update()
+        }
         for gun in (&mut blasters).join() {
             gun.update()
         }
@@ -1711,6 +1732,7 @@ impl<'a> System<'a> for AISystem {
         WriteStorage<'a, Shield>,
         WriteStorage<'a, Lifes>,
         WriteStorage<'a, Polygon>,
+        WriteStorage<'a, Charge>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, AI>,
@@ -1738,6 +1760,7 @@ impl<'a> System<'a> for AISystem {
             mut shields,
             mut lifes,
             polygons,
+            mut chargings,
             character_markers,
             asteroid_markers,
             ais,
@@ -1842,7 +1865,6 @@ impl<'a> System<'a> for AISystem {
                     }
                     AIType::Follow => {
                         let speed = 0.1f32;
-                        // TODO remove this hack with another AI mechanism?
                         if diff.norm() > follow_area {
                             if character_noticed {
                                 let ai_vel = speed * dir;
@@ -1870,9 +1892,6 @@ impl<'a> System<'a> for AISystem {
                     AIType::Rotate(speed) => {
                         spin.0 = *speed;                        
                     }
-                    AIType::ShootAndFollow => {
-
-                    }
                     AIType::Kamikadze => {
                         let speed = 0.1f32;
                         let diff = character_position - position;
@@ -1882,6 +1901,19 @@ impl<'a> System<'a> for AISystem {
                         let mut velocity = *body.velocity();
                         *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
                         body.set_velocity(velocity);
+                    }
+                    AIType::Charging(_) => {
+                        let speed = 0.2f32;
+                        let charging = chargings.get_mut(entity).expect("no charging component while have charging AI");
+                        if charging.shoot() {
+                            let diff = character_position - position;
+                            let dir = speed * (diff).normalize();
+                            *vel = Velocity::new(dir.x, dir.y);
+                            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                            let mut velocity = *body.velocity();
+                            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                            body.set_velocity(velocity);
+                        }
                     }
                 }
             }
