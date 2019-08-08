@@ -2,62 +2,64 @@
 	[
 		(
 			distribution: [
-				(4, 1.0),
+				("kamikadze", 1.0),
 			],
-			ships_number: 7,
-			boss: None,
+			ships_number: 10,
+			const_distribution : [
+				("lazer_boss", 1)
+			],
 			iterations: 1
 		),
 		(
 			distribution: [
-				(0, 0.5),
-				(1, 0.5)
+				("kamikadze", 0.5),
+				("enemy1", 0.5)
 			],
 			ships_number: 7,
-			boss: None,
+			const_distribution : [],
 			iterations: 1
 		),
 		(
 			distribution: [
-				(0, 0.1),
-				(1, 0.5),
-				(2, 0.4)
+				("kamikadze", 0.1),
+				("enemy1", 0.5),
+				("lazer", 0.4)
 			],
 			ships_number: 6,
-			boss: None,
+			const_distribution : [],
 			iterations: 1
 		),
 		(
 			distribution: [
-				(0, 0.1),
-				(1, 0.2),
-				(2, 0.4),
-				(3, 0.3)
+				("kamikadze", 0.1),
+				("enemy1", 0.2),
+				("lazer", 0.4),
+				("enemy3", 0.3)
 			],
 			ships_number: 4,
-			boss: None,
+			const_distribution : [],
 			iterations: 1
 		),
 		(
 			distribution: [
-				(0, 0.1),
-				(1, 0.2),
-				(2, 0.4),
-				(3, 0.3)
+				("kamikadze", 0.1),
+				("enemy1", 0.2),
+				("lazer", 0.4),
+				("enemy3", 0.3)
 			],
 			ships_number: 8,
-			boss: None,
+			const_distribution : [],
 			iterations: 1
 		),
 		(
 			distribution: [
-				(0, 0.1),
-				(1, 0.2),
-				(2, 0.4),
-				(3, 0.3)
+				("kamikadze", 0.1),
+				("enemy1", 0.2),
+				("lazer", 0.4),
+				("enemy3", 0.3)
 			],
 			ships_number: 15,
-			boss: None,
+			const_distribution : [],
 			iterations: 1
 		),
 	]

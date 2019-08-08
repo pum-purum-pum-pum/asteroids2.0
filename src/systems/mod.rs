@@ -965,10 +965,10 @@ impl<'a> System<'a> for InsertSystem {
                     kind,
                     gun_kind,
                     ship_stats,
+                    size,
                     image,
                 } => {
-                    let size = 0.4f32;
-
+                    let size = *size;
                     let enemy_shape = 
                         Geometry::Circle { radius: size };
                     let enemy_physics_shape = 
@@ -1355,38 +1355,53 @@ impl<'a> System<'a> for GamePlaySystem {
         }
         let cnt = ships.count();
         let wave = &waves.0[current_wave.id];
-        let add_cnt = if cnt == 1 {
+        let (add_cnt, const_spawn) = if cnt == 1 {
             current_wave.iteration += 1;
-            wave.ships_number - cnt + 1
+            (
+                wave.ships_number - cnt + 1,
+                true
+            )
         } else {
-            0
+            (
+                0,
+                false
+            )
         };
         if current_wave.iteration > wave.iterations {
             current_wave.iteration = 0;
             current_wave.id = (waves.0.len() - 1).min(current_wave.id + 1);
         }
         let mut rng = thread_rng();
+        fn ships2insert(
+            spawn_pos: Point2,
+            enemy: EnemyKind
+        ) -> InsertEvent {
+            InsertEvent::Ship {
+                iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
+                light_shape: Geometry::Circle { radius: 1f32 },
+                spin: 0f32,
+                kind: enemy.ai_kind,
+                gun_kind: enemy.gun_kind,
+                ship_stats: enemy.ship_stats,
+                size: enemy.size,
+                image: enemy.image,
+            }
+        };
         for _ in 0..add_cnt {
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
             // TODO move from loop 
             let ships = &description.enemies;
-            fn ships2insert(
-                spawn_pos: Point2,
-                enemy: EnemyKind
-            ) -> InsertEvent {
-                InsertEvent::Ship {
-                    iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
-                    light_shape: Geometry::Circle { radius: 1f32 },
-                    spin: 0f32,
-                    kind: enemy.ai_kind,
-                    gun_kind: enemy.gun_kind,
-                    ship_stats: enemy.ship_stats,
-                    image: enemy.image,
-                }
-            };
             let ship_id = wave.distribution.choose_weighted(&mut rng, |item| item.1).unwrap().0;
             insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
         };
+        if const_spawn {
+            for kind in wave.const_distribution.iter() {
+                let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
+                let ships = &description.enemies;
+                let ship_id = kind.0;
+                insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
+            }
+        }
         let cnt = nebulas.count();
         let add_cnt = if NEBULA_MIN_NUMBER > cnt {
             NEBULA_MIN_NUMBER - cnt

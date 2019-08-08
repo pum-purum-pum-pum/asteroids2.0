@@ -148,6 +148,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<ThreadPin<ParticlesData>>();
     specs_world.register::<ShipStats>();
     specs_world.register::<Animation>();
+    // TODO: load all this imagea automagicly (assets pack?)
     let images = [
         "back",
         "player_ship1", 
@@ -175,7 +176,8 @@ pub fn run() -> Result<(), String> {
         "shotgun",
         "coin",
         "exp",
-        "lazer_boss"
+        "lazer_boss",
+        "random_ship"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -263,10 +265,12 @@ pub fn run() -> Result<(), String> {
         }
 
         fn load_enemy(enemy_save: &EnemyKindSave, name_to_image: &HashMap<String, specs::Entity>) -> EnemyKind {
+            dbg!(&enemy_save.image_name);
             EnemyKind {
                 ai_kind: enemy_save.ai_kind.clone(),
                 gun_kind: enemy_save.gun_kind.clone(),
                 ship_stats: enemy_save.ship_stats,
+                size: enemy_save.size,
                 image: Image(name_to_image[&enemy_save.image_name])
             }
         }
@@ -275,6 +279,7 @@ pub fn run() -> Result<(), String> {
             pub ai_kind: AI,
             pub gun_kind: GunKind,
             pub ship_stats: ShipStats,
+            pub size: f32,
             pub image_name: String,
         };
         // let file = File::open("desc.ron").unwrap();
@@ -287,6 +292,10 @@ pub fn run() -> Result<(), String> {
                 std::process::exit(1);
             }
         };
+        let mut enemy_name_to_id = HashMap::new();
+        for (id, enemy) in desc.enemies.iter().enumerate() {
+            enemy_name_to_id.insert(enemy.image_name.clone(), id);
+        }
         let desc = process_description(desc, &name_to_image);
         specs_world.add_resource(desc);
         let file = include_str!("../upgrades.ron");
@@ -312,14 +321,37 @@ pub fn run() -> Result<(), String> {
         specs_world.add_resource(avaliable_upgrades);
 
         // let file = File::open("waves.ron").unwrap();
+        pub fn wave_load(wave: &WaveSave, enemy_name_to_id: &HashMap<String, usize>) -> Wave {
+            let distribution: Vec<(usize, f32)> = 
+                wave.distribution
+                    .iter()
+                    .map(|p| (enemy_name_to_id[&p.0], p.1))
+                    .collect();
+            let const_distribution: Vec<(usize, usize)> =
+                wave.const_distribution
+                    .iter()
+                    .map(|p| (enemy_name_to_id[&p.0], p.1))
+                    .collect();
+            Wave {
+                distribution: distribution,
+                ships_number: wave.ships_number,
+                const_distribution: const_distribution,
+                iterations: wave.iterations
+            }
+        }
+
         let file = include_str!("../waves.ron");
-        let waves: Waves = match from_str(file) {
+        let waves: WavesSave = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
                 println!("Failed to load config: {}", e);
                 std::process::exit(1);
             }
         };
+        let waves: Waves = Waves(waves.0
+            .iter()
+            .map(|p| wave_load(p, &enemy_name_to_id))
+            .collect());
         specs_world.add_resource(waves);
         specs_world.add_resource(upgrades_all);
         specs_world.add_resource(CurrentWave::default());

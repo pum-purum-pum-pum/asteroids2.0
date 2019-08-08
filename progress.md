@@ -12,9 +12,11 @@
 * rewrite lazers logic and unify killing logic \/
 * exp coins and coins add real exp and real money. Killing -- not \/
 * Time to next wave (mb also add ability to add pauses between waves) -- \nope/
-* add boss1
+* enemies by name \/
+* add boss1 \/
+* constant enemies \/
 * enemies
-* * constantly trhows slow bullets in spiral(while rotating)
+* * constantly trhows slow bullets in spiral(while rotating) \/
 * * rarely throws super fast bullets
 * * lazer beams around and rotating \/
 * add boss2

@@ -40,10 +40,21 @@ pub struct CurrentWave{
 pub struct Waves (pub Vec<Wave>);
 
 #[derive(Debug, Default, Serialize, Deserialize)]
+pub struct WavesSave (pub Vec<WaveSave>);
+
+#[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Wave {
     pub distribution: Vec<(usize, f32)>,
     pub ships_number: usize,
-    pub boss: Option<usize>,
+    pub const_distribution: Vec<(usize, usize)>,
+    pub iterations: usize
+}
+
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+pub struct WaveSave {
+    pub distribution: Vec<(String, f32)>,
+    pub ships_number: usize,
+    pub const_distribution: Vec<(String, usize)>,
     pub iterations: usize
 }
 
@@ -73,6 +84,7 @@ pub struct EnemyKind {
     pub ai_kind: AI,
     pub gun_kind: GunKind,
     pub ship_stats: ShipStats,
+    pub size: f32,
     pub image: Image,
 }
 
@@ -103,6 +115,7 @@ pub enum InsertEvent {
         kind: AI,
         ship_stats: ShipStats,
         image: Image,
+        size: f32,
     },
     Bullet {
         kind: EntityType,
