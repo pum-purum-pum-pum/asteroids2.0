@@ -1,7 +1,7 @@
 [
     (
         upgrade_type: AttackSpeed,
-        image: "attack_speed",
+        image: "fire_rate",
         name: "Attack speed",
         description: "+ X% attack speed",
         assigned: [ToGun(Blaster), ToGun(ShotGun)]
@@ -17,7 +17,7 @@
         upgrade_type: ShipSpeed,
         image: "ship_speed",
         name: "Ship speed",
-        description: "+ X% attack speed",
+        description: "+ X% ship speed",
         assigned: [General]
     ),
     (

@@ -200,6 +200,28 @@
                 damage: 10
             ),
             size: 0.4,
-            image_name: "coin",        )
+            image_name: "coin",
+        ),
+        (
+            ai_kind: AI(kinds:[Follow, Shoot, Aim]),
+            gun_kind: Cannon((
+                recharge_state: 0,
+                recharge_time: 100,
+                bullets_damage: 0,
+                bullet_speed: 0.12,
+                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0)
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            size: 0.4,
+            image_name: "exp",
+        )
     ],
 )

@@ -123,6 +123,7 @@ pub enum InsertEvent {
         velocity: Point2,
         damage: usize,
         owner: specs::Entity,
+        blast: Option<Blast>
     },
     Coin {
         value: usize,
@@ -525,7 +526,8 @@ pub enum GunKindMarker {
     Blaster,
     Lazer,
     ShotGun,
-    MultyLazer
+    MultyLazer,
+    Cannon
 }
 
 impl Into<GunKindMarker> for &GunKind {
@@ -534,7 +536,8 @@ impl Into<GunKindMarker> for &GunKind {
             GunKind::Blaster(_) => GunKindMarker::Blaster,
             GunKind::ShotGun(_) => GunKindMarker::ShotGun,
             GunKind::Lazer(_) => GunKindMarker::Lazer,
-            GunKind::MultyLazer(_) => GunKindMarker::MultyLazer
+            GunKind::MultyLazer(_) => GunKindMarker::MultyLazer,
+            GunKind::Cannon(_) => GunKindMarker::Cannon,
         }
     }
 }
@@ -587,12 +590,19 @@ pub enum GunKind {
     Blaster(Blaster),
     Lazer(Lazer),
     ShotGun(ShotGun),
-    MultyLazer(MultyLazer)
+    MultyLazer(MultyLazer),
+    Cannon(Cannon)
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct MultyLazer {
     pub lazers: Vec<Lazer>
+}
+
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Blast {
+    pub blast_damage: usize,
+    pub blast_radius: f32,
 }
 
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -717,6 +727,7 @@ impl Gun for ShotGun {
                 velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                 damage: bullet_damage,
                 owner: owner,
+                blast: None,
             });
         }
         for i in 1..=self.side_projectiles_number {
@@ -740,6 +751,7 @@ impl Gun for ShotGun {
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                     damage: self.bullets_damage,
                     owner: owner,
+                    blast: None
                 });
             }
         }
@@ -806,6 +818,76 @@ impl Gun for Blaster {
                 velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                 damage: bullet_damage,
                 owner: owner,
+                blast: None
+            };
+            res.push(insert_event)
+        }
+        res
+    }
+}
+
+
+#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Cannon {
+    recharge_state: usize,
+    pub recharge_time: usize,
+    pub bullets_damage: usize,
+    pub bullet_speed: f32,
+    pub bullet_blast: Blast
+}
+
+impl Cannon {
+    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32, bullet_blast: Blast) -> Self {
+        Self {
+            recharge_state: 0usize,
+            recharge_time: recharge_time,
+            bullets_damage: bullets_damage,
+            bullet_speed: bullet_speed,
+            bullet_blast: bullet_blast,
+        }
+    }
+}
+
+impl Gun for Cannon {
+    fn recharge_state(&self) -> usize {
+        self.recharge_state
+    }
+
+    fn set_recharge_state(&mut self, recharge_state: usize) {
+        self.recharge_state = recharge_state;
+    }
+
+    fn recharge_time(&self) -> usize {
+        self.recharge_time
+    }
+
+    fn spawn_bullets(
+        &self,
+        entity_type: EntityType,
+        isometry: Isometry3,
+        bullet_speed: f32,
+        bullet_damage: usize,
+        ship_velocity: Vector2,
+        owner: specs::Entity
+    ) -> Vec<InsertEvent> {
+        let mut res = vec![];
+        {
+            let position = isometry.translation.vector;
+            let mut rng = rand::thread_rng();
+            let shift = rng.gen_range(-0.2f32, 0.2f32);
+            let direction = isometry * Vector3::new(shift, -1f32, 0f32).normalize();
+            let velocity_rel = bullet_speed * direction;
+            let projectile_velocity = Velocity::new(
+                ship_velocity.x + velocity_rel.x,
+                ship_velocity.y + velocity_rel.y,
+            ) ;
+            let insert_event = InsertEvent::Bullet {
+                kind: entity_type,
+                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                damage: bullet_damage,
+                owner: owner,
+                blast: Some(self.bullet_blast)
             };
             res.push(insert_event)
         }

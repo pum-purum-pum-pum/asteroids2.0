@@ -2,7 +2,7 @@
 	[
 		(
 			distribution: [
-				("coin", 1.0),
+				("exp", 1.0),
 			],
 			ships_number: 10,
 			const_distribution : [

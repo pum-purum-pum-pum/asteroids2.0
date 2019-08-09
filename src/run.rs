@@ -118,11 +118,13 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<CharacterMarker>();
     specs_world.register::<AsteroidMarker>();
     specs_world.register::<Projectile>();
+    specs_world.register::<Blast>();
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
     specs_world.register::<Blaster>();
     specs_world.register::<ShotGun>();
+    specs_world.register::<Cannon>();
     specs_world.register::<Lazer>();
     specs_world.register::<MultyLazer>();
     specs_world.register::<Image>();
@@ -164,7 +166,7 @@ pub fn run() -> Result<(), String> {
         "lazer",
         "bullet_speed",
         "ship_speed",
-        "attack_speed",
+        "fire_rate",
         "direction",
         "circle",
         "rotation_speed",
@@ -371,7 +373,7 @@ pub fn run() -> Result<(), String> {
         nebulas: nebula_images,
         ship_speed_upgrade: name_to_image["ship_speed"],
         bullet_speed_upgrade: name_to_image["bullet_speed"],
-        attack_speed_upgrade: name_to_image["attack_speed"],
+        attack_speed_upgrade: name_to_image["fire_rate"],
         light_white: name_to_image["light"],
         light_sea: name_to_image["light_sea"],
         direction: name_to_image["direction"],

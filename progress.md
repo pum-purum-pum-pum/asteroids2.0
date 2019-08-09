@@ -1,29 +1,14 @@
-* damage ship \/
-* Sample only usefull upgrades \/
-* try shadows again \/
-* animations \/
-* explosions with animations \/
-* android revisit \no stencil :O/
-* make gif (+ video) on #screenshot_saturday \/
-* correct shadows \/
-* add AI for enemies with aware of shadows \somehow/
-* asteroids spawn coins \/
-* collect conins with magneto \/
-* rewrite lazers logic and unify killing logic \/
-* exp coins and coins add real exp and real money. Killing -- not \/
-* Time to next wave (mb also add ability to add pauses between waves) -- \nope/
-* enemies by name \/
-* add boss1 \/
-* constant enemies \/
 * enemies
-* * constantly trhows slow bullets in spiral(while rotating) \/
+<!-- * * constantly trhows slow bullets in spiral(while rotating) \/ -->
 * * rarely throws super fast bullets
-* * lazer beams around and rotating \/
-* * charging enemies \sort of/
-* * shotgun enemy
+<!-- * * lazer beams around and rotating \/ -->
+<!-- * * charging enemies \/ -->
+* * real shotgun enemy
+* * bomb thrower
+* * bomb trace
 * add boss2
 * add score table
-* agressive only if noticed \/
+<!-- * agressive only if noticed \/ -->
 * fix sounds??? seems ok
 * more gold for more level you are
 
@@ -70,6 +55,25 @@ TODO LIST
 * when oriented towards speed is more and also add reactor on the back like in "weired game wich name I forgot"
 
 * ship damage upgrade (taran ship! :) )
+
+
+<!-- * damage ship \/ -->
+<!-- * Sample only usefull upgrades \/ -->
+<!-- * try shadows again \/ -->
+<!-- * animations \/ -->
+<!-- * explosions with animations \/ -->
+<!-- * android revisit \no stencil :O/ -->
+<!-- * make gif (+ video) on #screenshot_saturday \/ -->
+<!-- * correct shadows \/ -->
+<!-- * add AI for enemies with aware of shadows \somehow/ -->
+<!-- * asteroids spawn coins \/ -->
+<!-- * collect conins with magneto \/ -->
+<!-- * rewrite lazers logic and unify killing logic \/ -->
+<!-- * exp coins and coins add real exp and real money. Killing -- not \/ -->
+<!-- * Time to next wave (mb also add ability to add pauses between waves) -- \nope/ -->
+<!-- * enemies by name \/ -->
+<!-- * add boss1 \/ -->
+<!-- * constant enemies \/ -->
 
 <!-- * Pick gun UI \/ -->
 <!-- * Don't slow down bullets \/ -->
