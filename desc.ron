@@ -22,6 +22,7 @@
             recharge_time: 12,
             bullets_damage: 10,
             bullet_speed: 0.5,
+            bullet_image: "enemy_projectile"
         )),
         ShotGun((
             recharge_state: 0,
@@ -30,6 +31,7 @@
             side_projectiles_number: 1,
             angle_shift: 0.25,
             bullet_speed: 0.3,
+            bullet_image: "enemy_projectile"
         )),
     ],
     enemies: [
@@ -40,6 +42,7 @@
                 recharge_time: 12,
                 bullets_damage: 10,
                 bullet_speed: 0.5,
+                bullet_image: "enemy_projectile"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -61,6 +64,7 @@
                 recharge_time: 17,
                 bullets_damage: 100,
                 bullet_speed: 0.2,
+                bullet_image: "enemy_projectile"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -105,6 +109,7 @@
                 side_projectiles_number: 4,
                 angle_shift: 0.35,
                 bullet_speed: 0.08,
+                bullet_image: "enemy_projectile"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -120,31 +125,31 @@
         ),
 
         (
-            ai_kind: AI(kinds:[Shoot, Follow, Rotate(0.1)]),
+            ai_kind: AI(kinds:[Shoot, Follow, Rotate(0.03)]),
             gun_kind: MultyLazer((
                 lazers: [
                     Lazer(
                         damage: 7,
                         active: false,
-                        distance: 3,
+                        distance: 8,
                         current_distance: 8,
                     ),
                     Lazer(
                         damage: 7,
                         active: false,
-                        distance: 3,
+                        distance: 8,
                         current_distance: 8,
                     ),
                     Lazer(
                         damage: 7,
                         active: false,
-                        distance: 3,
+                        distance: 8,
                         current_distance: 8,
                     ),
                     Lazer(
                         damage: 7,
                         active: false,
-                        distance: 3,
+                        distance: 8,
                         current_distance: 8,
                     ),
                 ]
@@ -169,6 +174,7 @@
                 recharge_time: 3,
                 bullets_damage: 100,
                 bullet_speed: 0.1,
+                bullet_image: "enemy_projectile"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -183,12 +189,57 @@
             image_name: "random_ship",
         ),
         (
-            ai_kind: AI(kinds:[Charging(70)]),
+            ai_kind: AI(kinds:[Charging(70), Aim]),
             gun_kind: Blaster((
                 recharge_state: 0,
                 recharge_time: 3,
                 bullets_damage: 100,
                 bullet_speed: 0.1,
+                bullet_image: "enemy_projectile"
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            size: 0.4,
+            image_name: "charging",
+        ),
+        (
+            ai_kind: AI(kinds:[Follow, Shoot, Aim]),
+            gun_kind: Cannon((
+                recharge_state: 0,
+                recharge_time: 100,
+                bullets_damage: 0,
+                bullet_speed: 0.12,
+                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0),
+                bullet_image: "bomb"
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            size: 0.4,
+            image_name: "bomber",
+        ),
+        (
+            ai_kind: AI(kinds:[Follow, Shoot, Aim]),
+            gun_kind: Cannon((
+                recharge_state: 0,
+                recharge_time: 100,
+                bullets_damage: 0,
+                bullet_speed: 0,
+                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0),
+                bullet_image: "bomb"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -201,27 +252,6 @@
             ),
             size: 0.4,
             image_name: "coin",
-        ),
-        (
-            ai_kind: AI(kinds:[Follow, Shoot, Aim]),
-            gun_kind: Cannon((
-                recharge_state: 0,
-                recharge_time: 100,
-                bullets_damage: 0,
-                bullet_speed: 0.12,
-                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0)
-            )),
-            ship_stats: (
-                thrust_force: 0.003,
-                torque: 0.2,
-                health_regen: 0,
-                shield_regen: 0,
-                max_health: 100,
-                max_shield: 0,
-                damage: 10
-            ),
-            size: 0.4,
-            image_name: "exp",
         )
     ],
 )

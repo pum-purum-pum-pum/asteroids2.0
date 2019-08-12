@@ -8,6 +8,147 @@ use specs_derive::Component;
 pub const EPS: f32 = 1E-3;
 pub const SHADOW_LENGTH: f32 = 100f32;
 
+pub struct NebulaGrid {
+    pub grid: Grid<bool>
+}
+
+impl NebulaGrid {
+    pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
+        let grid = Grid::new(n, rw, rh, rbw, rbh);
+        NebulaGrid {
+            grid: grid
+        }
+    }
+}
+
+pub struct PlanetGrid {
+    pub grid: Grid<bool>
+}
+
+impl PlanetGrid {
+    pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
+        let grid = Grid::new(n, rw, rh, rbw, rbh);
+        PlanetGrid {
+            grid: grid
+        }
+    }
+}
+
+
+pub struct Grid<T> {
+    bricks: Vec<T>,
+    x: f32, 
+    y: f32,
+    rw: f32,
+    rh: f32,
+    rbw: f32,
+    rbh: f32,
+    pub max_w: f32, 
+    pub max_h: f32,
+    pub n: usize,
+    pub size: usize,
+}
+
+impl<T> Grid<T> where T: Default + Clone {
+    pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
+        let size = 2 * n + 1;
+        let bricks = vec![T::default(); size * size];
+        Self {
+            bricks: bricks,
+            x: 0.0,
+            y: 0.0,
+            rw: rw,
+            rh: rh,
+            rbw: rbw,
+            rbh: rbh,
+            max_w: rw + 2.0 * n as f32 * rw,
+            max_h: rh + 2.0 * n as f32 * rh,
+            n: n,
+            size: size
+        }
+    }
+
+    pub fn shift(&mut self, x: f32, y: f32) {
+        self.x += x;
+        self.y += y;
+        // shift grid by one cell if necessary
+        if self.x > self.rw + EPS {
+            self.x = -self.rw
+        }
+        if self.x < -self.rw - EPS {
+            self.x = self.rw
+        }
+        if self.y > self.rh + EPS {
+            self.y = -self.rh
+        }
+        if self.y < -self.rh - EPS {
+            self.y = self.rh
+        }
+        self.bricks = vec![T::default(); self.bricks.len()];
+    }
+
+    pub fn get_column(&self, x: f32) -> usize {
+        (self.n as i32 + ((self.rw + x - self.x) / (2.0 * self.rw)).floor() as i32) as usize
+    }
+
+    pub fn get_row(&self, y: f32) -> usize {
+        // assert_debug!();
+        (self.n as i32 + ((self.rh + y - self.y) / (2.0 * self.rh)).floor() as i32) as usize
+    }
+
+    pub fn get(&self, point: Point2) -> &T {
+        let id = self.size * self.get_row(point.y) + 
+            self.get_column(point.x);
+        &self.bricks[id]
+    }
+
+    pub fn get_rectangle(&self, row: usize, col: usize) -> ((f32, f32), (f32, f32)) {        
+        let point = self.get_cell_point(row, col);
+        return (
+            (
+                point.x - self.rw + self.rbw, 
+                point.x + self.rw - self.rbw
+            ), 
+            (
+                point.y - self.rh + self.rbh,
+                point.y + self.rh - self.rbh
+            )
+        )
+    }
+
+    pub fn get_ids(&self, id: usize) -> (usize, usize) {
+        let row = id / self.size;
+        let col = id % self.size;
+        (row, col)        
+    }
+
+    pub fn get_cell_point(&self, row: usize, column: usize) -> Point2 {
+        let (row, column) = (row as f32 - self.n as f32, column as f32 - self.n as f32);
+        Point2::new(
+            self.x + column * 2.0 * self.rw, 
+            self.y + row * 2.0 * self.rh
+        )
+    }
+
+    pub fn get_cell_value(&self, row: usize, column: usize) -> &T {
+        &self.bricks[row * self.size + column]
+    }
+
+    pub fn reset(&mut self) {
+        self.bricks = vec![T::default(); self.bricks.len()];
+    }
+
+    pub fn update(&mut self, point: Point2, value: T) -> Result<(), ()> {
+        if (point.x - self.x).abs() < self.max_w && (point.y - self.y).abs() < self.max_h {
+            let id = self.size * self.get_row(point.y) + 
+            self.get_column(point.x);
+            self.bricks[id] = value;
+            return Ok(())
+        }
+        Err(())
+    }
+}
+
 pub fn generate_convex_polygon(samples_num: usize, size: f32) -> Polygon {
     let mut rng = thread_rng();
     let mut points = vec![];

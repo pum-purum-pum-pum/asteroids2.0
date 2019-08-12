@@ -1,11 +1,22 @@
+* nebulas spawn control \/
+* * spawning grid? \/
+* add planet \/
+* image loading for bullets \/
+* add rotation behaviour
+* add rockets
+* image borders fix -- wtf
+
+
 * enemies
 <!-- * * constantly trhows slow bullets in spiral(while rotating) \/ -->
 * * rarely throws super fast bullets
 <!-- * * lazer beams around and rotating \/ -->
 <!-- * * charging enemies \/ -->
 * * real shotgun enemy
-* * bomb thrower
+* * bomb thrower \/
+* * bomberman \/
 * * bomb trace
+* * rockets enemy
 * add boss2
 * add score table
 <!-- * agressive only if noticed \/ -->
@@ -16,7 +27,9 @@
 
 * new projectiles
 * * rocketes
-* * granades
+* * granades \/
+* * * animations
+* * * custom image
 ws bullets around
 * * constantly trhows slow bullets in spiral(while rotating)
 

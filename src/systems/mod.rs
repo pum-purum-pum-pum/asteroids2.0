@@ -75,6 +75,13 @@ pub fn spawn_position(char_pos: Point2, forbidden: f32, active: f32) -> Point2 {
     }
 }
 
+pub fn spawn_in_rectangle(min_w: f32, max_w: f32, min_h: f32, max_h: f32) -> Point2 {
+    let mut rng = thread_rng();
+    let x = rng.gen_range(min_w, max_w);
+    let y = rng.gen_range(min_h, max_h);
+    Point2::new(x, y)
+}
+
 pub fn is_active(character_position: Point2, point: Point2, active_area: f32) -> bool {
     (point.x - character_position.x).abs() < active_area
         && (point.y - character_position.y).abs() < active_area
@@ -154,6 +161,8 @@ impl<'a> System<'a> for PhysicsSystem {
         ReadStorage<'a, EnemyMarker>,
         ReadStorage<'a, Charge>,
         Write<'a, World<f32>>,
+        WriteExpect<'a, NebulaGrid>,
+        WriteExpect<'a, PlanetGrid>,
         Read<'a, AppState>,
     );
 
@@ -166,7 +175,9 @@ impl<'a> System<'a> for PhysicsSystem {
             character_markers,
             chargings,
             enemies,
-            mut world, 
+            mut world,
+            mut nebula_grid,
+            mut planet_grid,
             app_state
         ) = data;
         let (character_position, character_prev_position) = {
@@ -218,13 +229,14 @@ impl<'a> System<'a> for PhysicsSystem {
                 }
             }
         }
+        let char_vec = character_position.translation.vector;
+        let prev_vec = character_prev_position.0.translation.vector;
+        let diff = Vector3::new(char_vec.x, char_vec.y, 0f32)  - Vector3::new(prev_vec.x, prev_vec.y, 0f32);
         for (isometry, ()) in (&mut isometries, !&physics).join() {
-            let char_vec = character_position.translation.vector;
-            let prev_vec = character_prev_position.0.translation.vector;
-            let diff = Vector3::new(char_vec.x, char_vec.y, 0f32)  - Vector3::new(prev_vec.x, prev_vec.y, 0f32);
             isometry.0.translation.vector -= diff;
         }
-
+        nebula_grid.grid.shift(-diff.x, -diff.y);
+        planet_grid.grid.shift(-diff.x, -diff.y);
         for (isometry, velocity, physics_component) in
             (&mut isometries, &mut velocities, &physics).join()
         {
@@ -474,6 +486,7 @@ impl<'a> System<'a> for ControlSystem {
             ReadStorage<'a, AsteroidMarker>,
             WriteStorage<'a, ShipStats>,
         ),
+        ReadExpect<'a, PreloadedImages>,
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
         Write<'a, EventChannel<Sound>>,
@@ -483,6 +496,7 @@ impl<'a> System<'a> for ControlSystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, Progress>,
         Write<'a, AppState>,
+        WriteExpect<'a, Canvas>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -504,6 +518,7 @@ impl<'a> System<'a> for ControlSystem {
                 asteroid_markers,
                 mut ships_stats,
             ),
+            preloaded_images,
             keys_channel,
             mouse_state,
             mut sounds_channel,
@@ -512,7 +527,8 @@ impl<'a> System<'a> for ControlSystem {
             bodies_map,
             mut insert_channel,
             mut progress,
-            mut app_state
+            mut app_state,
+            mut canvas,
         ) = data;
         let (ship_stats, _) = (&mut ships_stats, &character_markers).join().next().unwrap();
         #[cfg(not(target_os = "android"))]
@@ -712,6 +728,12 @@ impl<'a> System<'a> for ControlSystem {
                     Keycode::Space => {
                         *app_state = AppState::Play(PlayState::Upgrade)
                     }
+                    Keycode::LeftBracket => {
+                        canvas.z_far -= 0.5;
+                    }
+                    Keycode::RightBracket => {
+                        canvas.z_far += 0.5;
+                    }
                     _ => ()
                     
                 }
@@ -771,6 +793,7 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Blast>,
         ),
         WriteStorage<'a, NebulaMarker>,
+        WriteStorage<'a, PlanetMarker>,
         WriteStorage<'a, AttachPosition>,
         WriteStorage<'a, Animation>,
         WriteStorage<'a, Coin>,
@@ -819,6 +842,7 @@ impl<'a> System<'a> for InsertSystem {
                 mut blasts,
             ),
             mut nebulas,
+            mut planets,
             mut attach_positions,
             mut animations,
             mut coins,
@@ -1076,20 +1100,20 @@ impl<'a> System<'a> for InsertSystem {
                     velocity,
                     damage,
                     owner,
+                    bullet_image,
                     blast
                 } => {
                     let r = 0.12;
-                    let image = match kind {
-                        EntityType::Player => preloaded_images.projectile,
-                        EntityType::Enemy => preloaded_images.enemy_projectile
-                    };
-
+                    // let image = match kind {
+                    //     EntityType::Player => preloaded_images.projectile,
+                    //     EntityType::Enemy => preloaded_images.enemy_projectile
+                    // };
                     let mut bullet = entities
                         .build_entity()
                         .with(Damage(*damage), &mut damages)
                         .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                        .with(Image(image), &mut images)
+                        .with(Image(bullet_image.0), &mut images)
                         .with(Spin::default(), &mut spins)
                         .with(Projectile { owner: *owner }, &mut projectiles)
                         .with(Lifetime::new(100usize), &mut lifetimes)
@@ -1175,6 +1199,20 @@ impl<'a> System<'a> for InsertSystem {
                         .with(explosion_particles, &mut particles_datas)
                         .build();
                 }
+                InsertEvent::Animation {
+                    animation,
+                    lifetime,
+                    pos
+                } => {
+                    let iso = Isometry::new(pos.x, pos.y, 0f32);
+                    let _animation_entity = entities
+                        .build_entity()
+                        .with(iso, &mut isometries)
+                        .with(animation.clone(), &mut animations)
+                        .with(Lifetime::new(*lifetime), &mut lifetimes)
+                        .with(Size(4f32), &mut sizes)        
+                        .build();            
+                }
                 InsertEvent::Engine {
                     position,
                     num,
@@ -1195,7 +1233,7 @@ impl<'a> System<'a> for InsertSystem {
                     iso
                 } => {
                     let mut rng = thread_rng();
-                    let z = rng.gen_range(-70f32, -40f32);
+                    let z = rng.gen_range(-120f32, -80f32);
                     let nebulas_num = preloaded_images.nebulas.len();
                     let nebula_id = rng.gen_range(0, nebulas_num);
                     let _nebula = entities
@@ -1203,7 +1241,22 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
                         .with(Image(preloaded_images.nebulas[nebula_id]), &mut images)
                         .with(NebulaMarker::default(), &mut nebulas)
-                        .with(Size(40f32), &mut sizes)
+                        .with(Size(45f32), &mut sizes)
+                        .build();
+                }
+                InsertEvent::Planet {
+                    iso
+                } => {
+                    let mut rng = thread_rng();
+                    let z = -45.0;
+                    let planets_num = preloaded_images.planets.len();
+                    let planet_id = rng.gen_range(0, planets_num);
+                    let _nebula = entities
+                        .build_entity()
+                        .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
+                        .with(Image(preloaded_images.planets[planet_id]), &mut images)
+                        .with(PlanetMarker::default(), &mut planets)
+                        .with(Size(25f32), &mut sizes)
                         .build();
                 }
                 InsertEvent::Wobble(wobble) => {
@@ -1244,6 +1297,7 @@ impl<'a> System<'a> for GamePlaySystem {
             WriteStorage<'a, Size>,
             WriteStorage<'a, Polygon>,
             WriteStorage<'a, NebulaMarker>,
+            WriteStorage<'a, PlanetMarker>,
             WriteStorage<'a, Shield>,
             WriteStorage<'a, Lifes>,
             ReadStorage<'a, ShipStats>,
@@ -1266,6 +1320,8 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, AppState>,
+        WriteExpect<'a, NebulaGrid>,
+        WriteExpect<'a, PlanetGrid>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1290,6 +1346,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 _sizes,
                 polygons,
                 nebulas,
+                planets,
                 mut shields,
                 mut lifes,
                 ships_stats,
@@ -1299,7 +1356,7 @@ impl<'a> System<'a> for GamePlaySystem {
             ),
             mut macro_game,
             _stat,
-            _preloaded_images,
+            preloaded_images,
             _world,
             _bodies_map,
             mut insert_channel,
@@ -1312,6 +1369,8 @@ impl<'a> System<'a> for GamePlaySystem {
             mut sounds_channel,
             preloaded_sounds,
             mut app_state,
+            mut nebula_grid,
+            mut planet_grid,
         ) = data;
         for (shield, life, ship_stats, _character) in (&mut shields, &mut lifes, &ships_stats, &character_markers).join() {
             shield.0 = (shield.0 + ship_stats.shield_regen).min(ship_stats.max_shield);
@@ -1389,15 +1448,23 @@ impl<'a> System<'a> for GamePlaySystem {
                     };
                     let position = isometries.get(entity).unwrap().0.translation.vector;
                     insert_channel.single_write(
-                        InsertEvent::Explosion{
-                            position: Point2::new(position.x, position.y),
-                            num: 10usize,
-                            lifetime: 20usize,
-                            with_animation: false
+                        InsertEvent::Animation {
+                            animation: preloaded_images.blast.clone(),
+                            lifetime: 100,
+                            pos: Point2::new(position.x, position.y)
                         }
                     );
+                    // insert_channel.single_write(
+                    //     InsertEvent::Explosion{
+                    //         position: Point2::new(position.x, position.y),
+                    //         num: 10usize,
+                    //         lifetime: 20usize,
+                    //         with_animation: true
+                    //     }
+                    // );
                     { // process_blast_damage
                         let blast_position = isometries.get(entity).unwrap().0.translation.vector;
+
                         for (entity, life, isometry) in (&entities, &mut lifes, &isometries).join() {
                             let position = isometry.0.translation.vector;
                             let is_character = entity == char_entity;
@@ -1528,18 +1595,80 @@ impl<'a> System<'a> for GamePlaySystem {
                 insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
             }
         }
-        let cnt = nebulas.count();
-        let add_cnt = if NEBULA_MIN_NUMBER > cnt {
-            NEBULA_MIN_NUMBER - cnt
-        } else {
-            0
-        };
-        for _ in 0..add_cnt {
-            let spawn_pos = spawn_position(character_position, NEBULA_PLAYER_AREA, NEBULA_ACTIVE_AREA);
-            insert_channel.single_write(InsertEvent::Nebula {
-                iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
-            })
+        planet_grid.grid.reset();
+        for (isometry, _planet) in (&isometries, &planets).join() {
+            let position = isometry.0.translation.vector;
+            let point = Point2::new(position.x, position.y);
+            match planet_grid.grid.update(point, true) {
+                Ok(_) => (),
+                Err(_) => ()
+            }
         }
+
+        for i in 0..planet_grid.grid.size {
+            for j in 0..planet_grid.grid.size {
+                let value = *planet_grid.grid.get_cell_value(i, j);
+                if !value {
+                    let ((min_w, max_w), (min_h, max_h)) = planet_grid.grid.get_rectangle(i, j);
+                    let spawn_pos = spawn_in_rectangle(min_w, max_w, min_h, max_h);
+                    insert_channel.single_write(InsertEvent::Planet {
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
+                    })
+                }
+            }
+        }
+
+        for (entity, isometry, _planet) in (&entities, &isometries, &planets).join() {
+            let pos3d = isometry.0.translation.vector;
+            if  (pos3d.x - character_position.x).abs() > planet_grid.grid.max_w ||
+                (pos3d.y - character_position.y).abs() > planet_grid.grid.max_h {
+                entities.delete(entity).unwrap();
+            }
+        }
+
+        nebula_grid.grid.reset();
+        for (isometry, _nebula) in (&isometries, &nebulas).join() {
+            let position = isometry.0.translation.vector;
+            let point = Point2::new(position.x, position.y);
+            match nebula_grid.grid.update(point, true) {
+                Ok(_) => (),
+                Err(_) => ()
+            }
+        }
+        for i in 0..nebula_grid.grid.size {
+            for j in 0..nebula_grid.grid.size {
+                let value = *nebula_grid.grid.get_cell_value(i, j);
+                if !value {
+                    let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
+                    let spawn_pos = spawn_in_rectangle(min_w, max_w, min_h, max_h);
+                    insert_channel.single_write(InsertEvent::Nebula {
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
+                    })
+                }
+            }
+        }
+
+        for (entity, isometry, _nebula) in (&entities, &isometries, &nebulas).join() {
+            let pos3d = isometry.0.translation.vector;
+            if  (pos3d.x - character_position.x).abs() > nebula_grid.grid.max_w ||
+                (pos3d.y - character_position.y).abs() > nebula_grid.grid.max_h {
+                entities.delete(entity).unwrap();
+            }
+        }
+
+
+        // let cnt = nebulas.count();
+        // let add_cnt = if NEBULA_MIN_NUMBER > cnt {
+        //     NEBULA_MIN_NUMBER - cnt
+        // } else {
+        //     0
+        // };
+        // for _ in 0..add_cnt {
+        //     let spawn_pos = spawn_position(character_position, NEBULA_PLAYER_AREA, NEBULA_ACTIVE_AREA);
+        //     insert_channel.single_write(InsertEvent::Nebula {
+        //         iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
+        //     })
+        // }
         for (entity, isometry, _asteroid) in (&entities, &isometries, &asteroid_markers).join() {
             let pos3d = isometry.0.translation.vector;
             if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), ACTIVE_AREA) {
@@ -1552,12 +1681,12 @@ impl<'a> System<'a> for GamePlaySystem {
                 entities.delete(entity).unwrap();
             }
         }
-        for (entity, isometry, _nebula) in (&entities, &isometries, &nebulas).join() {
-            let pos3d = isometry.0.translation.vector;
-            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), NEBULA_ACTIVE_AREA) {
-                entities.delete(entity).unwrap();
-            }
-        }
+        // for (entity, isometry, _nebula) in (&entities, &isometries, &nebulas).join() {
+        //     let pos3d = isometry.0.translation.vector;
+        //     if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), NEBULA_ACTIVE_AREA) {
+        //         entities.delete(entity).unwrap();
+        //     }
+        // }
     }
 }
 
@@ -1847,6 +1976,7 @@ impl<'a> System<'a> for AISystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, AI>,
+        ReadExpect<'a, PreloadedImages>,
         Write<'a, Stat>,
         Write<'a, World<f32>>,
         Write<'a, EventChannel<InsertEvent>>,
@@ -1869,19 +1999,20 @@ impl<'a> System<'a> for AISystem {
             mut multy_lazers,
             mut cannons,
             enemies,
-            mut shields,
-            mut lifes,
-            polygons,
+            _shields,
+            _lifes,
+            _polygons,
             mut chargings,
             character_markers,
-            asteroid_markers,
+            _asteroid_markers,
             ais,
+            _preloaded_images,
             _stat,
             mut world,
             mut insert_channel,
             bodies_map,
             mut sounds_channel,
-            mut app_state,
+            _app_state,
             preloaded_sounds,
         ) = data;
         let _rng = thread_rng();

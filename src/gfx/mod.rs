@@ -112,7 +112,6 @@ impl GeometryData {
         })
     }
 }
-
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
 #[derive(VertexAttribPointers)]
@@ -268,7 +267,8 @@ pub struct Canvas {
     perlin_time: f32,
     camera_wobble: f32,
     direction: Vector2,
-    direction_offset: Vector2
+    direction_offset: Vector2,
+    pub z_far: f32,
     // default_params: glium::DrawParameters<'a>,
     // stencil_check_params: glium::DrawParameters<'a>,
     // stencil_write_params: glium::DrawParameters<'a>,
@@ -282,20 +282,22 @@ impl Canvas {
         let program_light = create_shader_program(gl, "light", glsl_version)?;
         let program_instancing = create_shader_program(gl, "instancing", glsl_version)?;
         let program_glyph = create_shader_program(gl, "text", &glsl_version)?;
+        let z_far = Z_FAR;
         Ok(Canvas {
             program: program,
             program_primitive: program_primitive,
             program_primitive_texture: program_primitive_texture,
             program_light: program_light,
             program_instancing: program_instancing,
-            observer: Point3::new(0f32, 0f32, Z_FAR),
+            observer: Point3::new(0f32, 0f32, z_far),
             program_glyph: program_glyph,
             perlin_x: Perlin::new().set_seed(0),
             perlin_y: Perlin::new().set_seed(1),
             perlin_time: 0.1f32,
             camera_wobble: 0f32,
             direction: Vector2::new(0f32, 0f32),
-            direction_offset: Vector2::new(0f32, 0f32)
+            direction_offset: Vector2::new(0f32, 0f32),
+            z_far: z_far
         })
     }
 
@@ -317,7 +319,7 @@ impl Canvas {
         self.observer.x = pos.x;
         self.observer.y = pos.y;
         self.observer.z = (1.0 - SPEED_EMA) * self.observer.z
-            + SPEED_EMA * (Z_FAR + MAX_ADD_SPEED_Z * speed_ratio);
+            + SPEED_EMA * (self.z_far + MAX_ADD_SPEED_Z * speed_ratio);
         self.perlin_time += 0.1;
         self.camera_wobble /= 2.0;
         self.direction = direction;
@@ -325,7 +327,7 @@ impl Canvas {
     }
 
     pub fn get_z_shift(&self) -> f32 {
-        self.observer.z - Z_FAR
+        self.observer.z - self.z_far
     }
 
     pub fn render_text(
@@ -492,6 +494,7 @@ impl Canvas {
         model: &Isometry3,
         scale: f32,
         with_lights: bool,
+        blend: Option<red::Blend>
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -523,10 +526,14 @@ impl Canvas {
                     test: StencilTest::NotEqual,
                     pass_operation: None
                 }),
+                blend: blend,
                 ..Default::default()
             }
         } else {
-            DrawParams::default()
+            DrawParams{
+                blend: blend,
+                ..Default::default()
+            }
         };
         frame.draw(
             vao, 
@@ -628,9 +635,10 @@ pub fn unproject(
     window_coord: &Point2,
     width: u32,
     height: u32,
+    z_far: f32,
 ) -> (Point3, Vector3) {
     let begin_ray = Point4::new(window_coord.x, window_coord.y, 0f32, 1f32);
-    let ingame_window_coord = Point4::new(window_coord.x, window_coord.y, Z_FAR, 1f32);
+    let ingame_window_coord = Point4::new(window_coord.x, window_coord.y, z_far, 1f32);
     let perspective: Matrix4 = perspective(width, height).into();
     let view: Matrix4 = get_view(observer).to_homogeneous().into();
     let inverse_transform = (perspective * view).try_inverse().unwrap();
@@ -655,8 +663,9 @@ pub fn unproject_with_z(
     z_coord: f32,
     width: u32,
     height: u32,
+    z_far: f32,
 ) -> Point3 {
-    let (pos, dir) = unproject(observer, window_coord, width, height);
+    let (pos, dir) = unproject(observer, window_coord, width, height, z_far);
     let z_safe_scaler = (-pos.z + z_coord) / dir.z;
     return pos + dir * z_safe_scaler;
 }

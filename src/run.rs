@@ -30,6 +30,7 @@ use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
 
 const NEBULAS_NUM: usize = 3usize;
+const PLANETS_NUM: usize = 1usize;
 pub const FINGER_NUMBER: usize = 20;
 
 pub fn run() -> Result<(), String> {
@@ -145,6 +146,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Lifes>();
     specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
+    specs_world.register::<PlanetMarker>();
     specs_world.register::<Damage>();
     specs_world.register::<AI>();
     specs_world.register::<ThreadPin<ParticlesData>>();
@@ -159,6 +161,7 @@ pub fn run() -> Result<(), String> {
         "light",
         "light_sea",
         "projectile",
+        "bomb",
         "enemy_projectile",
         "enemy1",
         "kamikadze",
@@ -180,12 +183,15 @@ pub fn run() -> Result<(), String> {
         "coin",
         "exp",
         "lazer_boss",
-        "random_ship"
+        "random_ship",
+        "bomber",
+        "charging"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
         let animations = [
-            "explosion1"
+            "explosion1",
+            "explosion2"
         ];
         for animation_name in animations.iter() {
             // let animation_full = &format!("assets/{}", animation_name);
@@ -239,6 +245,17 @@ pub fn run() -> Result<(), String> {
             .build();
         nebula_images.push(nebula_image);
     }
+    let mut planet_images = vec![];
+    for i in  1..=PLANETS_NUM {
+        let planet_image_data = ThreadPin::new(
+            ImageData::new(&context, &format!("planet{}", i)).unwrap()
+        );
+        let planet_image = specs_world
+            .create_entity()
+            .with(planet_image_data)
+            .build();
+        planet_images.push(planet_image);
+    }
 
     {   // load .ron files with tweaks 
         use ron::de::{from_str};
@@ -248,7 +265,7 @@ pub fn run() -> Result<(), String> {
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
             player_ships_stats: Vec<ShipStats>,
-            player_guns: Vec<GunKind>,
+            player_guns: Vec<GunKindSave>,
             enemies: Vec<EnemyKindSave>
         }
   
@@ -258,7 +275,10 @@ pub fn run() -> Result<(), String> {
         ) -> Description {
             Description {
                 player_ships_stats: description_save.player_ships_stats,
-                player_guns: description_save.player_guns,
+                player_guns: description_save.player_guns
+                    .iter()
+                    .map(|gun| gun.convert(name_to_image))
+                    .collect(),
                 enemies: description_save.enemies.iter().map(
                     |enemy| {
                         load_enemy(enemy, name_to_image)
@@ -268,10 +288,10 @@ pub fn run() -> Result<(), String> {
         }
 
         fn load_enemy(enemy_save: &EnemyKindSave, name_to_image: &HashMap<String, specs::Entity>) -> EnemyKind {
-            dbg!(&enemy_save.image_name);
+
             EnemyKind {
                 ai_kind: enemy_save.ai_kind.clone(),
-                gun_kind: enemy_save.gun_kind.clone(),
+                gun_kind: enemy_save.gun_kind.convert(name_to_image),
                 ship_stats: enemy_save.ship_stats,
                 size: enemy_save.size,
                 image: Image(name_to_image[&enemy_save.image_name])
@@ -280,7 +300,7 @@ pub fn run() -> Result<(), String> {
         #[derive(Debug, Serialize, Deserialize)]
         pub struct EnemyKindSave {
             pub ai_kind: AI,
-            pub gun_kind: GunKind,
+            pub gun_kind: GunKindSave,
             pub ship_stats: ShipStats,
             pub size: f32,
             pub image_name: String,
@@ -371,6 +391,7 @@ pub fn run() -> Result<(), String> {
         enemy4: name_to_image["lazer"],
         background: name_to_image["back"],
         nebulas: nebula_images,
+        planets: planet_images,
         ship_speed_upgrade: name_to_image["ship_speed"],
         bullet_speed_upgrade: name_to_image["bullet_speed"],
         attack_speed_upgrade: name_to_image["fire_rate"],
@@ -383,7 +404,8 @@ pub fn run() -> Result<(), String> {
         shotgun: name_to_image["shotgun"],
         coin: name_to_image["coin"],
         exp: name_to_image["exp"],
-        explosion: name_to_animation["explosion1"].clone()
+        explosion: name_to_animation["explosion1"].clone(),
+        blast: name_to_animation["explosion2"].clone()
     };
 
 
@@ -412,6 +434,8 @@ pub fn run() -> Result<(), String> {
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
     let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
+    specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
     specs_world.add_resource(MacroGame{coins: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
@@ -425,7 +449,8 @@ pub fn run() -> Result<(), String> {
         .with_thread_local(sound_system)
         .build();
     let mut dispatcher = DispatcherBuilder::new()
-        .with(control_system, "control_system", &[])
+        // .with(control_system, "control_system", &[])
+        .with_thread_local(control_system)
         .with(gameplay_sytem, "gameplay_system", &[])
         .with(ai_system, "ai_system", &[])
         .with(collision_system, "collision_system", &["ai_system"])
@@ -434,7 +459,7 @@ pub fn run() -> Result<(), String> {
             "physics_system",
             &[
                 // "kinematic_system",
-                "control_system",
+                // "control_system",
                 "gameplay_system",
                 "collision_system",
             ],
@@ -494,6 +519,7 @@ pub fn run() -> Result<(), String> {
                 specs_world.read_resource::<ThreadPin<Canvas>>().observer(),
                 dims.0 as u32,
                 dims.1 as u32,
+                specs_world.read_resource::<ThreadPin<Canvas>>().z_far,
             );
             // fingers
             {
@@ -511,7 +537,10 @@ pub fn run() -> Result<(), String> {
                                 .observer(),
                             0f32, 
                             dims.0 as u32,
-                            dims.1 as u32
+                            dims.1 as u32,
+                            specs_world
+                                .read_resource::<ThreadPin<Canvas>>()
+                                .z_far,
                         ))
                     } else {None};
                 }

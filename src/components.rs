@@ -1,7 +1,7 @@
 use std::ops::AddAssign;
 use std::collections::{HashMap};
 
-pub use crate::geometry::Polygon;
+pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData};
@@ -29,6 +29,8 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
+
+
 
 #[derive(Debug, Default)]
 pub struct CurrentWave{
@@ -123,6 +125,7 @@ pub enum InsertEvent {
         velocity: Point2,
         damage: usize,
         owner: specs::Entity,
+        bullet_image: Image,
         blast: Option<Blast>
     },
     Coin {
@@ -154,7 +157,15 @@ pub enum InsertEvent {
     Nebula {
         iso: Point3
     },
-    Wobble(f32)
+    Planet {
+        iso: Point3
+    },
+    Wobble(f32),
+    Animation {
+        animation: Animation,
+        lifetime: usize,
+        pos: Point2
+    }
 }
 
 #[derive(Default, Clone)]
@@ -367,6 +378,7 @@ pub struct PreloadedImages {
     pub enemy4: specs::Entity,
     pub background: specs::Entity,
     pub nebulas: Vec<specs::Entity>,
+    pub planets: Vec<specs::Entity>,
     pub ship_speed_upgrade: specs::Entity,
     pub bullet_speed_upgrade: specs::Entity,
     pub attack_speed_upgrade: specs::Entity,
@@ -380,6 +392,7 @@ pub struct PreloadedImages {
     pub coin: specs::Entity,
     pub exp: specs::Entity,
     pub explosion: Animation,
+    pub blast: Animation
 }
 
 pub struct PreloadedParticles {
@@ -397,14 +410,14 @@ pub struct Finger {
 }
 
 impl Finger {
-    pub fn new(id: usize, x: f32, y: f32, observer: Point3, pressure: f32, width_u: u32, height_u: u32) -> Self {
+    pub fn new(id: usize, x: f32, y: f32, observer: Point3, pressure: f32, width_u: u32, height_u: u32, z_far: f32) -> Self {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
         let (x, y) = (x as f32, height_u as f32 - y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
         let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));
-        let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u);
+        let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u, z_far);
         Finger{
             id: id,
             x: point.x,
@@ -436,7 +449,7 @@ pub struct Mouse {
 
 impl Mouse {
     /// get system location of mouse and then unproject it into canvas coordinates
-    pub fn set_position(&mut self, x: i32, y: i32, observer: Point3, width_u: u32, height_u: u32) {
+    pub fn set_position(&mut self, x: i32, y: i32, observer: Point3, width_u: u32, height_u: u32, z_far: f32) {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
         let (x, y) = (x as f32, y as f32);
@@ -447,7 +460,7 @@ impl Mouse {
         let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, y));
         self.o_x = ortho_point.x;
         self.o_y = ortho_point.y;
-        let point = unproject_with_z(observer, &Point2::new(x, y), 0f32, width_u, height_u);
+        let point = unproject_with_z(observer, &Point2::new(x, y), 0f32, width_u, height_u, z_far);
         self.x = point.x;
         self.y = point.y;
     }
@@ -470,6 +483,10 @@ pub struct CharacterMarker;
 #[derive(Default, Component, Clone, Copy)]
 #[storage(NullStorage)]
 pub struct NebulaMarker;
+
+#[derive(Default, Component, Clone, Copy)]
+#[storage(NullStorage)]
+pub struct PlanetMarker;
 
 #[derive(Default, Component)]
 #[storage(NullStorage)]
@@ -585,13 +602,45 @@ pub fn get_avaliable_cards(
 #[derive(Component, Debug, Clone)]
 pub struct AttachPosition(pub specs::Entity);
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum GunKind {
     Blaster(Blaster),
     Lazer(Lazer),
     ShotGun(ShotGun),
     MultyLazer(MultyLazer),
     Cannon(Cannon)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum GunKindSave {
+    Blaster(BlasterSave),
+    Lazer(Lazer),
+    ShotGun(ShotGunSave),
+    MultyLazer(MultyLazer),
+    Cannon(CannonSave)
+}
+
+impl GunKindSave {
+    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> GunKind {
+        match self {
+            GunKindSave::Blaster(blaster_save) => {
+                GunKind::Blaster(blaster_save.convert(name_to_image))
+            }
+            GunKindSave::Lazer(lazer) => {
+                GunKind::Lazer(lazer.clone())
+            }
+            GunKindSave::ShotGun(shotgun_save) => {
+                GunKind::ShotGun(shotgun_save.convert(name_to_image))
+            }
+            GunKindSave::MultyLazer(multy_lazer) => {
+                GunKind::MultyLazer(multy_lazer.clone())
+            }
+            GunKindSave::Cannon(cannon_save) => {
+                GunKind::Cannon(cannon_save.convert(name_to_image))
+            }
+        }
+        // name_to_image[]
+    }
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -660,7 +709,7 @@ pub trait Gun {
     ) -> Vec<InsertEvent>;
 }
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct ShotGun {
     recharge_state: usize,
     pub recharge_time: usize,
@@ -668,6 +717,31 @@ pub struct ShotGun {
     pub side_projectiles_number: usize,
     pub angle_shift: f32,
     pub bullet_speed: f32,
+    pub bullet_image: Image
+}
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct ShotGunSave {
+    recharge_state: usize,
+    pub recharge_time: usize,
+    pub bullets_damage: usize,
+    pub side_projectiles_number: usize,
+    pub angle_shift: f32,
+    pub bullet_speed: f32,    
+    pub bullet_image: String
+}
+
+impl ShotGunSave {
+    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> ShotGun {
+        ShotGun::new(
+            self.recharge_time,
+            self.bullets_damage,
+            self.side_projectiles_number,
+            self.angle_shift,
+            self.bullet_speed,
+            Image(name_to_image[&self.bullet_image])
+        )
+    }
 }
 
 impl ShotGun {
@@ -676,7 +750,8 @@ impl ShotGun {
         bullets_damage: usize, 
         side_projectiles_number: usize, 
         angle_shift: f32, 
-        bullet_speed: f32
+        bullet_speed: f32,
+        bullet_image: Image,
     ) -> Self {
         Self {
             recharge_state: 0usize,
@@ -684,7 +759,8 @@ impl ShotGun {
             bullets_damage: bullets_damage,
             side_projectiles_number: side_projectiles_number,
             angle_shift: angle_shift,
-            bullet_speed: bullet_speed
+            bullet_speed: bullet_speed,
+            bullet_image: bullet_image
         }
     }
 }
@@ -727,6 +803,7 @@ impl Gun for ShotGun {
                 velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                 damage: bullet_damage,
                 owner: owner,
+                bullet_image: self.bullet_image,
                 blast: None,
             });
         }
@@ -751,6 +828,7 @@ impl Gun for ShotGun {
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                     damage: self.bullets_damage,
                     owner: owner,
+                    bullet_image: self.bullet_image,
                     blast: None
                 });
             }
@@ -760,21 +838,43 @@ impl Gun for ShotGun {
 }
 
 /// gun reloading status and time
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Blaster {
     recharge_state: usize,
     pub recharge_time: usize,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
+    pub bullet_image: Image
+}
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct BlasterSave {
+    pub recharge_state: usize,
+    pub recharge_time: usize,
+    pub bullets_damage: usize,
+    pub bullet_speed: f32,
+    pub bullet_image: String
+}
+
+impl BlasterSave {
+    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> Blaster {
+        Blaster::new(
+            self.recharge_time, 
+            self.bullets_damage, 
+            self.bullet_speed, 
+            Image(name_to_image[&self.bullet_image])
+        )
+    }
 }
 
 impl Blaster {
-    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32) -> Self {
+    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32, bullet_image: Image) -> Self {
         Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
+            bullet_image: bullet_image
         }
     }
 }
@@ -818,6 +918,7 @@ impl Gun for Blaster {
                 velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                 damage: bullet_damage,
                 owner: owner,
+                bullet_image: self.bullet_image,
                 blast: None
             };
             res.push(insert_event)
@@ -827,23 +928,47 @@ impl Gun for Blaster {
 }
 
 
-#[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Cannon {
     recharge_state: usize,
     pub recharge_time: usize,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
-    pub bullet_blast: Blast
+    pub bullet_blast: Blast,
+    pub bullet_image: Image
+}
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct CannonSave {
+    recharge_state: usize,
+    pub recharge_time: usize,
+    pub bullets_damage: usize,
+    pub bullet_speed: f32,
+    pub bullet_blast: Blast,
+    pub bullet_image: String
+}
+
+impl CannonSave {
+    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> Cannon {
+        Cannon::new(
+            self.recharge_time,
+            self.bullets_damage,
+            self.bullet_speed,
+            self.bullet_blast,
+            Image(name_to_image[&self.bullet_image])
+        )
+    }
 }
 
 impl Cannon {
-    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32, bullet_blast: Blast) -> Self {
+    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32, bullet_blast: Blast, bullet_image: Image) -> Self {
         Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
             bullet_blast: bullet_blast,
+            bullet_image: bullet_image
         }
     }
 }
@@ -887,6 +1012,7 @@ impl Gun for Cannon {
                 velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                 damage: bullet_damage,
                 owner: owner,
+                bullet_image: self.bullet_image,
                 blast: Some(self.bullet_blast)
             };
             res.push(insert_event)

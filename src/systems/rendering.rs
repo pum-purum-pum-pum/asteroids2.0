@@ -709,6 +709,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, AsteroidMarker>,
             ReadStorage<'a, LightMarker>,
             ReadStorage<'a, NebulaMarker>,
+            ReadStorage<'a, PlanetMarker>,
             ReadStorage<'a, Projectile>,
             ReadStorage<'a, ThreadPin<ImageData>>,
             ReadStorage<'a, Image>,
@@ -731,6 +732,7 @@ impl<'a> System<'a> for RenderingSystem {
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
+        WriteExpect<'a, NebulaGrid>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -745,6 +747,7 @@ impl<'a> System<'a> for RenderingSystem {
                 asteroid_markers,
                 light_markers,
                 nebulas,
+                planets,
                 projectiles,
                 image_datas,
                 image_ids,
@@ -766,7 +769,8 @@ impl<'a> System<'a> for RenderingSystem {
             world,
             mut primitives_channel,
             mut ingame_ui,
-            mut text_data
+            mut text_data,
+            nebula_grid
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.015, 0.004, 0.0, 1.0);
@@ -829,9 +833,26 @@ impl<'a> System<'a> for RenderingSystem {
                         &image_data,
                         &iso.0,
                         size.0,
-                        false
+                        false,
+                        None
                 );
         };
+        for (_entity, iso, image, size, _planet) in
+            (&entities, &isometries, &image_ids, &sizes, &planets).join() {
+            let image_data = image_datas.get(image.0).unwrap();
+            canvas
+                .render(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        false,
+                        None
+                );
+        };
+
         {
             for (entity, particles_data) in (&entities, &mut particles_datas).join() {
                 match **particles_data {
@@ -894,6 +915,7 @@ impl<'a> System<'a> for RenderingSystem {
                     &isometry,
                     size.0,
                     true,
+                    Some(red::Blend)
                 );
         }
 
@@ -934,7 +956,8 @@ impl<'a> System<'a> for RenderingSystem {
                     &image_datas.get(image.0).unwrap(),
                     &iso.0,
                     size.0,
-                    true
+                    true,
+                    Some(red::Blend)
                 );
         }
         for (_entity, physics_component, image, size, _ship) in
@@ -954,6 +977,7 @@ impl<'a> System<'a> for RenderingSystem {
                         &iso,
                         size.0,
                         true,
+                        None
                     )
         }
         for (_entity, iso, _image, _size, polygon, _asteroid) in (
@@ -988,7 +1012,8 @@ impl<'a> System<'a> for RenderingSystem {
                         &image_data,
                         &iso.0,
                         size.0,
-                        true
+                        true,
+                        None
                 )
         }
         for (iso, size, image, _exps) in (&isometries, &sizes, &image_ids, &exps).join() {
@@ -1001,9 +1026,52 @@ impl<'a> System<'a> for RenderingSystem {
                     &image_data,
                     &iso.0,
                     size.0,
-                    true
+                    true,
+                    Some(red::Blend)
                 )
         }
+        let mut render_line = |
+            a: Point2,
+            b: Point2
+        | {
+            let line_width = 0.05;
+            let line_length = (b.coords - a.coords).norm();
+            let positions = vec![
+                Point2::new(-line_width / 2.0, 0f32),
+                Point2::new(line_width / 2.0, 0f32),
+                Point2::new(-line_width / 2.0, -line_length),
+                Point2::new(line_width / 2.0, -line_length)
+            ];
+            let up = Vector2::new(0.0, -line_length);
+            let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
+            let iso = Isometry3::new(
+                Vector3::new(a.x, a.y, 0f32), 
+                Vector3::new(0f32, 0f32, rotation.angle())
+            );
+            let indices = [0u16, 1, 2, 0, 2, 3];
+            let geometry_data = GeometryData::new(
+                &gl, &positions, &indices
+            ).unwrap();
+            canvas.render_geometry(
+                &gl,
+                &viewport,
+                &mut frame,
+                &geometry_data,
+                &iso,
+                RenderMode::Draw
+            );
+        };
+        // debug grid drawing
+        for i in 0..nebula_grid.grid.size {
+            for j in 0..nebula_grid.grid.size {
+                let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
+                render_line(Point2::new(min_w, min_h), Point2::new(min_w, max_h));
+                render_line(Point2::new(min_w, max_h), Point2::new(max_w, max_h));
+                render_line(Point2::new(max_w, max_h), Point2::new(max_w, min_h));                
+                render_line(Point2::new(max_w, min_h), Point2::new(min_w, min_h));
+            }
+        }
+
         let mut render_lazer = |
             iso: &Isometry,
             lazer: &Lazer,
@@ -1057,7 +1125,8 @@ impl<'a> System<'a> for RenderingSystem {
                         &image_data,
                         &iso.0,
                         size.0,
-                        false
+                        false,
+                        Some(red::Blend)
                     )
             };
         };
