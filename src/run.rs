@@ -12,8 +12,8 @@ use backtrace::Backtrace;
 #[cfg(any(target_os = "android"))]
 use std::panic;
 use std::collections::{HashMap};
-use std::fs::{self, DirEntry};
-use std::io::{BufReader};
+
+
 use std::path::Path;
 use crate::types::{*};
 use crate::components::*;
@@ -163,10 +163,12 @@ pub fn run() -> Result<(), String> {
         "projectile",
         "bomb",
         "enemy_projectile",
+        "player_projectile",
         "enemy1",
         "kamikadze",
         "enemy3",
         "lazer",
+        "play",
         "bullet_speed",
         "ship_speed",
         "fire_rate",
@@ -185,13 +187,15 @@ pub fn run() -> Result<(), String> {
         "lazer_boss",
         "random_ship",
         "bomber",
+        "bomberman",
         "charging"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
         let animations = [
             "explosion1",
-            "explosion2"
+            "explosion2",
+            "bullet_contact"
         ];
         for animation_name in animations.iter() {
             // let animation_full = &format!("assets/{}", animation_name);
@@ -400,12 +404,14 @@ pub fn run() -> Result<(), String> {
         direction: name_to_image["direction"],
         circle: name_to_image["circle"],
         lazer: name_to_image["lazer_gun"],
+        play: name_to_image["play"],
         blaster: name_to_image["blaster_gun"],
         shotgun: name_to_image["shotgun"],
         coin: name_to_image["coin"],
         exp: name_to_image["exp"],
         explosion: name_to_animation["explosion1"].clone(),
-        blast: name_to_animation["explosion2"].clone()
+        blast: name_to_animation["explosion2"].clone(),
+        bullet_contact: name_to_animation["bullet_contact"].clone()
     };
 
 

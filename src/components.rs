@@ -125,6 +125,7 @@ pub enum InsertEvent {
         velocity: Point2,
         damage: usize,
         owner: specs::Entity,
+        lifetime: usize,
         bullet_image: Image,
         blast: Option<Blast>
     },
@@ -164,7 +165,8 @@ pub enum InsertEvent {
     Animation {
         animation: Animation,
         lifetime: usize,
-        pos: Point2
+        pos: Point2,
+        size: f32
     }
 }
 
@@ -389,10 +391,12 @@ pub struct PreloadedImages {
     pub lazer: specs::Entity,
     pub blaster: specs::Entity,
     pub shotgun: specs::Entity,
+    pub play: specs::Entity,
     pub coin: specs::Entity,
     pub exp: specs::Entity,
     pub explosion: Animation,
-    pub blast: Animation
+    pub blast: Animation,
+    pub bullet_contact: Animation,
 }
 
 pub struct PreloadedParticles {
@@ -717,6 +721,7 @@ pub struct ShotGun {
     pub side_projectiles_number: usize,
     pub angle_shift: f32,
     pub bullet_speed: f32,
+    pub bullet_lifetime: usize,
     pub bullet_image: Image
 }
 
@@ -728,6 +733,7 @@ pub struct ShotGunSave {
     pub side_projectiles_number: usize,
     pub angle_shift: f32,
     pub bullet_speed: f32,    
+    pub bullet_lifetime: usize,
     pub bullet_image: String
 }
 
@@ -739,6 +745,7 @@ impl ShotGunSave {
             self.side_projectiles_number,
             self.angle_shift,
             self.bullet_speed,
+            self.bullet_lifetime,
             Image(name_to_image[&self.bullet_image])
         )
     }
@@ -751,6 +758,7 @@ impl ShotGun {
         side_projectiles_number: usize, 
         angle_shift: f32, 
         bullet_speed: f32,
+        bullet_lifetime: usize,
         bullet_image: Image,
     ) -> Self {
         Self {
@@ -760,6 +768,7 @@ impl ShotGun {
             side_projectiles_number: side_projectiles_number,
             angle_shift: angle_shift,
             bullet_speed: bullet_speed,
+            bullet_lifetime: bullet_lifetime,
             bullet_image: bullet_image
         }
     }
@@ -803,6 +812,7 @@ impl Gun for ShotGun {
                 velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                 damage: bullet_damage,
                 owner: owner,
+                lifetime: self.bullet_lifetime,
                 bullet_image: self.bullet_image,
                 blast: None,
             });
@@ -828,6 +838,7 @@ impl Gun for ShotGun {
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                     damage: self.bullets_damage,
                     owner: owner,
+                    lifetime: self.bullet_lifetime,
                     bullet_image: self.bullet_image,
                     blast: None
                 });
@@ -844,6 +855,7 @@ pub struct Blaster {
     pub recharge_time: usize,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
+    pub bullet_lifetime: usize,
     pub bullet_image: Image
 }
 
@@ -853,6 +865,7 @@ pub struct BlasterSave {
     pub recharge_time: usize,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
+    pub bullet_lifetime: usize,
     pub bullet_image: String
 }
 
@@ -861,19 +874,27 @@ impl BlasterSave {
         Blaster::new(
             self.recharge_time, 
             self.bullets_damage, 
-            self.bullet_speed, 
+            self.bullet_speed,
+            self.bullet_lifetime,
             Image(name_to_image[&self.bullet_image])
         )
     }
 }
 
 impl Blaster {
-    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32, bullet_image: Image) -> Self {
+    pub fn new(
+        recharge_time: usize, 
+        bullets_damage: usize, 
+        bullet_speed: f32, 
+        bullet_lifetime: usize, 
+        bullet_image: Image
+    ) -> Self {
         Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
+            bullet_lifetime: bullet_lifetime,
             bullet_image: bullet_image
         }
     }
@@ -919,6 +940,7 @@ impl Gun for Blaster {
                 damage: bullet_damage,
                 owner: owner,
                 bullet_image: self.bullet_image,
+                lifetime: self.bullet_lifetime,
                 blast: None
             };
             res.push(insert_event)
@@ -935,6 +957,7 @@ pub struct Cannon {
     pub bullets_damage: usize,
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
+    pub bullet_lifetime: usize,
     pub bullet_image: Image
 }
 
@@ -945,6 +968,7 @@ pub struct CannonSave {
     pub bullets_damage: usize,
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
+    pub bullet_lifetime: usize,
     pub bullet_image: String
 }
 
@@ -955,19 +979,28 @@ impl CannonSave {
             self.bullets_damage,
             self.bullet_speed,
             self.bullet_blast,
+            self.bullet_lifetime,
             Image(name_to_image[&self.bullet_image])
         )
     }
 }
 
 impl Cannon {
-    pub fn new(recharge_time: usize, bullets_damage: usize, bullet_speed: f32, bullet_blast: Blast, bullet_image: Image) -> Self {
+    pub fn new(
+        recharge_time: usize, 
+        bullets_damage: usize, 
+        bullet_speed: f32, 
+        bullet_blast: Blast, 
+        bullet_lifetime: usize,
+        bullet_image: Image,
+    ) -> Self {
         Self {
             recharge_state: 0usize,
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
             bullet_blast: bullet_blast,
+            bullet_lifetime: bullet_lifetime,
             bullet_image: bullet_image
         }
     }
@@ -1013,6 +1046,7 @@ impl Gun for Cannon {
                 damage: bullet_damage,
                 owner: owner,
                 bullet_image: self.bullet_image,
+                lifetime: self.bullet_lifetime,
                 blast: Some(self.bullet_blast)
             };
             res.push(insert_event)

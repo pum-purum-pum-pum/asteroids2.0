@@ -1,10 +1,25 @@
-* nebulas spawn control \/
-* * spawning grid? \/
-* add planet \/
-* image loading for bullets \/
+* fix kamikadze \/
+* add planet rotation \/
+* effect on bullet impact \/
+* bullet lifetime in gun desc \/
+* menu \/
+* ship trace
+* bullet trace
 * add rotation behaviour
 * add rockets
 * image borders fix -- wtf
+* unify damage processing/killing code
+* bullet sound in gun desc
+
+* ship buy
+* save money and scores
+
+* gui feedback and states
+
+<!-- * nebulas spawn control \/ -->
+<!-- * * spawning grid? \/ -->
+<!-- * add planet \/ -->
+<!-- * image loading for bullets \/ -->
 
 
 * enemies

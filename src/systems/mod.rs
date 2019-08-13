@@ -173,8 +173,8 @@ impl<'a> System<'a> for PhysicsSystem {
             mut velocities, 
             physics, 
             character_markers,
-            chargings,
             enemies,
+            chargings,
             mut world,
             mut nebula_grid,
             mut planet_grid,
@@ -215,8 +215,8 @@ impl<'a> System<'a> for PhysicsSystem {
                         let distance = (position1 - position2).norm();
                         let center = (position1 + position2) / 2.0;
                         (
-                            Force2::new(0.004 * (position1 - center).normalize(), 0.0), 
-                            Force2::new(0.004 * (position2 - center).normalize(), 0.0),
+                            Force2::new(0.006 * (position1 - center).normalize(), 0.0), 
+                            Force2::new(0.006 * (position2 - center).normalize(), 0.0),
                             distance
                         )
                     };
@@ -1100,10 +1100,11 @@ impl<'a> System<'a> for InsertSystem {
                     velocity,
                     damage,
                     owner,
+                    lifetime,
                     bullet_image,
                     blast
                 } => {
-                    let r = 0.12;
+                    let r = 0.2;
                     // let image = match kind {
                     //     EntityType::Player => preloaded_images.projectile,
                     //     EntityType::Enemy => preloaded_images.enemy_projectile
@@ -1116,7 +1117,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Image(bullet_image.0), &mut images)
                         .with(Spin::default(), &mut spins)
                         .with(Projectile { owner: *owner }, &mut projectiles)
-                        .with(Lifetime::new(100usize), &mut lifetimes)
+                        .with(Lifetime::new(*lifetime), &mut lifetimes)
                         .with(Size(r), &mut sizes);
                     if let Some(blast) = blast {
                         bullet = bullet
@@ -1154,7 +1155,7 @@ impl<'a> System<'a> for InsertSystem {
                         .build_entity()
                         .with(Coin(*value), &mut coins)
                         .with(iso, &mut isometries)
-                        .with(Size(0.1), &mut sizes)
+                        .with(Size(0.25), &mut sizes)
                         .with(Image(preloaded_images.coin), &mut images)
                         .build();
                 }
@@ -1167,7 +1168,7 @@ impl<'a> System<'a> for InsertSystem {
                         .build_entity()
                         .with(Exp(*value), &mut exps)
                         .with(iso, &mut isometries)
-                        .with(Size(0.1), &mut sizes)
+                        .with(Size(0.25), &mut sizes)
                         .with(Image(preloaded_images.exp), &mut images)
                         .build();
                 }
@@ -1202,7 +1203,8 @@ impl<'a> System<'a> for InsertSystem {
                 InsertEvent::Animation {
                     animation,
                     lifetime,
-                    pos
+                    pos,
+                    size
                 } => {
                     let iso = Isometry::new(pos.x, pos.y, 0f32);
                     let _animation_entity = entities
@@ -1210,7 +1212,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(iso, &mut isometries)
                         .with(animation.clone(), &mut animations)
                         .with(Lifetime::new(*lifetime), &mut lifetimes)
-                        .with(Size(4f32), &mut sizes)        
+                        .with(Size(*size), &mut sizes)        
                         .build();            
                 }
                 InsertEvent::Engine {
@@ -1241,7 +1243,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
                         .with(Image(preloaded_images.nebulas[nebula_id]), &mut images)
                         .with(NebulaMarker::default(), &mut nebulas)
-                        .with(Size(45f32), &mut sizes)
+                        .with(Size(60f32), &mut sizes)
                         .build();
                 }
                 InsertEvent::Planet {
@@ -1451,7 +1453,8 @@ impl<'a> System<'a> for GamePlaySystem {
                         InsertEvent::Animation {
                             animation: preloaded_images.blast.clone(),
                             lifetime: 100,
-                            pos: Point2::new(position.x, position.y)
+                            pos: Point2::new(position.x, position.y),
+                            size: blast.blast_radius
                         }
                     );
                     // insert_channel.single_write(
@@ -1611,8 +1614,10 @@ impl<'a> System<'a> for GamePlaySystem {
                 if !value {
                     let ((min_w, max_w), (min_h, max_h)) = planet_grid.grid.get_rectangle(i, j);
                     let spawn_pos = spawn_in_rectangle(min_w, max_w, min_h, max_h);
+                    let mut rng = thread_rng();
+                    let angle = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
                     insert_channel.single_write(InsertEvent::Planet {
-                        iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle)
                     })
                 }
             }
@@ -1737,6 +1742,7 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
+        ReadExpect<'a, PreloadedImages>,
         Write<'a, Progress>,
         Write<'a, AppState>,
     );
@@ -1759,6 +1765,7 @@ impl<'a> System<'a> for CollisionSystem {
             mut insert_channel,
             mut sounds_channel,
             preloaded_sounds,
+            preloaded_images,
             mut progress,
             mut app_state,
         ) = data;
@@ -1854,6 +1861,8 @@ impl<'a> System<'a> for CollisionSystem {
                 let projectile = entity2;
                 let projectile_damage = damages.get(projectile).unwrap().0;
                 let isometry = isometries.get(ship).unwrap().0;
+                let projectile_pos = isometries.get(projectile).unwrap().0.translation.vector;
+                let projectile_pos = Point2::new(projectile_pos.x, projectile_pos.y);
                 let position = isometry.translation.vector;
                 if character_markers.get(ship).is_some() {
                     if process_damage(
@@ -1893,6 +1902,13 @@ impl<'a> System<'a> for CollisionSystem {
                         lifetime: 50usize,
                         with_animation: with_animation
                     };
+                    let animation = InsertEvent::Animation {
+                        animation: preloaded_images.bullet_contact.clone(),
+                        lifetime: 10,
+                        pos: projectile_pos,
+                        size: 1f32
+                    };
+                    insert_channel.single_write(animation);
                     insert_channel.single_write(effect);
                 }
                 // Kludge
@@ -1903,6 +1919,8 @@ impl<'a> System<'a> for CollisionSystem {
             if ships.get(entity1).is_some() && ships.get(entity2).is_some() {
                 let mut ship1 = entity1;
                 let mut ship2 = entity2;
+                let isometry = isometries.get(ship1).unwrap().0;
+                let position = isometry.translation.vector;
                 if character_markers.get(ship2).is_some() {
                     swap(&mut ship1, &mut ship2)
                 }
@@ -1916,6 +1934,15 @@ impl<'a> System<'a> for CollisionSystem {
                         shields.get_mut(other_ship),
                         damages.get(character_ship).unwrap().0
                     ) {
+                        insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
+                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                        let effect = InsertEvent::Explosion {
+                            position: Point2::new(position.x, position.y),
+                            num: 20,
+                            lifetime: 50usize,
+                            with_animation: true
+                        };
+                        insert_channel.single_write(effect);
                         entities.delete(other_ship).unwrap();
                     }
                     if process_damage(

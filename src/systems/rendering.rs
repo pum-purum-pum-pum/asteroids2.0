@@ -67,42 +67,36 @@ impl<'a> System<'a> for MenuRenderingSystem {
         // return;
 
         let (button_w, button_h) = (w/4f32, h/4f32);
-        let lazer_button = Button::new(
-            Point2::new(0f32, button_h / 2f32),
-            button_w,
-            button_h,
-            Point3::new(0f32, 0f32, 0f32),
-            false,
-            Some(Image(preloaded_images.lazer)),
-            "Lazer gun".to_string()
-        );
-        let blaster_button = Button::new(
-            Point2::new(button_w + 0.1, button_h / 2f32),
-            button_w,
-            button_h,
-            Point3::new(0f32, 0f32, 0f32),
-            false,
-            Some(Image(preloaded_images.blaster)),
-            "Lazer gun".to_string()
-        );
-
-        let shotgun_button = Button::new(
-            Point2::new(2.0 * button_w + 0.1, button_h / 2f32),
-            button_w,
-            button_h,
-            Point3::new(0f32, 0f32, 0f32),
-            false,
-            Some(Image(preloaded_images.shotgun)),
-            "Lazer gun".to_string()
-        );
-        if lazer_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(description.player_guns[0].clone())
+        let mut buttons = vec![];
+        let buttons_names = vec!["Lazer", "Blaster", "Shotgun"];
+        let buttons_num = buttons_names.len();
+        let button_images = vec![
+            preloaded_images.lazer, 
+            preloaded_images.blaster, 
+            preloaded_images.shotgun
+        ];
+        let shift_between = w / 20f32;
+        let shift_init = w / 2.0 - shift_between - button_w - button_w / 2.0; 
+                // -button_w / 2.0 since start draw from left corner :)
+        for i in 0..buttons_num {
+            let button = Button::new(
+                Point2::new(
+                    shift_init + i as f32 * (shift_between + button_w), 
+                    button_h / 2f32
+                ),
+                button_w,
+                button_h,
+                Point3::new(0f32, 0f32, 0f32),
+                false,
+                Some(Image(button_images[i])),
+                buttons_names[i].to_string()
+            );
+            buttons.push(button);
         }
-        if blaster_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(description.player_guns[1].clone())
-        }
-        if shotgun_button.place_and_check(&mut ui, &*mouse) {
-            chosed_gun.0 = Some(description.player_guns[2].clone())
+        for i in 0..buttons_num {
+            if buttons[i].place_and_check(&mut ui, &*mouse) {
+                chosed_gun.0 = Some(description.player_guns[i].clone());
+            }
         }
         let button = Button::new(
             Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
@@ -111,7 +105,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             button_h, 
             Point3::new(0.1f32, 0.4f32, 1f32), 
             false, 
-            None, 
+            Some(Image(preloaded_images.play)),
             "Play".to_string()
         );
         if let Some(gun) = chosed_gun.0.clone() {

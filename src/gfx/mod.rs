@@ -30,7 +30,7 @@ pub mod animation;
 pub use animation::*;
 
 const Z_CANVAS: f32 = 0f32;
-const Z_FAR: f32 = 10f32;
+const Z_FAR: f32 = 15f32;
 const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
@@ -235,7 +235,10 @@ impl Into<DrawParams> for RenderMode {
                 }
             }
             RenderMode::Draw => {
-                red::DrawParams::default()
+                red::DrawParams{
+                    blend: Some(red::Blend),
+                    ..Default::default()
+                }
             }
             RenderMode::StencilCheck => {
                 red::DrawParams{
@@ -246,6 +249,7 @@ impl Into<DrawParams> for RenderMode {
                         test: StencilTest::NotEqual,
                         pass_operation: None
                     }),
+                    blend: Some(red::Blend),
                     ..Default::default()
                 }
             }
