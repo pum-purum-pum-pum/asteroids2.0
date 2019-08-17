@@ -435,12 +435,12 @@ pub fn spawn_asteroids<'a>(
 ) {
     let position = isometry.translation.vector;
     let new_polygons = polygon.deconstruct();
-    if new_polygons.len() != 1 {
+    if new_polygons.len() > 1 {
         for poly in new_polygons.iter() {
             let asteroid_shape = Geometry::Polygon(poly.clone());
             let mut rng = thread_rng();
             let insert_event = InsertEvent::Asteroid {
-                iso: Point3::new(position.x, position.y, isometry.rotation.angle()),
+                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
                 velocity: initial_asteroid_velocity(),
                 polygon: poly.clone(),
                 light_shape: asteroid_shape,
@@ -956,8 +956,14 @@ impl<'a> System<'a> for InsertSystem {
                     spin,
                 } => {
                     let physics_polygon =
-                        ncollide2d::shape::ConvexPolygon::try_from_points(&polygon.points())
-                            .unwrap();
+                        if let Some(physics_polygon) = ncollide2d::shape::ConvexPolygon::try_from_points(&polygon.points()) {
+                            physics_polygon
+                        } else {
+                            // TODO: looks like BUG!
+                            dbg!(&polygon.points);
+                            break
+                            // panic!();
+                        };
                     let asteroid = entities
                         .build_entity()
                         .with(light_shape.clone(), &mut geometries)
@@ -1541,7 +1547,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 iso: Point3::new(
                     spawn_pos.x,
                     spawn_pos.y,
-                    char_isometry.0.rotation.euler_angles().2,
+                    0.0,
                 ),
                 velocity: initial_asteroid_velocity(),
                 polygon: poly,

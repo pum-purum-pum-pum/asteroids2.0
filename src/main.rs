@@ -20,6 +20,7 @@ pub use derive_deref;
 pub use nalgebra;
 pub use nphysics2d;
 pub use ncollide2d;
+pub use vorod;
 
 // int SDL_main(int argc, char *argv[])
 #[no_mangle]

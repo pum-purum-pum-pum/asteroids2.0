@@ -29,6 +29,7 @@ use glyph_brush::{*};
 use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
 
+
 const NEBULAS_NUM: usize = 3usize;
 const PLANETS_NUM: usize = 1usize;
 pub const FINGER_NUMBER: usize = 20;

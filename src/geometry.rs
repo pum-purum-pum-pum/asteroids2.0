@@ -4,6 +4,7 @@ use ncollide2d::transformation::convex_hull_idx;
 use rand::prelude::*;
 use specs::prelude::*;
 use specs_derive::Component;
+use vorod::destruction;
 
 pub const EPS: f32 = 1E-3;
 pub const SHADOW_LENGTH: f32 = 100f32;
@@ -210,9 +211,7 @@ pub trait TriangulateFromCenter {
     fn triangulate(&self) -> Triangulation {
         let mut points = vec![];
         points.push(self.center());
-        for i in 0..self.points().len() {
-            points.push(self.points()[i].clone());
-        }
+        points.extend(self.points().iter());
         let mut indicies = vec![];
         for i in 1..points.len() {
             indicies.push(0u16);
@@ -235,6 +234,8 @@ pub struct Polygon {
     pub points: Vec<Point2>,
     mass_center: Point2,
     pub min_r: f32,
+    pub width: f32,
+    pub height: f32,
 }
 
 impl Polygon {
@@ -261,40 +262,79 @@ impl Polygon {
     pub fn new(points: Vec<Point2>) -> Self {
         let w = 1.0 / (points.len() as f32);
         let mut center = Point2::new(0f32, 0f32);
+        let mut min_x = 100f32;
+        let mut max_x = 100f32;
+        let mut min_y = 100f32;
+        let mut max_y = 100f32;
         for p in points.iter() {
             center.x += w * p.x;
             center.y += w * p.y;
+            min_x = min_x.min(p.x);
+            min_y = min_y.min(p.y);
+            max_x = max_x.max(p.y);
+            max_y = max_y.max(p.y);
+
         }
+        let width = max_x - min_x;
+        let height = max_y - min_y;
         let mut min_r = 10f32;
         for p in points.iter() {
             min_r = min_r.min((p - center).norm())
         }
         Polygon {
             points: points,
-            mass_center: Point2::new(0f32, 0f32),
+            mass_center: center,
             min_r,
+            width: width,
+            height: height
         }
     }
 
     pub fn deconstruct(&self) -> Vec<Polygon> {
-        let mut res = vec![];
-        if self.points.len() == 3 {
-            return vec![self.clone()];
+        if self.min_r < 0.8 {
+            return vec![]
         }
-        // dummy destruct for now
-        let triangulation = self.triangulate();
-        let points = triangulation.points;
-        let indicies = triangulation.indicies;
-        let mut i = 0usize;
-        while i < indicies.len() {
-            res.push(Polygon::new(vec![
-                points[indicies[i] as usize],
-                points[indicies[i + 1] as usize],
-                points[indicies[i + 2] as usize],
-            ]));
-            i += 3;
+        let mut transofrmed_points = self.points.clone();
+        let w_div = self.width + 0.05;
+        let h_div = self.height + 0.05;
+        for p in transofrmed_points.iter_mut() {
+            p.x += self.width / 2.0;
+            p.x /= w_div;
+            p.y += self.height / 2.0;
+            p.y /= h_div;
+        }
+        let (polys, _, _) = destruction(&transofrmed_points, self.center(), 10);
+        let mut res = vec![];
+        for poly in polys.iter() {
+            let mut poly = poly.clone();
+            for p in poly.iter_mut() {
+                p.x *= w_div;
+                p.x -= self.width / 2.0;
+                p.y *= h_div;
+                p.y -= self.height / 2.0;
+            }
+            res.push(Polygon::new(poly.to_vec()));
         }
         res
+        // polys.iter().map(|poly |Polygon::new(poly.to_vec())).collect()
+        // let mut res = vec![];
+        // if self.points.len() == 3 {
+        //     return vec![self.clone()];
+        // }
+        // // dummy destruct for now
+        // let triangulation = self.triangulate();
+        // let points = triangulation.points;
+        // let indicies = triangulation.indicies;
+        // let mut i = 0usize;
+        // while i < indicies.len() {
+        //     res.push(Polygon::new(vec![
+        //         points[indicies[i] as usize],
+        //         points[indicies[i + 1] as usize],
+        //         points[indicies[i + 2] as usize],
+        //     ]));
+        //     i += 3;
+        // }
+        // res
     }
 }
 

@@ -1,13 +1,14 @@
-* fix kamikadze \/
-* add planet rotation \/
-* effect on bullet impact \/
-* bullet lifetime in gun desc \/
-* menu \/
+<!-- * fix kamikadze \/ -->
+<!-- * add planet rotation \/ -->
+<!-- * effect on bullet impact \/ -->
+<!-- * bullet lifetime in gun desc \/ -->
+<!-- * menu \/ -->
+* GO VORONOI!!!
 * ship trace
 * bullet trace
 * add rotation behaviour
 * add rockets
-* image borders fix -- wtf
+<!-- * image borders fix \sort of. Nearest filter average white colors around/ -->
 * unify damage processing/killing code
 * bullet sound in gun desc
 
@@ -15,12 +16,14 @@
 * save money and scores
 
 * gui feedback and states
+* spawn group of enemies simultaniously
 
 <!-- * nebulas spawn control \/ -->
 <!-- * * spawning grid? \/ -->
 <!-- * add planet \/ -->
 <!-- * image loading for bullets \/ -->
 
+* damage ship from asteroids
 
 * enemies
 <!-- * * constantly trhows slow bullets in spiral(while rotating) \/ -->

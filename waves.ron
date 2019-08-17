@@ -1,5 +1,21 @@
 (
 	[
+			(
+			distribution: [
+				("kamikadze", 0.1),
+				("charging", 0.1),
+				("bomber", 0.1),
+				("bomberman", 0.1),
+				("enemy1", 0.2),
+				("lazer", 0.1),
+				("enemy3", 0.3),
+			],
+			ships_number: 15,
+			const_distribution : [
+				("lazer_boss", 1)
+			],
+			iterations: 1
+		),
 		(
 			distribution: [
 				("kamikadze", 0.5),
@@ -55,22 +71,6 @@
 			],
 			ships_number: 8,
 			const_distribution : [],
-			iterations: 1
-		),
-		(
-			distribution: [
-				("kamikadze", 0.1),
-				("charging", 0.1),
-				("bomber", 0.1),
-				("bomberman", 0.1),
-				("enemy1", 0.2),
-				("lazer", 0.1),
-				("enemy3", 0.3),
-			],
-			ships_number: 15,
-			const_distribution : [
-				("lazer_boss", 1)
-			],
 			iterations: 1
 		),
 	]

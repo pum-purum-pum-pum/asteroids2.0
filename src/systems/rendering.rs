@@ -106,7 +106,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Point3::new(0.1f32, 0.4f32, 1f32), 
             false, 
             Some(Image(preloaded_images.play)),
-            "Play".to_string()
+            "".to_string()
         );
         if let Some(gun) = chosed_gun.0.clone() {
             if button.place_and_check(&mut ui, &*mouse) {

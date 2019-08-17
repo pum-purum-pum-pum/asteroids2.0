@@ -22,6 +22,7 @@ pub use derive_deref;
 pub use nalgebra;
 pub use nphysics2d;
 pub use ncollide2d;
+pub use vorod;
 #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
 #[macro_use] extern crate log;
 #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
