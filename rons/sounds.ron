@@ -1,0 +1,54 @@
+(
+	[
+		(
+			name: "shot",
+			count: 3,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
+			name: "explosion",
+			count: 3,
+			gap: (secs: 0, nanos: 20_000_000)
+		),
+		(
+			name: "explosion2",
+			count: 3,
+			gap: (secs: 0, nanos: 20_000_000)
+		),
+		(
+			name: "explosion_",
+			count: 3,
+			gap: (secs: 0, nanos: 20_000_000)
+		),
+		(
+			name: "lazer",
+			count: 1,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
+			name: "collision",
+			count: 1,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
+			name: "shot2",
+			count: 1,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
+			name: "shot3",
+			count: 1,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
+			name: "coin",
+			count: 2,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
+			name: "exp",
+			count: 2,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+	]
+)

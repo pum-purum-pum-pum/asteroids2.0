@@ -3,17 +3,43 @@
 <!-- * effect on bullet impact \/ -->
 <!-- * bullet lifetime in gun desc \/ -->
 <!-- * menu \/ -->
-* GO VORONOI!!!
+
+MVP:
+* score table \/
+* scores by exp :) \/
+* different sounds for different explosions \/
+* sound position \sort of/
+* different coins sound collect tone
+
+* ui selection
+* fix bug lazers dead
+* fix bug asteroid spawn
+* add harder placeholder waves at the end (mb just loop with improved stats..?)
+* ship buying on coins
+
+<!-- * fixed number of the same sounds at a time and gap. \/ -->
+* GO VORONOI!!! \/
+* score table saving
+* spawn less coins
+* add lifetime to coins
+* UI art
+* UI with feedback
+* add bullet position for voronoi
+* ship buy
+* save money and scores
+* unify damage processing/killing code
+
 * ship trace
 * bullet trace
 * add rotation behaviour
 * add rockets
 <!-- * image borders fix \sort of. Nearest filter average white colors around/ -->
-* unify damage processing/killing code
 * bullet sound in gun desc
 
-* ship buy
-* save money and scores
+
+FUN IDEAS TO TRY(TO SWITCH FROM WORK FOR FUN)
+* PORT TO WEB
+* MORE PROC GEN?
 
 * gui feedback and states
 * spawn group of enemies simultaniously

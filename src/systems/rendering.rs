@@ -1,12 +1,100 @@
 use crate::gfx::{TextData, RenderMode};
 use std::collections::{HashMap};
-use std::cmp::Ordering::Equal;
+
 use super::*;
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
 use crate::geometry::{shadow_geometry};
-const LIGHT_RECTANGLE_SIZE: f32 = 10f32;
 
+pub struct ScoreTableRendering {
+    reader: ReaderId<Primitive>,
+}
+
+impl ScoreTableRendering {
+    pub fn new(reader: ReaderId<Primitive>) -> Self {
+        ScoreTableRendering {
+            reader: reader
+        }
+    }
+}
+
+impl<'a> System<'a> for ScoreTableRendering {
+    type SystemData = (
+        ReadStorage<'a, ThreadPin<ImageData>>,
+        ReadExpect<'a, ThreadPin<red::GL>>,
+        WriteExpect<'a, Canvas>,
+        ReadExpect<'a, red::Viewport>,
+        Write<'a, EventChannel<Primitive>>,
+        Write<'a, IngameUI>,
+        Read<'a, Mouse>,
+        WriteExpect<'a, ThreadPin<TextData<'static>>>,
+        Write<'a, AppState>,
+        ReadExpect<'a, ScoreTable>
+    );
+    fn run(&mut self, data: Self::SystemData) {
+        let (
+            image_datas,
+            gl,
+            mut canvas,
+            viewport,
+            mut primitives_channel,
+            mut ui,
+            mouse,
+            mut text_data,
+            mut app_state,
+            score_table,
+        ) = data;
+        let mut frame = red::Frame::new(&gl);
+        frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
+        frame.clear_color();
+        let dims = viewport.dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        let (button_w, button_h) = (w/4f32, h/4f32);
+
+        let mut current_h = h / 20.0;
+        let text_gap_h = h / 20.0; // TODO somehow measure it
+        for score in score_table.0.iter() {
+            current_h += text_gap_h;
+            ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Text(Text {
+                        position: Point2::new(w/20.0, current_h), 
+                        text: format!("{}", score).to_string(), 
+                    }),
+                    with_projection: false,
+                    image: None
+                }
+            );            
+        }
+
+        let back_to_menu = Button::new(
+            Point2::new(w / 2.0, 1.5 * button_h),
+            button_w,
+            button_h,
+            Point3::new(0f32, 0f32, 0f32),
+            false,
+            None,
+            "Back to Menu".to_string()
+        );
+        if back_to_menu.place_and_check(&mut ui, &*mouse) {
+            *app_state = AppState::Menu;
+        }
+
+        primitives_channel.iter_write(ui.primitives.drain(..));
+        render_primitives(
+            &mouse,
+            &mut self.reader,
+            &mut frame,
+            &image_datas,
+            &gl,
+            &mut canvas,
+            &viewport,
+            &mut primitives_channel,
+            &mut text_data,
+        );
+
+    }
+}
 pub struct MenuRenderingSystem {
     reader: ReaderId<Primitive>,
 }
@@ -97,6 +185,18 @@ impl<'a> System<'a> for MenuRenderingSystem {
             if buttons[i].place_and_check(&mut ui, &*mouse) {
                 chosed_gun.0 = Some(description.player_guns[i].clone());
             }
+        }
+        let score_table_button = Button::new(
+            Point2::new(w / 2.0, 1.5 * button_h + shift_between),
+            button_w,
+            button_h,
+            Point3::new(0f32, 0f32, 0f32),
+            false,
+            None,
+            "Score Table".to_string()
+        );
+        if score_table_button.place_and_check(&mut ui, &*mouse) {
+            *app_state = AppState::ScoreTable;
         }
         let button = Button::new(
             Point2::new(w/2.0 - button_w / 2.0, h - button_h), 

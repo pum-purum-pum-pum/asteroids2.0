@@ -5,6 +5,7 @@ use crate::types::{*};
 use rand::prelude::*;
 use sdl2::keyboard::Keycode;
 use sdl2::TimerSubsystem;
+use std::time::{Instant, Duration};
 
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
@@ -20,7 +21,7 @@ use crate::components::*;
 use crate::geometry::{generate_convex_polygon, Polygon, TriangulateFromCenter, EPS};
 use crate::gfx::{GeometryData, Engine, ParticlesData, Explosion};
 use crate::physics::CollisionId;
-use crate::sound::{PreloadedSounds, SoundData, MusicData};
+use crate::sound::{PreloadedSounds, SoundData, MusicData, EFFECT_MAX_VOLUME};
 use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};
 
 mod rendering;
@@ -37,16 +38,11 @@ const SCREEN_AREA: f32 = 10f32;
 const PLAYER_AREA: f32 = 20f32;
 const ACTIVE_AREA: f32 = 40f32;
 // the same for NEBULAS
-const NEBULA_PLAYER_AREA: f32 = 90f32;
-const NEBULA_ACTIVE_AREA: f32 = 110f32;
-const NEBULA_MIN_NUMBER: usize = 20;
-
 const ASTEROIDS_MIN_NUMBER: usize = 25;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
 
-const AI_COLLISION_DISTANCE: f32 = 3.5f32;
 const EXPLOSION_WOBBLE: f32 = 0.4;
 
 const MAGNETO_RADIUS: f32 = 4f32;
@@ -274,6 +270,7 @@ impl<'a> System<'a> for SoundSystem {
         ReadStorage<'a, ThreadPin<SoundData>>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, Lazer>,
+        WriteStorage<'a, SoundPlacement>,
         WriteExpect<'a, ThreadPin<TimerSubsystem>>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, EventChannel<Sound>>,
@@ -288,6 +285,7 @@ impl<'a> System<'a> for SoundSystem {
             sounds, 
             character_markers,
             lazers,
+            mut sound_placements,
             _timer, 
             preloaded_sounds,
             sounds_channel,
@@ -297,10 +295,27 @@ impl<'a> System<'a> for SoundSystem {
             app_state
         ) = data;
         for s in sounds_channel.read(&mut self.reader) {
-            sdl2::mixer::Channel::all().play(
-                &sounds.get(s.0).unwrap().0, 
-                0
-            ).unwrap();
+            let sound = &sounds.get(s.0).unwrap().0;
+            let position = s.1;
+            let placement = sound_placements.get_mut(s.0).unwrap();
+            for i in placement.start..placement.end {
+                let current_channel = sdl2::mixer::Channel(i as i32);
+                if !current_channel.is_playing() && 
+                    Instant::now()
+                        .duration_since(placement.last_upd) >= placement.gap {
+                    placement.last_upd = Instant::now();
+                    current_channel.play(sound, 0).unwrap();
+                    let fade = (1.0 + 1.0 / (1.0 * position.coords.norm_squared() + 1.0)) / 2.0;
+                    current_channel.set_volume(
+                        (EFFECT_MAX_VOLUME as f32 * fade) as i32
+                    );
+                    break;
+                }
+            }
+            // sdl2::mixer::Channel::all().play(
+            //     &sounds.get(s.0).unwrap().0, 
+            //     0
+            // ).unwrap();
         }
         for (lazer, _character) in (&lazers, &character_markers).join() {
             if lazer.active {
@@ -338,6 +353,9 @@ impl<'a> System<'a> for SoundSystem {
                     music_data.menu_music.play(-1).unwrap();
                     music.menu_play = true;
                 }
+            }
+            AppState::ScoreTable => {
+                
             }
         }
     }
@@ -557,7 +575,7 @@ impl<'a> System<'a> for ControlSystem {
 
             }
             let character = character.unwrap();
-            let (_character_isometry, mut character_velocity) = {
+            let (character_isometry, mut character_velocity) = {
                 let character_body = world
                     .rigid_body(physics.get(character).unwrap().body_handle)
                     .unwrap();
@@ -608,14 +626,30 @@ impl<'a> System<'a> for ControlSystem {
                                 shields.get_mut(*target_entity),
                                 lazer.damage
                             ) {
+                                let explosion_isometry = isometries.get(*target_entity).unwrap().0;
+                                let explosion_position = explosion_isometry.translation.vector;
+                                let explosion_position =
+                                    Point2::new(explosion_position.x, explosion_position.y);
                                 if asteroid_markers.get(*target_entity).is_some() {
                                     let asteroid = *target_entity;
+                                    sounds_channel.single_write(
+                                        Sound(
+                                            preloaded_sounds.asteroid_explosion,
+                                            explosion_position
+                                        )
+                                    );
                                     spawn_asteroids(
-                                        isometries.get(asteroid).unwrap().0, 
+                                        explosion_isometry, 
                                         polygons.get(asteroid).unwrap(), 
                                         &mut insert_channel,
                                     );
                                 } else {
+                                    sounds_channel.single_write(
+                                        Sound(
+                                            preloaded_sounds.ship_explosion,
+                                            explosion_position
+                                        )
+                                    );
                                     let target_position = isometries
                                         .get(*target_entity).unwrap().0.translation.vector;
                                     insert_channel.single_write(
@@ -627,7 +661,6 @@ impl<'a> System<'a> for ControlSystem {
                                 }
                                 explosion_size = 20;
                                 with_animation = true;
-                                sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                                 insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                                 entities.delete(*target_entity).unwrap();
                             }
@@ -676,7 +709,10 @@ impl<'a> System<'a> for ControlSystem {
                     zero_rotation
                 )
             }
-
+            let gun_position = Point2::new(
+                    character_isometry.translation.vector.x, 
+                    character_isometry.translation.vector.y
+                );
             if mouse_state.left {
                 if let Some(blaster) = blasters.get_mut(character) {
                     if blaster.shoot() {
@@ -688,7 +724,11 @@ impl<'a> System<'a> for ControlSystem {
                             velocities.get(character).unwrap().0,
                             character
                         );
-                        sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                        sounds_channel.single_write(
+                            Sound(
+                                preloaded_sounds.shot,
+                                gun_position
+                            ));
                         insert_channel.iter_write(bullets.into_iter());
                     }
                 }
@@ -702,7 +742,12 @@ impl<'a> System<'a> for ControlSystem {
                             velocities.get(character).unwrap().0,
                             character
                         );
-                        sounds_channel.single_write(Sound(preloaded_sounds.shot));
+                        sounds_channel.single_write(
+                            Sound(
+                                preloaded_sounds.shot,
+                                gun_position
+                            )
+                        );
                         insert_channel.iter_write(bullets.into_iter());
                     }
                 }
@@ -1330,6 +1375,7 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, AppState>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
+        WriteExpect<'a, ScoreTable>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1379,6 +1425,7 @@ impl<'a> System<'a> for GamePlaySystem {
             mut app_state,
             mut nebula_grid,
             mut planet_grid,
+            mut score_table
         ) = data;
         for (shield, life, ship_stats, _character) in (&mut shields, &mut lifes, &ships_stats, &character_markers).join() {
             shield.0 = (shield.0 + ship_stats.shield_regen).min(ship_stats.max_shield);
@@ -1481,8 +1528,13 @@ impl<'a> System<'a> for GamePlaySystem {
                             let affected = 
                                 is_character && owner != char_entity ||
                                 entity != char_entity && (owner == char_entity || is_asteroid);
+                            sounds_channel.single_write(
+                                Sound(
+                                    preloaded_sounds.blast,
+                                    Point2::new(position.x, position.y)
+                                )
+                            );
                             if affected && (blast_position - position).norm() < blast.blast_radius {
-                                sounds_channel.single_write(Sound(preloaded_sounds.explosion));
                                 if process_damage(life, shields.get_mut(entity), blast.blast_damage) {
                                     if is_asteroid {
                                         spawn_asteroids(
@@ -1492,7 +1544,8 @@ impl<'a> System<'a> for GamePlaySystem {
                                         );
                                     }
                                     if is_character {
-                                        *app_state = AppState::Menu;
+                                        // *app_state = AppState::Menu;
+                                        to_menu(&mut app_state, &mut progress, &mut score_table);
                                     }
                                     // delete character
                                     entities.delete(entity).unwrap();
@@ -1516,13 +1569,23 @@ impl<'a> System<'a> for GamePlaySystem {
                 }
             }
             if coin.is_some() && (pos3d - collectable_position).norm() < COLLECT_RADIUS {
-                sounds_channel.single_write(Sound(preloaded_sounds.coin));
+                sounds_channel.single_write(Sound(
+                        preloaded_sounds.coin,
+                        Point2::new(collectable_position.x, collectable_position.y)
+                    )
+                );
+                progress.add_coins(coin.unwrap().0);
                 progress.add_score(coin.unwrap().0);
                 macro_game.coins += coin.unwrap().0;
                 entities.delete(entity).unwrap();
             }
             if exp.is_some() && (pos3d - collectable_position).norm() < COLLECT_RADIUS {
-                sounds_channel.single_write(Sound(preloaded_sounds.exp));
+                sounds_channel.single_write(
+                    Sound(
+                        preloaded_sounds.exp,
+                        Point2::new(collectable_position.x, collectable_position.y)
+                    )
+                );
                 progress.add_exp(exp.unwrap().0);
                 entities.delete(entity).unwrap();
             }
@@ -1724,6 +1787,18 @@ fn process_damage(life: &mut Lifes, mut shield: Option<&mut Shield>, mut project
     false
 }
 
+pub fn to_menu(
+    app_state: &mut Write<AppState>,
+    progress: &mut Write<Progress>,
+    score_table: &mut WriteExpect<ScoreTable>
+) {
+    **app_state = AppState::Menu;
+    // score_table.0 = score_table.0.sort()
+    score_table.0.push(progress.score);
+    score_table.0.sort_by(|a, b| b.cmp(a));
+    progress.score = 0;
+}
+
 #[derive(Default)]
 pub struct CollisionSystem {
     colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
@@ -1751,6 +1826,7 @@ impl<'a> System<'a> for CollisionSystem {
         ReadExpect<'a, PreloadedImages>,
         Write<'a, Progress>,
         Write<'a, AppState>,
+        WriteExpect<'a, ScoreTable>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1774,6 +1850,7 @@ impl<'a> System<'a> for CollisionSystem {
             preloaded_images,
             mut progress,
             mut app_state,
+            mut score_table
         ) = data;
         self.colliding_start_events.clear();
         self.colliding_end_events.clear();
@@ -1836,7 +1913,12 @@ impl<'a> System<'a> for CollisionSystem {
                     };
                     insert_channel.single_write(effect);
                     if character_markers.get(ship).is_some() {
-                        sounds_channel.single_write(Sound(preloaded_sounds.collision));
+                        sounds_channel.single_write(
+                            Sound(
+                                preloaded_sounds.collision,
+                                Point2::new(position.x, position.y)
+                            )
+                        );
                     }
                 }
                 if asteroid_explosion {
@@ -1850,7 +1932,10 @@ impl<'a> System<'a> for CollisionSystem {
                         with_animation: true
                     };
                     insert_channel.single_write(effect);
-                    sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                    sounds_channel.single_write(Sound(
+                        preloaded_sounds.asteroid_explosion,
+                        Point2::new(position.x, position.y)
+                    ));
                     spawn_asteroids(
                         isometries.get(asteroid).unwrap().0, 
                         polygons.get(asteroid).unwrap(), 
@@ -1876,7 +1961,12 @@ impl<'a> System<'a> for CollisionSystem {
                         shields.get_mut(ship),
                         projectile_damage
                     ) {
-                        *app_state = AppState::Menu;
+                        // *app_state = AppState::Menu;
+                        to_menu(
+                            &mut app_state, 
+                            &mut progress,
+                            &mut score_table
+                        );
                         // delete character
                         entities.delete(ship).unwrap();
                     }
@@ -1900,7 +1990,11 @@ impl<'a> System<'a> for CollisionSystem {
                         explosion_size = 20;
                         with_animation = true;
                         insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
-                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                        sounds_channel.single_write(Sound(
+                                preloaded_sounds.ship_explosion,
+                                ship_pos
+                            )
+                        );
                     }
                     let effect = InsertEvent::Explosion {
                         position: ship_pos,
@@ -1934,14 +2028,22 @@ impl<'a> System<'a> for CollisionSystem {
                     let character_ship = ship1;
                     let other_ship = ship2;
                     // entities.delete(other_ship).unwrap();
-                    sounds_channel.single_write(Sound(preloaded_sounds.collision));
+                    sounds_channel.single_write(Sound(
+                        preloaded_sounds.collision, 
+                        Point2::new(0f32, 0f32))
+                    );
                     if process_damage(
                         lifes.get_mut(other_ship).unwrap(),
                         shields.get_mut(other_ship),
                         damages.get(character_ship).unwrap().0
                     ) {
                         insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
-                        sounds_channel.single_write(Sound(preloaded_sounds.explosion));
+                        sounds_channel.single_write(
+                            Sound(
+                                preloaded_sounds.ship_explosion,
+                                Point2::new(0f32, 0f32)
+                            )
+                        );
                         let effect = InsertEvent::Explosion {
                             position: Point2::new(position.x, position.y),
                             num: 20,
@@ -1956,7 +2058,7 @@ impl<'a> System<'a> for CollisionSystem {
                         shields.get_mut(character_ship),
                         damages.get(other_ship).unwrap().0
                     ) {
-                        *app_state = AppState::Menu;
+                        to_menu(&mut app_state, &mut progress, &mut score_table);
                         // delete character
                         entities.delete(character_ship).unwrap();
                     }
@@ -2100,7 +2202,12 @@ impl<'a> System<'a> for AISystem {
                                     entity
                                 );
                                 insert_channel.iter_write(bullets.into_iter());
-                                sounds_channel.single_write(Sound(preloaded_sounds.enemy_blaster))
+                                sounds_channel.single_write(
+                                    Sound(
+                                        preloaded_sounds.enemy_blaster,
+                                        Point2::new(position.x, position.y)
+                                    ),
+                                )
                             }
                         }
                         // Copy paste from top
@@ -2116,7 +2223,12 @@ impl<'a> System<'a> for AISystem {
                                     entity
                                 );
                                 insert_channel.iter_write(bullets.into_iter());
-                                sounds_channel.single_write(Sound(preloaded_sounds.enemy_blaster))
+                                sounds_channel.single_write(
+                                    Sound(
+                                        preloaded_sounds.enemy_blaster,
+                                        Point2::new(position.x, position.y),
+                                    ),
+                                )
                             }
                         }
                         let shotgun = shotguns.get_mut(entity);
@@ -2131,7 +2243,12 @@ impl<'a> System<'a> for AISystem {
                                     entity
                                 );
                                 insert_channel.iter_write(bullets.into_iter());
-                                sounds_channel.single_write(Sound(preloaded_sounds.enemy_shotgun))
+                                sounds_channel.single_write(
+                                    Sound(
+                                        preloaded_sounds.enemy_shotgun,
+                                        Point2::new(position.x, position.y)
+                                    )
+                                )
                             }
                         }
                         if diff.norm() > follow_area {

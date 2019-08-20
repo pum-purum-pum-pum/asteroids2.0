@@ -100,7 +100,7 @@
                 max_shield: 0,
                 damage: 10
             ),
-            size: 0.4,
+            size: 0.7,
             image_name: "lazer",
         ),
 
@@ -213,7 +213,7 @@
                 max_shield: 0,
                 damage: 100
             ),
-            size: 0.4,
+            size: 0.3,
             image_name: "charging",
         ),
         (
@@ -236,7 +236,7 @@
                 max_shield: 0,
                 damage: 10
             ),
-            size: 0.4,
+            size: 0.6,
             image_name: "bomber",
         ),
         (

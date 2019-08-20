@@ -12,6 +12,8 @@ use backtrace::Backtrace;
 #[cfg(any(target_os = "android"))]
 use std::panic;
 use std::collections::{HashMap};
+use ron::de::{from_str};
+use serde::{Serialize, Deserialize};
 
 
 use std::path::Path;
@@ -23,7 +25,7 @@ use crate::sound::{init_sound, };
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
-    GUISystem,
+    GUISystem, ScoreTableRendering
 };
 use glyph_brush::{*};
 use crate::gfx::{ParticlesData, MovementParticles};
@@ -154,6 +156,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<ShipStats>();
     specs_world.register::<Animation>();
     specs_world.register::<Charge>();
+    specs_world.register::<SoundPlacement>();
     // TODO: load all this imagea automagicly (assets pack?)
     let images = [
         "back",
@@ -262,11 +265,7 @@ pub fn run() -> Result<(), String> {
         planet_images.push(planet_image);
     }
 
-    {   // load .ron files with tweaks 
-        use ron::de::{from_str};
-        use serde::{Serialize, Deserialize};
-        
-
+    {   // load .ron files with tweaks
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
             player_ships_stats: Vec<ShipStats>,
@@ -311,7 +310,7 @@ pub fn run() -> Result<(), String> {
             pub image_name: String,
         };
         // let file = File::open("desc.ron").unwrap();
-        let file = include_str!("../desc.ron");
+        let file = include_str!("../rons/desc.ron");
         let desc: DescriptionSave = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
@@ -326,7 +325,7 @@ pub fn run() -> Result<(), String> {
         }
         let desc = process_description(desc, &name_to_image);
         specs_world.add_resource(desc);
-        let file = include_str!("../upgrades.ron");
+        let file = include_str!("../rons/upgrades.ron");
         let upgrades_all: Vec<UpgradeCardRaw> = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
@@ -368,7 +367,7 @@ pub fn run() -> Result<(), String> {
             }
         }
 
-        let file = include_str!("../waves.ron");
+        let file = include_str!("../rons/waves.ron");
         let waves: WavesSave = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
@@ -433,6 +432,10 @@ pub fn run() -> Result<(), String> {
     let mut menu_dispatcher = DispatcherBuilder::new()
         .with_thread_local(menu_rendering_system)
         .build();
+    let score_table_system = ScoreTableRendering::new(primitives_channel.register_reader());
+    let mut score_table_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(score_table_system)
+        .build();
     let phyiscs_system = PhysicsSystem::default();
     let sound_system = SoundSystem::new(sounds_channel.register_reader());
     let control_system = ControlSystem::new(keys_channel.register_reader());
@@ -443,7 +446,7 @@ pub fn run() -> Result<(), String> {
     let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
-    specs_world.add_resource(MacroGame{coins: 0});
+    specs_world.add_resource(MacroGame{coins: 0, score: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
@@ -452,6 +455,18 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
+    {
+        let file = include_str!("../assets/scores.ron");
+        let score_table: ScoreTable = match from_str(file) {
+            Ok(x) => x,
+            Err(e) => {
+                println!("Failed to load config: {}", e);
+
+                std::process::exit(1);
+            }
+        };
+        specs_world.add_resource(score_table);
+    }
     let mut sound_dispatcher = DispatcherBuilder::new()
         .with_thread_local(sound_system)
         .build();
@@ -586,6 +601,9 @@ pub fn run() -> Result<(), String> {
             }
             AppState::Play(_) => {
                 dispatcher.dispatch(&specs_world.res);
+            }
+            AppState::ScoreTable => {
+                score_table_dispatcher.dispatch(&specs_world.res);
             }
         }
         insert_dispatcher.dispatch(&specs_world.res);

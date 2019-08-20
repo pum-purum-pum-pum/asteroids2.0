@@ -4,7 +4,7 @@ use std::collections::{HashMap};
 pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
-pub use crate::sound::{SoundData};
+pub use crate::sound::{SoundData, SoundPlacement};
 pub use crate::gui::{Button, Rectangle};
 pub use crate::gfx::animation::{Animation, AnimationFrame};
 use crate::types::{*};
@@ -17,7 +17,7 @@ use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
 
-pub const ASTEROID_MAX_LIFES: usize = 1000usize;
+pub const ASTEROID_MAX_LIFES: usize = 100usize;
 
 
 pub const BULLET_SPEED_INIT: f32 = 0.5;
@@ -29,8 +29,6 @@ use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
-
-
 
 #[derive(Debug, Default)]
 pub struct CurrentWave{
@@ -245,10 +243,14 @@ pub enum PlayState {
     Upgrade
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ScoreTable(pub Vec<usize>);
+
 #[derive(Debug, Clone, Copy)]
 pub enum AppState {
     Menu,
     Play(PlayState),
+    ScoreTable,
 }
 
 impl Default for AppState {
@@ -315,7 +317,7 @@ pub struct Size(pub f32);
 pub struct Image(pub specs::Entity);
 
 #[derive(Component, Clone, Copy)]
-pub struct Sound(pub specs::Entity);
+pub struct Sound(pub specs::Entity, pub Point2);
 
 #[derive(Component, Clone, Copy)]
 pub struct Particles(pub usize);
@@ -333,13 +335,18 @@ pub struct Damage(pub usize);
 #[derive(Clone)]
 pub struct MacroGame {
     pub coins: usize,
+    pub score: usize,
 }
+
+// #[derive(Default)]
+// pub struct CurrentScore(pub usize);
 
 #[derive(Default, Clone, Copy)]
 pub struct Progress {
     pub experience: usize,
     pub level: usize,
     pub score: usize,
+    pub coins: usize,
 }
 
 impl Progress {
@@ -362,6 +369,10 @@ impl Progress {
 
     pub fn add_score(&mut self, score: usize) {
         self.score += score;
+    }
+
+    pub fn add_coins(&mut self, coins: usize) {
+        self.coins += coins;
     }
 }
 
