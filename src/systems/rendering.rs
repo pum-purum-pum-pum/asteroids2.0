@@ -154,7 +154,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         // return;
 
-        let (button_w, button_h) = (w/4f32, h/4f32);
+        let button_w = w/6f32;
+        let button_h = button_w;
         let mut buttons = vec![];
         let buttons_names = vec!["Lazer", "Blaster", "Shotgun"];
         let buttons_num = buttons_names.len();
@@ -251,7 +252,7 @@ pub fn render_primitives<'a>(
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
-    let scale = Scale::uniform((w / 6000.0 * mouse.hdpi as f32).round());
+    let scale = Scale::uniform(((w * w + h * h).sqrt() / 8000.0 * mouse.hdpi as f32).round());
     for primitive in primitives_channel.read(reader) {
         match primitive {
             Primitive {
@@ -272,7 +273,7 @@ pub fn render_primitives<'a>(
                                 image_datas.get(image.0).unwrap(),
                                 &model, 
                                 *with_projection, 
-                                rectangle.height
+                                (rectangle.width, rectangle.height)
                             );
                     }
                     None => {
@@ -357,30 +358,30 @@ impl<'a> System<'a> for GUISystem {
           let (
             (
                 entities,
-                isometries,
-                mut velocities,
-                physics,
+                _isometries,
+                _velocities,
+                _physics,
                 character_markers,
-                ship_markers,
+                _ship_markers,
                 lifes,
                 shields,
-                mut spins,
+                _spins,
                 mut blasters,
                 mut ships_stats,
                 viewport,
             ),
             // preloaded_particles,
-            mut world,
+            _world,
             _primitives_channel,
             mut ingame_ui,
             progress,
             mut app_state,
             mouse,
             preloaded_images,
-            preloaded_sounds,
-            touches,
-            mut sounds_channel,
-            mut insert_channel,
+            _preloaded_sounds,
+            _touches,
+            _sounds_channel,
+            _insert_channel,
             avaliable_upgrades,
             mut spawned_upgrades,
             mut choosed_upgrade,
@@ -388,8 +389,9 @@ impl<'a> System<'a> for GUISystem {
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
-        let life_color = Point3::new(0.0, 0.6, 0.1); // TODO move in consts?
-        let _shield_color = Point3::new(0.0, 0.1, 0.6); 
+        let d = (w * w + h * h).sqrt();
+        let life_color = Point3::new(0.5, 0.9, 0.7); // TODO move in consts?
+        let shield_color = Point3::new(0.5, 0.7, 0.9); 
         let experience_color = Point3::new(0.8, 0.8, 0.8);
         let white_color = Point3::new(1.0, 1.0, 1.0);
         let grey_color = Point3::new(0.5, 0.5, 0.5);
@@ -558,7 +560,6 @@ impl<'a> System<'a> for GUISystem {
             }
         );
 
-
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
@@ -615,7 +616,8 @@ impl<'a> System<'a> for GUISystem {
 
         // upgrade UI
         let mut current_upgrade = None;
-        let (upgrade_button_w, upgrade_button_h) = ((w/4f32).min(h/2f32), (w/4f32).min(h/2f32));
+        let upgrade_button_w = (w/4f32).min(h/2f32);
+        let upgrade_button_h = upgrade_button_w;
         let (choose_button_w, choose_button_h) = (w/6f32, h/12f32);
         let shift = upgrade_button_h / 10f32;
         match *app_state {
@@ -628,7 +630,7 @@ impl<'a> System<'a> for GUISystem {
                             Point2::new(
                                 w / 2.0 - upgrade_button_w - shift 
                                 + i as f32 * (upgrade_button_w + shift), 
-                                shift
+                                upgrade_button_h / 2.0 + shift
                             );
                         let upgrade_button = Button::new(
                             current_point,
@@ -732,38 +734,68 @@ impl<'a> System<'a> for GUISystem {
             None => ()
         }
 
-
+        if spawned_upgrades.len() > 0 {
+        // {
+            let (upgrade_bar_w, upgrade_bar_h) = (w / 3f32, h / 10.0);
+            let upgrade_bar = Button::new(
+                Point2::new(w / 2.0 - upgrade_bar_w / 2.0, h - h / 20.0 - upgrade_bar_h),
+                upgrade_bar_w,
+                upgrade_bar_h,
+                Point3::new(0f32, 0f32, 0f32),
+                false,
+                Some(Image(preloaded_images.bar)),
+                "Upgrade avaliable!".to_string()
+            );
+            upgrade_bar.place_and_check(&mut ingame_ui, &*mouse);
+        }
+        let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
+        let health_y = h / 40.0;
+        let shields_y = health_y + h / 13.0;
         for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
-            let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
+            {   // upgrade bar
+                let border = d / 106f32;
+                let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
+                let back_bar = Button::new(
+                    Point2::new(w/2.0 - health_back_w / 2.0, health_y - border / 2.0),
+                    health_back_w,
+                    health_back_h,
+                    Point3::new(0f32, 0f32, 0f32),
+                    false,
+                    Some(Image(preloaded_images.bar)),
+                    "".to_string()
+                );
+                back_bar.place_and_check(&mut ingame_ui, &*mouse);
+
+                let border = d / 200f32;
+                let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
+                let back_bar = Button::new(
+                    Point2::new(w/2.0 - health_back_w / 2.0, shields_y - border / 2.0),
+                    health_back_w,
+                    health_back_h,
+                    Point3::new(0f32, 0f32, 0f32),
+                    false,
+                    Some(Image(preloaded_images.bar)),
+                    "".to_string()
+                );
+                back_bar.place_and_check(&mut ingame_ui, &*mouse);
+            }
+
+
             let lifes_bar = Rectangle {
-                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/20.0),
+                position: Point2::new(w/2.0 - lifebar_w / 2.0, health_y),
                 width: (life.0 as f32 / ship_stats.max_health as f32) * lifebar_w,
                 height: lifebar_h,
                 color: life_color.clone()
             };
             let shields_bar = Rectangle {
-                position: Point2::new(w/2.0 - lifebar_w / 2.0, h/40.0),
+                position: Point2::new(w/2.0 - lifebar_w / 2.0, shields_y),
                 width: (shield.0 as f32 / ship_stats.max_shield as f32) * lifebar_w,
                 height: lifebar_h,
-                color: Point3::new(0.0, 0.1, 0.6)
-            };
-            let border = 0f32;
-            let lifes_bar_back = Rectangle {
-                position: Point2::new(w/2.0 - lifebar_w / 2.0 - border, h/40.0 - border + h/40.0 - border),
-                width: lifebar_w + border * 2.0,
-                height: lifebar_h + border * 2.0,
-                color: Point3::new(1.0, 1.0, 1.0)
+                color: shield_color
             };
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(shields_bar),
-                    with_projection: false,
-                    image: None
-                }
-            );
-            ingame_ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Rectangle(lifes_bar_back),
                     with_projection: false,
                     image: None
                 }
@@ -802,6 +834,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, ShipMarker>,
             ReadStorage<'a, AsteroidMarker>,
             ReadStorage<'a, LightMarker>,
+            ReadStorage<'a, StarsMarker>,
             ReadStorage<'a, NebulaMarker>,
             ReadStorage<'a, PlanetMarker>,
             ReadStorage<'a, Projectile>,
@@ -840,6 +873,7 @@ impl<'a> System<'a> for RenderingSystem {
                 ship_markers,
                 asteroid_markers,
                 light_markers,
+                stars,
                 nebulas,
                 planets,
                 projectiles,
@@ -868,6 +902,7 @@ impl<'a> System<'a> for RenderingSystem {
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.015, 0.004, 0.0, 1.0);
+        // frame.set_clear_color(0.15, 0.004, 0.0, 1.0);
         frame.set_clear_stencil(0);
         frame.clear_color_and_stencil();
         let (char_iso, char_pos, char_vel) = {
@@ -916,6 +951,21 @@ impl<'a> System<'a> for RenderingSystem {
                     );
             }
         }
+        for (_entity, iso, image, size, _stars) in
+            (&entities, &isometries, &image_ids, &sizes, &stars).join() {
+            let image_data = image_datas.get(image.0).unwrap();
+            canvas
+                .render(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        false,
+                        None
+                );
+        };
         for (_entity, iso, image, size, _nebula) in
             (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
             let image_data = image_datas.get(image.0).unwrap();
@@ -946,6 +996,8 @@ impl<'a> System<'a> for RenderingSystem {
                         None
                 );
         };
+
+
 
         {
             for (entity, particles_data) in (&entities, &mut particles_datas).join() {

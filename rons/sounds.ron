@@ -46,6 +46,11 @@
 			gap: (secs: 0, nanos: 100_000_000)
 		),
 		(
+			name: "coin2",
+			count: 2,
+			gap: (secs: 0, nanos: 100_000_000)
+		),
+		(
 			name: "exp",
 			count: 2,
 			gap: (secs: 0, nanos: 100_000_000)

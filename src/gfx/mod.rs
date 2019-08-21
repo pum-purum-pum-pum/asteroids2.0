@@ -590,7 +590,7 @@ impl Canvas {
         image_data: &ImageData,
         model: &Isometry3,
         with_projection: bool,
-        size: f32,
+        dim_scales: (f32, f32),
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -606,11 +606,13 @@ impl Canvas {
             let view: [[f32; 4]; 4] = Matrix4::identity().into();
             (orthographic, view)
         };
+        // let scales = image_data.dim_scales;
         program.set_uniform("model", model);
         program.set_uniform("view", view);
         program.set_uniform("projection", projection);
         program.set_uniform("tex", image_data.texture.clone());
-        program.set_uniform("size", size);
+        program.set_uniform("dim_scales", dim_scales);
+        // program.set_uniform("size", size);
         program.set_layout(&gl, vao, &[&image_data.positions]);
 
         let draw_params = DrawParams::default();

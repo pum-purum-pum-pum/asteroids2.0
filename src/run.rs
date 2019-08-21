@@ -149,6 +149,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Lifes>();
     specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
+    specs_world.register::<StarsMarker>();
     specs_world.register::<PlanetMarker>();
     specs_world.register::<Damage>();
     specs_world.register::<AI>();
@@ -160,7 +161,8 @@ pub fn run() -> Result<(), String> {
     // TODO: load all this imagea automagicly (assets pack?)
     let images = [
         "back",
-        "player_ship1", 
+        "player_ship1",
+        "basic",
         "asteroid",
         "light",
         "light_sea",
@@ -192,7 +194,8 @@ pub fn run() -> Result<(), String> {
         "random_ship",
         "bomber",
         "bomberman",
-        "charging"
+        "charging",
+        "bar"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -253,10 +256,21 @@ pub fn run() -> Result<(), String> {
             .build();
         nebula_images.push(nebula_image);
     }
+    let mut stars_images = vec![];
+    for i in 1..=5 {
+        let stars_image_data = ThreadPin::new(
+            ImageData::new(&context, &format!("stars{}", i)).unwrap()
+        );
+        let stars_image = specs_world
+            .create_entity()
+            .with(stars_image_data)
+            .build();
+        stars_images.push(stars_image);
+    }
     let mut planet_images = vec![];
-    for i in  1..=PLANETS_NUM {
+    for planet_name in vec!["planet1", "jupyterish", "halfmoon"].iter() {
         let planet_image_data = ThreadPin::new(
-            ImageData::new(&context, &format!("planet{}", i)).unwrap()
+            ImageData::new(&context, &planet_name).unwrap()
         );
         let planet_image = specs_world
             .create_entity()
@@ -385,7 +399,7 @@ pub fn run() -> Result<(), String> {
     }
 
     let preloaded_images = PreloadedImages {
-        character: name_to_image["player_ship1"],
+        character: name_to_image["basic"],
         projectile: name_to_image["projectile"],
         enemy_projectile: name_to_image["enemy_projectile"],
         asteroid: name_to_image["asteroid"],
@@ -395,6 +409,7 @@ pub fn run() -> Result<(), String> {
         enemy4: name_to_image["lazer"],
         background: name_to_image["back"],
         nebulas: nebula_images,
+        stars: stars_images,
         planets: planet_images,
         ship_speed_upgrade: name_to_image["ship_speed"],
         bullet_speed_upgrade: name_to_image["bullet_speed"],
@@ -409,9 +424,10 @@ pub fn run() -> Result<(), String> {
         shotgun: name_to_image["shotgun"],
         coin: name_to_image["coin"],
         exp: name_to_image["exp"],
+        bar: name_to_image["bar"],
         explosion: name_to_animation["explosion1"].clone(),
         blast: name_to_animation["explosion2"].clone(),
-        bullet_contact: name_to_animation["bullet_contact"].clone()
+        bullet_contact: name_to_animation["bullet_contact"].clone(),
     };
 
 
@@ -446,6 +462,7 @@ pub fn run() -> Result<(), String> {
     let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
+    specs_world.add_resource(StarsGrid::new(3, 40f32, 40f32, 4f32, 4f32));
     specs_world.add_resource(MacroGame{coins: 0, score: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));

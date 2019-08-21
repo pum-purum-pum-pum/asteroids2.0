@@ -1,7 +1,7 @@
 use std::ops::AddAssign;
 use std::collections::{HashMap};
 
-pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid};
+pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData, SoundPlacement};
@@ -154,6 +154,9 @@ pub enum InsertEvent {
         attached: AttachPosition
     },
     Nebula {
+        iso: Point3
+    },
+    Stars {
         iso: Point3
     },
     Planet {
@@ -392,6 +395,7 @@ pub struct PreloadedImages {
     pub background: specs::Entity,
     pub nebulas: Vec<specs::Entity>,
     pub planets: Vec<specs::Entity>,
+    pub stars: Vec<specs::Entity>,
     pub ship_speed_upgrade: specs::Entity,
     pub bullet_speed_upgrade: specs::Entity,
     pub attack_speed_upgrade: specs::Entity,
@@ -405,6 +409,7 @@ pub struct PreloadedImages {
     pub play: specs::Entity,
     pub coin: specs::Entity,
     pub exp: specs::Entity,
+    pub bar: specs::Entity,
     pub explosion: Animation,
     pub blast: Animation,
     pub bullet_contact: Animation,
@@ -498,6 +503,10 @@ pub struct CharacterMarker;
 #[derive(Default, Component, Clone, Copy)]
 #[storage(NullStorage)]
 pub struct NebulaMarker;
+
+#[derive(Default, Component, Clone, Copy)]
+#[storage(NullStorage)]
+pub struct StarsMarker;
 
 #[derive(Default, Component, Clone, Copy)]
 #[storage(NullStorage)]

@@ -305,7 +305,7 @@ impl<'a> System<'a> for SoundSystem {
                         .duration_since(placement.last_upd) >= placement.gap {
                     placement.last_upd = Instant::now();
                     current_channel.play(sound, 0).unwrap();
-                    let fade = (1.0 + 1.0 / (1.0 * position.coords.norm_squared() + 1.0)) / 2.0;
+                    let fade = (1.0 + 1.0 / (1.0 * position.coords.norm() * position.coords.norm_squared() + 1.0)) / 2.0;
                     current_channel.set_volume(
                         (EFFECT_MAX_VOLUME as f32 * fade) as i32
                     );
@@ -837,6 +837,7 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Projectile>,
             WriteStorage<'a, Blast>,
         ),
+        WriteStorage<'a, StarsMarker>,
         WriteStorage<'a, NebulaMarker>,
         WriteStorage<'a, PlanetMarker>,
         WriteStorage<'a, AttachPosition>,
@@ -886,6 +887,7 @@ impl<'a> System<'a> for InsertSystem {
                 mut projectiles,
                 mut blasts,
             ),
+            mut stars,
             mut nebulas,
             mut planets,
             mut attach_positions,
@@ -1297,6 +1299,21 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Size(60f32), &mut sizes)
                         .build();
                 }
+                InsertEvent::Stars {
+                    iso
+                } => {
+                    let mut rng = thread_rng();
+                    let z = rng.gen_range(-140f32, -120f32);
+                    let stars_num = preloaded_images.stars.len();
+                    let stars_id = rng.gen_range(0, stars_num);
+                    let _stars = entities
+                        .build_entity()
+                        .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
+                        .with(Image(preloaded_images.stars[stars_id]), &mut images)
+                        .with(StarsMarker::default(), &mut stars)
+                        .with(Size(30f32), &mut sizes)
+                        .build();
+                }
                 InsertEvent::Planet {
                     iso
                 } => {
@@ -1346,9 +1363,8 @@ impl<'a> System<'a> for GamePlaySystem {
             WriteStorage<'a, AsteroidMarker>,
             ReadStorage<'a, CharacterMarker>,
             ReadStorage<'a, ShipMarker>,
-            WriteStorage<'a, Image>,
-            WriteStorage<'a, Size>,
             WriteStorage<'a, Polygon>,
+            WriteStorage<'a, StarsMarker>,
             WriteStorage<'a, NebulaMarker>,
             WriteStorage<'a, PlanetMarker>,
             WriteStorage<'a, Shield>,
@@ -1373,6 +1389,7 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, AppState>,
+        WriteExpect<'a, StarsGrid>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
         WriteExpect<'a, ScoreTable>,
@@ -1391,14 +1408,13 @@ impl<'a> System<'a> for GamePlaySystem {
                 mut shotguns,
                 mut cannons,
                 mut chargings,
-                mut blasts,
+                blasts,
                 mut lifetimes,
                 asteroid_markers,
                 character_markers,
                 ships,
-                _images,
-                _sizes,
                 polygons,
+                stars,
                 nebulas,
                 planets,
                 mut shields,
@@ -1423,6 +1439,7 @@ impl<'a> System<'a> for GamePlaySystem {
             mut sounds_channel,
             preloaded_sounds,
             mut app_state,
+            mut stars_grid,
             mut nebula_grid,
             mut planet_grid,
             mut score_table
@@ -1510,6 +1527,12 @@ impl<'a> System<'a> for GamePlaySystem {
                             size: blast.blast_radius
                         }
                     );
+                    sounds_channel.single_write(
+                        Sound(
+                            preloaded_sounds.blast,
+                            Point2::new(position.x, position.y)
+                        )
+                    );
                     // insert_channel.single_write(
                     //     InsertEvent::Explosion{
                     //         position: Point2::new(position.x, position.y),
@@ -1528,12 +1551,6 @@ impl<'a> System<'a> for GamePlaySystem {
                             let affected = 
                                 is_character && owner != char_entity ||
                                 entity != char_entity && (owner == char_entity || is_asteroid);
-                            sounds_channel.single_write(
-                                Sound(
-                                    preloaded_sounds.blast,
-                                    Point2::new(position.x, position.y)
-                                )
-                            );
                             if affected && (blast_position - position).norm() < blast.blast_radius {
                                 if process_damage(life, shields.get_mut(entity), blast.blast_damage) {
                                     if is_asteroid {
@@ -1569,8 +1586,15 @@ impl<'a> System<'a> for GamePlaySystem {
                 }
             }
             if coin.is_some() && (pos3d - collectable_position).norm() < COLLECT_RADIUS {
+                let mut rng = thread_rng();
+                let coin_number = rng.gen_range(0, 2);
+                let coin_sound = if coin_number == 0 {
+                    preloaded_sounds.coin
+                } else {
+                    preloaded_sounds.coin2
+                };
                 sounds_channel.single_write(Sound(
-                        preloaded_sounds.coin,
+                        coin_sound,
                         Point2::new(collectable_position.x, collectable_position.y)
                     )
                 );
@@ -1667,6 +1691,41 @@ impl<'a> System<'a> for GamePlaySystem {
                 insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
             }
         }
+        // TOOOOOO MANY COOPY PASTE %-P
+        stars_grid.grid.reset();
+        for (isometry, _stars) in (&isometries, &stars).join() {
+            let position = isometry.0.translation.vector;
+            let point = Point2::new(position.x, position.y);
+            match stars_grid.grid.update(point, true) {
+                Ok(_) => (),
+                Err(_) => ()
+            }
+        }
+
+        for i in 0..stars_grid.grid.size {
+            for j in 0..stars_grid.grid.size {
+                let value = *stars_grid.grid.get_cell_value(i, j);
+                if !value {
+                    let ((min_w, max_w), (min_h, max_h)) = stars_grid.grid.get_rectangle(i, j);
+                    let spawn_pos = spawn_in_rectangle(min_w, max_w, min_h, max_h);
+                    let mut rng = thread_rng();
+                    let angle = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
+                    insert_channel.single_write(InsertEvent::Stars {
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle)
+                    })
+                }
+            }
+        }
+
+        for (entity, isometry, _stars) in (&entities, &isometries, &stars).join() {
+            let pos3d = isometry.0.translation.vector;
+            if  (pos3d.x - character_position.x).abs() > stars_grid.grid.max_w ||
+                (pos3d.y - character_position.y).abs() > stars_grid.grid.max_h {
+                entities.delete(entity).unwrap();
+            }
+        }
+
+
         planet_grid.grid.reset();
         for (isometry, _planet) in (&isometries, &planets).join() {
             let position = isometry.0.translation.vector;

@@ -68,6 +68,7 @@ pub struct PreloadedSounds {
     pub enemy_shotgun: specs::Entity,
     pub collision: specs::Entity,
     pub coin: specs::Entity,
+    pub coin2: specs::Entity,
     pub exp: specs::Entity,
 }
 
@@ -145,6 +146,7 @@ pub fn init_sound<'a>(
         enemy_shotgun: name_to_sound["shot3"],
         collision: name_to_sound["collision"],
         coin: name_to_sound["coin"],
+        coin2: name_to_sound["coin2"],
         exp: name_to_sound["exp"]
     };
     let mut name_to_music: HashMap<String, Music> = HashMap::new();

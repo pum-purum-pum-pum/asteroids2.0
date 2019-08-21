@@ -36,6 +36,19 @@ impl PlanetGrid {
 }
 
 
+pub struct StarsGrid {
+    pub grid: Grid<bool>
+}
+
+impl StarsGrid {
+    pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
+        let grid = Grid::new(n, rw, rh, rbw, rbh);
+        StarsGrid {
+            grid: grid
+        }
+    }
+}
+
 pub struct Grid<T> {
     bricks: Vec<T>,
     x: f32, 
@@ -93,7 +106,6 @@ impl<T> Grid<T> where T: Default + Clone {
     }
 
     pub fn get_row(&self, y: f32) -> usize {
-        // assert_debug!();
         (self.n as i32 + ((self.rh + y - self.y) / (2.0 * self.rh)).floor() as i32) as usize
     }
 
@@ -142,7 +154,7 @@ impl<T> Grid<T> where T: Default + Clone {
     pub fn update(&mut self, point: Point2, value: T) -> Result<(), ()> {
         if (point.x - self.x).abs() < self.max_w && (point.y - self.y).abs() < self.max_h {
             let id = self.size * self.get_row(point.y) + 
-            self.get_column(point.x);
+                self.get_column(point.x);
             self.bricks[id] = value;
             return Ok(())
         }

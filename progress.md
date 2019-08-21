@@ -5,13 +5,18 @@
 <!-- * menu \/ -->
 
 MVP:
-* score table \/
-* scores by exp :) \/
-* different sounds for different explosions \/
-* sound position \sort of/
-* different coins sound collect tone
-
+<!-- * score table \/ -->
+<!-- * scores by exp :) \/ -->
+<!-- * different sounds for different explosions \/ -->
+<!-- * sound position \sort of/ -->
+<!-- * different coins sound collect tone \/ -->
+<!-- * avaliable upgrade primitive \/ -->
+<!-- * lifes and shields bars \/ -->
+* remove upgrade primitive when in selection process
+* make better stars
+* make better animations
 * ui selection
+* fix stars spawning bug
 * fix bug lazers dead
 * fix bug asteroid spawn
 * add harder placeholder waves at the end (mb just loop with improved stats..?)
