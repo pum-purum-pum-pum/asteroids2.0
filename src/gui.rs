@@ -1,6 +1,105 @@
 use crate::types::{*};
 use crate::components::{*};
-use crate::run::FINGER_NUMBER;
+use cfg_if::cfg_if;
+
+cfg_if! {
+    if #[cfg(any(target_os = "android"))] {
+        use crate::run::FINGER_NUMBER;
+        /// Note: ofcourse works only with orthographics projection
+        pub struct VecController {
+            position: Point2, // screen position, center
+            radius: f32,
+            stick_radius: f32,
+            _circle_image: Image,
+            controller_geometry: Primitive,
+        }
+
+        impl VecController {
+            pub fn new(position: Point2, radius: f32, stick_radius: f32, circle_image: Image) -> Self {
+                let controller_geometry = Primitive {
+                    kind: PrimitiveKind::Rectangle(Rectangle{
+                        position: position - Vector2::new(radius, radius), 
+                        width: 2.0 * radius, 
+                        height: 2.0 * radius,
+                        color: Point3::new(1.0, 1.0, 1.0)
+                    }),
+                    with_projection: false,
+                    image: Some(circle_image)
+                };
+                VecController {
+                    position: position,
+                    radius: radius,
+                    stick_radius: stick_radius,
+                    _circle_image: circle_image,
+                    controller_geometry: controller_geometry,
+                }
+            }
+
+            /// returns radius vector with lenght from 0 to 1 if updated
+            pub fn set(&self, id: usize, ingame_ui: &mut IngameUI,  touches: &Touches) -> Option<Vector2> {
+                ingame_ui.primitives.push(self.controller_geometry.clone());
+                for (touch_id, touch) in touches.iter().enumerate() {
+                    let previously_attached = 
+                        ingame_ui.widget_finger[touch_id].is_some() && 
+                        ingame_ui.widget_finger[touch_id].unwrap() == id;
+                    match touch {
+                        Some(touch) => {
+                            if self.is_in(touch) || previously_attached {
+                                let mut new_pos = Point2::new(touch.x_o, touch.y_o);
+                                let mut dir = new_pos - self.position;
+                                if dir.norm() > self.radius {
+                                    dir = dir.normalize() * self.radius;
+                                }
+                                new_pos = self.position + dir;
+                                // let new_pos = Point2::new(raw.x, raw.y);
+                                ingame_ui.widget_finger[touch_id] = Some(id);
+                                ingame_ui.primitives.push(
+                                    self.stick_geometry(new_pos)
+                                );
+                                return Some(self.get_rad(new_pos))
+                            };
+                        }
+                        None => {
+                            if previously_attached {
+                                ingame_ui.widget_finger[touch_id] = None;
+                            }
+                        }
+                    }
+                }
+                ingame_ui.primitives.push(
+                    self.stick_geometry(self.position)
+                );
+                None
+            }
+
+            fn get_rad(&self, finger_position: Point2) -> Vector2 {
+                (finger_position - self.position) / self.radius
+            }
+
+            pub fn stick_geometry(&self, new_pos: Point2) -> Primitive {
+                Primitive {
+                    kind: PrimitiveKind::Rectangle(Rectangle{
+                        position: new_pos, 
+                        width: self.stick_radius, 
+                        height: self.stick_radius,
+                        color: Point3::new(1.0, 1.0, 1.0)
+                    }),
+                    with_projection: false,
+                    image: None
+                }
+            }
+
+            pub fn is_in(&self, touch: &Finger) -> bool {
+                Vector2::new(
+                    self.position.x - touch.x_o, 
+                    self.position.y - touch.y_o
+                ).norm() < self.radius
+            }
+        }
+
+    }
+}
+
 
 fn check_in(x:f32, a: f32, b: f32) -> bool {
     x > a && x < b
@@ -13,101 +112,9 @@ pub struct IngameUI {
     _pressed_id: Option<usize>,
     // touch controls
     // for each finger we have id of pressed widget
+    #[cfg(any(target_os = "android"))]
     widget_finger: [Option<usize>; FINGER_NUMBER],
     pub primitives: Vec<Primitive>,
-}
-
-
-/// Note: ofcourse works only with orthographics projection
-pub struct VecController {
-    position: Point2, // screen position, center
-    radius: f32,
-    stick_radius: f32,
-    _circle_image: Image,
-    controller_geometry: Primitive,
-}
-
-impl VecController {
-    pub fn new(position: Point2, radius: f32, stick_radius: f32, circle_image: Image) -> Self {
-        let controller_geometry = Primitive {
-            kind: PrimitiveKind::Rectangle(Rectangle{
-                position: position - Vector2::new(radius, radius), 
-                width: 2.0 * radius, 
-                height: 2.0 * radius,
-                color: Point3::new(1.0, 1.0, 1.0)
-            }),
-            with_projection: false,
-            image: Some(circle_image)
-        };
-        VecController {
-            position: position,
-            radius: radius,
-            stick_radius: stick_radius,
-            _circle_image: circle_image,
-            controller_geometry: controller_geometry,
-        }
-    }
-
-    /// returns radius vector with lenght from 0 to 1 if updated
-    pub fn set(&self, id: usize, ingame_ui: &mut IngameUI,  touches: &Touches) -> Option<Vector2> {
-        ingame_ui.primitives.push(self.controller_geometry.clone());
-        for (touch_id, touch) in touches.iter().enumerate() {
-            let previously_attached = 
-                ingame_ui.widget_finger[touch_id].is_some() && 
-                ingame_ui.widget_finger[touch_id].unwrap() == id;
-            match touch {
-                Some(touch) => {
-                    if self.is_in(touch) || previously_attached {
-                        let mut new_pos = Point2::new(touch.x_o, touch.y_o);
-                        let mut dir = new_pos - self.position;
-                        if dir.norm() > self.radius {
-                            dir = dir.normalize() * self.radius;
-                        }
-                        new_pos = self.position + dir;
-                        // let new_pos = Point2::new(raw.x, raw.y);
-                        ingame_ui.widget_finger[touch_id] = Some(id);
-                        ingame_ui.primitives.push(
-                            self.stick_geometry(new_pos)
-                        );
-                        return Some(self.get_rad(new_pos))
-                    };
-                }
-                None => {
-                    if previously_attached {
-                        ingame_ui.widget_finger[touch_id] = None;
-                    }
-                }
-            }
-        }
-        ingame_ui.primitives.push(
-            self.stick_geometry(self.position)
-        );
-        None
-    }
-
-    fn get_rad(&self, finger_position: Point2) -> Vector2 {
-        (finger_position - self.position) / self.radius
-    }
-
-    pub fn stick_geometry(&self, new_pos: Point2) -> Primitive {
-        Primitive {
-            kind: PrimitiveKind::Rectangle(Rectangle{
-                position: new_pos, 
-                width: self.stick_radius, 
-                height: self.stick_radius,
-                color: Point3::new(1.0, 1.0, 1.0)
-            }),
-            with_projection: false,
-            image: None
-        }
-    }
-
-    pub fn is_in(&self, touch: &Finger) -> bool {
-        Vector2::new(
-            self.position.x - touch.x_o, 
-            self.position.y - touch.y_o
-        ).norm() < self.radius
-    }
 }
 
 pub struct Button {
@@ -175,10 +182,12 @@ impl Button {
     }
 
     pub fn get_text_box(&self) -> Primitive {
+        // TODO FIX
+        let crazy_position = Point2::new(self.position.x + self.width / 2.0, self.position.y + self.height / 2.0);
         Primitive{
             kind: PrimitiveKind::Text(
                 Text{
-                    position: self.position,
+                    position: crazy_position,
                     text: self.text.clone(),
                 },
             ),

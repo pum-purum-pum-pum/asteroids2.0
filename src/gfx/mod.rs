@@ -34,7 +34,6 @@ const Z_FAR: f32 = 15f32;
 const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
-const ENGINE_FAR: f32 = 3f32;
 
 pub fn get_view(observer: Point3) -> Isometry3 {
     let mut target = observer.clone();
@@ -214,7 +213,7 @@ pub fn create_shader_program(gl: &red::GL, name: &str, glsl_version: &str) -> Re
 
 pub enum RenderMode {
     StencilWrite,
-    StencilCheck,
+    _StencilCheck,
     Draw
 }
 
@@ -240,7 +239,7 @@ impl Into<DrawParams> for RenderMode {
                     ..Default::default()
                 }
             }
-            RenderMode::StencilCheck => {
+            RenderMode::_StencilCheck => {
                 red::DrawParams{
                     draw_type: DrawType::Standart,
                     stencil: Some(Stencil {
@@ -434,6 +433,7 @@ impl Canvas {
         geometry_data: &GeometryData,
         model: &Isometry3,
         render_mode: RenderMode,
+        color: Point3
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -445,6 +445,7 @@ impl Canvas {
         program.set_uniform("model", model);
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
+        program.set_uniform("color", (color.x, color.y, color.z));
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
         let draw_params = render_mode.into();
         frame.draw(

@@ -1,5 +1,6 @@
 use std::ops::AddAssign;
 use std::collections::{HashMap};
+use std::time::{Instant, Duration};
 
 pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
@@ -41,6 +42,32 @@ pub struct Waves (pub Vec<Wave>);
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct WavesSave (pub Vec<WaveSave>);
+
+pub struct Pallete {
+    pub life_color: Point3,
+    pub shield_color: Point3,
+    pub experience_color: Point3,
+    pub white_color: Point3,
+    pub grey_color: Point3,
+}
+
+impl Pallete {
+    pub fn new() -> Self {
+        let life_color = Point3::new(0.5, 0.9, 0.7); // TODO move in consts?
+        let shield_color = Point3::new(0.5, 0.7, 0.9); 
+        let experience_color = Point3::new(0.8, 0.8, 0.8);
+        let white_color = Point3::new(1.0, 1.0, 1.0);
+        let grey_color = Point3::new(0.5, 0.5, 0.5);
+
+        Pallete {
+            life_color: life_color,
+            shield_color: shield_color,
+            experience_color: experience_color,
+            white_color: white_color,
+            grey_color: grey_color
+        }
+    }
+}
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Wave {
@@ -123,7 +150,7 @@ pub enum InsertEvent {
         velocity: Point2,
         damage: usize,
         owner: specs::Entity,
-        lifetime: usize,
+        lifetime: Duration,
         bullet_image: Image,
         blast: Option<Blast>
     },
@@ -145,13 +172,8 @@ pub enum InsertEvent {
     Explosion {
         position: Point2,
         num: usize,
-        lifetime: usize,
+        lifetime: Duration,
         with_animation: bool
-    },
-    Engine {
-        position: Point2,
-        num: usize,
-        attached: AttachPosition
     },
     Nebula {
         iso: Point3
@@ -165,7 +187,7 @@ pub enum InsertEvent {
     Wobble(f32),
     Animation {
         animation: Animation,
-        lifetime: usize,
+        lifetime: Duration,
         pos: Point2,
         size: f32
     }
@@ -213,7 +235,7 @@ pub enum AIType {
     Aim,
     Rotate(f32),
     Kamikadze,
-    Charging(usize)
+    Charging(Duration)
 }
 
 #[derive(Debug, Clone, Copy, Component, Serialize, Deserialize)]
@@ -262,11 +284,6 @@ impl Default for AppState {
     }
 }
 
-#[derive(Default, Debug)]
-pub struct Stat {
-    pub asteroids_number: usize,
-}
-
 #[derive(Component, Debug, Clone, Copy)]
 pub struct BlockSegment {
     pub point1: Point2, 
@@ -276,26 +293,34 @@ pub struct BlockSegment {
 #[derive(Component, Debug, Clone)]
 pub enum Geometry {
     Circle { radius: f32 },
-    Segment(BlockSegment),
     Polygon(Polygon),
 }
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Charge {
-    pub recharge_state: usize,
-    pub recharge_time: usize,
+    pub recharge_start: Instant,
+    pub recharge_time: Duration,
+}
+
+impl Charge {
+    pub fn new(recharge_time: Duration) -> Self {
+        Charge {
+            recharge_start: Instant::now(),
+            recharge_time: recharge_time,
+        }
+    }
 }
 
 impl Gun for Charge {
-    fn recharge_state(&self) -> usize {
-        self.recharge_state
+    fn recharge_start(&self) -> Instant {
+        self.recharge_start
     }
 
-    fn set_recharge_state(&mut self, recharge_state: usize) {
-        self.recharge_state = recharge_state;
+    fn set_recharge_start(&mut self, recharge_start: Instant) {
+        self.recharge_start = recharge_start;
     }
 
-    fn recharge_time(&self) -> usize {
+    fn recharge_time(&self) -> Duration {
         self.recharge_time
     }
 
@@ -410,6 +435,7 @@ pub struct PreloadedImages {
     pub coin: specs::Entity,
     pub exp: specs::Entity,
     pub bar: specs::Entity,
+    pub upg_bar: specs::Entity,
     pub explosion: Animation,
     pub blast: Animation,
     pub bullet_contact: Animation,
@@ -541,24 +567,20 @@ pub struct Exp(pub usize);
 
 #[derive(Component)]
 pub struct Lifetime {
-    life_state: usize,
-    life_time: usize,
+    start_time: Instant,
+    lifetime: Duration,
 }
 
 impl Lifetime {
-    pub fn new(live_time: usize) -> Self {
+    pub fn new(lifetime: Duration) -> Self {
         Lifetime {
-            life_state: 0usize,
-            life_time: live_time,
+            start_time: Instant::now(),
+            lifetime: lifetime,
         }
     }
 
-    pub fn update(&mut self) {
-        self.life_state = usize::min(self.life_time, self.life_state + 1usize);
-    }
-
     pub fn delete(&self) -> bool {
-        self.life_state >= self.life_time
+        Instant::now() - self.start_time > self.lifetime
     }
 }
 
@@ -698,26 +720,20 @@ impl Lazer {
 }
 
 pub trait Gun {
-    fn recharge_state(&self) -> usize;
+    fn recharge_start(&self) -> Instant;
 
-    fn set_recharge_state(&mut self, recharge_state: usize);
+    fn set_recharge_start(&mut self, recharge_state: Instant);
 
-    fn recharge_time(&self) -> usize;
-
-    fn update(&mut self) {
-        self.set_recharge_state(usize::min(self.recharge_time(), self.recharge_state() + 1usize));
-        // self.recharge_state = usize::min(self.recharge_time, self.recharge_state + 1usize);
-    }
+    fn recharge_time(&self) -> Duration;
 
     fn is_ready(&self) -> bool {
-        self.recharge_state() >= self.recharge_time()
-        // self.recharge_state >= self.recharge_time
+        Instant::now().duration_since(self.recharge_start()) >= self.recharge_time()
     }
 
     fn shoot(&mut self) -> bool {
         let result = self.is_ready();
         if result {
-            self.set_recharge_state(0usize)
+            self.set_recharge_start(Instant::now());
         };
         result
     }
@@ -735,25 +751,24 @@ pub trait Gun {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct ShotGun {
-    recharge_state: usize,
-    pub recharge_time: usize,
+    recharge_start: Instant,
+    pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub side_projectiles_number: usize,
     pub angle_shift: f32,
     pub bullet_speed: f32,
-    pub bullet_lifetime: usize,
+    pub bullet_lifetime: Duration,
     pub bullet_image: Image
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct ShotGunSave {
-    recharge_state: usize,
-    pub recharge_time: usize,
+    pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub side_projectiles_number: usize,
     pub angle_shift: f32,
     pub bullet_speed: f32,    
-    pub bullet_lifetime: usize,
+    pub bullet_lifetime: Duration,
     pub bullet_image: String
 }
 
@@ -773,16 +788,16 @@ impl ShotGunSave {
 
 impl ShotGun {
     pub fn new(
-        recharge_time: usize, 
+        recharge_time: Duration, 
         bullets_damage: usize, 
         side_projectiles_number: usize, 
         angle_shift: f32, 
         bullet_speed: f32,
-        bullet_lifetime: usize,
+        bullet_lifetime: Duration,
         bullet_image: Image,
     ) -> Self {
         Self {
-            recharge_state: 0usize,
+            recharge_start: Instant::now(),
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             side_projectiles_number: side_projectiles_number,
@@ -795,15 +810,15 @@ impl ShotGun {
 }
 
 impl Gun for ShotGun {
-    fn recharge_state(&self) -> usize {
-        self.recharge_state
+    fn recharge_start(&self) -> Instant {
+        self.recharge_start
     }
 
-    fn set_recharge_state(&mut self, recharge_state: usize) {
-        self.recharge_state = recharge_state;
+    fn set_recharge_start(&mut self, recharge_start: Instant) {
+        self.recharge_start = recharge_start;
     }
 
-    fn recharge_time(&self) -> usize {
+    fn recharge_time(&self) -> Duration {
         self.recharge_time
     }
 
@@ -871,21 +886,20 @@ impl Gun for ShotGun {
 /// gun reloading status and time
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Blaster {
-    recharge_state: usize,
-    pub recharge_time: usize,
+    recharge_start: Instant,
+    pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
-    pub bullet_lifetime: usize,
+    pub bullet_lifetime: Duration,
     pub bullet_image: Image
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct BlasterSave {
-    pub recharge_state: usize,
-    pub recharge_time: usize,
+    pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
-    pub bullet_lifetime: usize,
+    pub bullet_lifetime: Duration,
     pub bullet_image: String
 }
 
@@ -903,14 +917,14 @@ impl BlasterSave {
 
 impl Blaster {
     pub fn new(
-        recharge_time: usize, 
+        recharge_time: Duration, 
         bullets_damage: usize, 
         bullet_speed: f32, 
-        bullet_lifetime: usize, 
+        bullet_lifetime: Duration, 
         bullet_image: Image
     ) -> Self {
         Self {
-            recharge_state: 0usize,
+            recharge_start: Instant::now(),
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
@@ -921,15 +935,15 @@ impl Blaster {
 }
 
 impl Gun for Blaster {
-    fn recharge_state(&self) -> usize {
-        self.recharge_state
+    fn recharge_start(&self) -> Instant {
+        self.recharge_start
     }
 
-    fn set_recharge_state(&mut self, recharge_state: usize) {
-        self.recharge_state = recharge_state;
+    fn set_recharge_start(&mut self, recharge_start: Instant) {
+        self.recharge_start = recharge_start;
     }
 
-    fn recharge_time(&self) -> usize {
+    fn recharge_time(&self) -> Duration {
         self.recharge_time
     }
 
@@ -972,23 +986,22 @@ impl Gun for Blaster {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Cannon {
-    recharge_state: usize,
-    pub recharge_time: usize,
+    recharge_start: Instant,
+    pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
-    pub bullet_lifetime: usize,
+    pub bullet_lifetime: Duration,
     pub bullet_image: Image
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct CannonSave {
-    recharge_state: usize,
-    pub recharge_time: usize,
+    pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
-    pub bullet_lifetime: usize,
+    pub bullet_lifetime: Duration,
     pub bullet_image: String
 }
 
@@ -1007,15 +1020,15 @@ impl CannonSave {
 
 impl Cannon {
     pub fn new(
-        recharge_time: usize, 
+        recharge_time: Duration, 
         bullets_damage: usize, 
         bullet_speed: f32, 
         bullet_blast: Blast, 
-        bullet_lifetime: usize,
+        bullet_lifetime: Duration,
         bullet_image: Image,
     ) -> Self {
         Self {
-            recharge_state: 0usize,
+            recharge_start: Instant::now(),
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
@@ -1027,15 +1040,15 @@ impl Cannon {
 }
 
 impl Gun for Cannon {
-    fn recharge_state(&self) -> usize {
-        self.recharge_state
+    fn recharge_start(&self) -> Instant {
+        self.recharge_start
     }
 
-    fn set_recharge_state(&mut self, recharge_state: usize) {
-        self.recharge_state = recharge_state;
+    fn set_recharge_start(&mut self, recharge_start: Instant) {
+        self.recharge_start = recharge_start;
     }
 
-    fn recharge_time(&self) -> usize {
+    fn recharge_time(&self) -> Duration {
         self.recharge_time
     }
 

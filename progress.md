@@ -3,8 +3,50 @@
 <!-- * effect on bullet impact \/ -->
 <!-- * bullet lifetime in gun desc \/ -->
 <!-- * menu \/ -->
+* video<!-- 
+* * show blaster
+* * show lazer
+* * show shotgun
+* * show destruction
+* * show upgrades
+* * show boss fight
+* * struggle (oo -->ps)
 
-MVP:
+
+
+ HUGE REFACTORING:
+ * warnings \/
+ * undersigns \/
+ * fix timers
+ * * think about animations
+ * fix progress file
+ * one struct for blaster and shotgun
+ * comments 
+ * move high level gfx into different crate?
+ * gui simplify
+ * go through TODO tags
+ * rendering simplify
+ * damage processing simplifyz
+* debug stuff rendering separately
+
+ This week devlog todo
+
+
+
+VIDEO
+
+PEOPLE
+* handmade network
+* indiedev subreddit
+* indiegaming subreddit
+* indiedb
+* rusty
+* * russia rust community forum??
+* russia
+* * make vk group
+* * indiecator
+
+<!-- PREVIEW: -->
 <!-- * score table \/ -->
 <!-- * scores by exp :) \/ -->
 <!-- * different sounds for different explosions \/ -->
@@ -12,13 +54,21 @@ MVP:
 <!-- * different coins sound collect tone \/ -->
 <!-- * avaliable upgrade primitive \/ -->
 <!-- * lifes and shields bars \/ -->
-* remove upgrade primitive when in selection process
-* make better stars
-* make better animations
+<!-- * remove upgrade primitive when in selection process \/ -->
+<!-- * make better stars \/ -->
+<!-- * fix ui text \/ -->
+* heal collectables from asteroids and remove regeneration
+* new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading?
+* add taran upgrade
 * ui selection
+* coins
+* buy sound
+* better lazer sound
+* fix cheating when upgrading
 * fix stars spawning bug
 * fix bug lazers dead
 * fix bug asteroid spawn
+* make better animations
 * add harder placeholder waves at the end (mb just loop with improved stats..?)
 * ship buying on coins
 

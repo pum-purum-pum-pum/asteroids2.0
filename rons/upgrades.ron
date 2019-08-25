@@ -22,7 +22,7 @@
     ),
     (
         upgrade_type: ShipRotationSpeed,
-        image: "rotation_speed",
+        image: "ship_rotation",
         name: "Ship rotation speed",
         description: "Improves rotation speed by X%",
         assigned: [General]

@@ -2,6 +2,7 @@ use crate::gfx::{TextData, RenderMode};
 use std::collections::{HashMap};
 
 use super::*;
+#[cfg(any(target_os = "android"))]
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
 use crate::geometry::{shadow_geometry};
@@ -157,7 +158,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let button_w = w/6f32;
         let button_h = button_w;
         let mut buttons = vec![];
-        let buttons_names = vec!["Lazer", "Blaster", "Shotgun"];
+        let buttons_names = vec!["", "", ""];
         let buttons_num = buttons_names.len();
         let button_images = vec![
             preloaded_images.lazer, 
@@ -190,15 +191,17 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let score_table_button = Button::new(
             Point2::new(w / 2.0, 1.5 * button_h + shift_between),
             button_w,
-            button_h,
+            button_h / 5.0,
             Point3::new(0f32, 0f32, 0f32),
             false,
-            None,
+            Some(Image(preloaded_images.upg_bar)),
             "Score Table".to_string()
         );
         if score_table_button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::ScoreTable;
         }
+        let button_w = button_w / 2.0;
+        let button_h = button_w;
         let button = Button::new(
             Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
             // Point2::new(0f32, 0f32),
@@ -252,7 +255,7 @@ pub fn render_primitives<'a>(
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
-    let scale = Scale::uniform(((w * w + h * h).sqrt() / 8000.0 * mouse.hdpi as f32).round());
+    let scale = Scale::uniform(((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round());
     for primitive in primitives_channel.read(reader) {
         match primitive {
             Primitive {
@@ -300,12 +303,16 @@ pub fn render_primitives<'a>(
                 with_projection: _,
                 image: _
             } => {
+                use glyph_brush::{Layout, HorizontalAlign, VerticalAlign};
                 text_data.glyph_brush.queue(Section {
                     text: &text.text,
                     scale,
                     screen_position: (text.position.x, text.position.y),
-                    bounds: (w /3.15, h),
+                    // bounds: (w /3.15, h),
                     color: [1.0, 1.0, 1.0, 1.0],
+                    layout: Layout::default()
+                        .h_align(HorizontalAlign::Center)
+                        .v_align(VerticalAlign::Center),
                     ..Section::default()
                 });
             }
@@ -318,6 +325,193 @@ pub fn render_primitives<'a>(
     );
 }
 
+
+#[derive(Default)]
+pub struct UpgradeGUI;
+
+impl<'a> System<'a> for UpgradeGUI {
+    type SystemData = (
+        (
+            Entities<'a>,
+            ReadStorage<'a, CharacterMarker>,
+            WriteStorage<'a, Blaster>,
+            WriteStorage<'a, ShipStats>,
+            ReadExpect<'a, red::Viewport>,
+        ),
+        Write<'a, IngameUI>,
+        Write<'a, AppState>,
+        Read<'a, Mouse>,
+        WriteExpect<'a, PreloadedImages>,
+        Read<'a, AvaliableUpgrades>,
+        Write<'a, SpawnedUpgrades>,
+        WriteExpect<'a, ChoosedUpgrade>,
+        ReadExpect<'a, Pallete>,
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        let (
+            (
+                entities,
+                character_markers,
+                mut blasters,
+                mut ships_stats,
+                viewport,
+            ),
+            // preloaded_particles,
+            mut ingame_ui,
+            mut app_state,
+            mouse,
+            preloaded_images,
+            avaliable_upgrades,
+            mut spawned_upgrades,
+            mut choosed_upgrade,
+            pallete
+        ) = data;
+        let dims = viewport.dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
+        let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
+        // upgrade UI
+        let mut current_upgrade = None;
+        let upgrade_button_w = (w/4f32).min(h/2f32);
+        let upgrade_button_h = upgrade_button_w;
+        let (choose_button_w, choose_button_h) = (w/6f32, h/10f32);
+        let shift = upgrade_button_h / 10f32;
+        match *app_state {
+            AppState::Play(PlayState::Upgrade) => {
+                let upgrades = spawned_upgrades.last();
+                if let Some(upgrades) = upgrades {
+                    for (i, upg_id) in upgrades.iter().enumerate() {
+                        let upg = &avaliable_upgrades[*upg_id];
+                        let current_point = 
+                            Point2::new(
+                                w / 2.0 - upgrade_button_w - shift 
+                                + i as f32 * (upgrade_button_w + shift), 
+                                shift
+                            );
+                        let mut w_add = 0f32;
+                        let mut h_add = 0f32;
+                        if let Some(id) = choosed_upgrade.0 {
+                            if id == *upg_id {
+                                w_add = upgrade_button_w * 0.1;
+                                h_add = upgrade_button_h * 0.1;
+                            }
+                        }
+                        let upgrade_button = Button::new(
+                            current_point - Vector2::new(w_add / 2.0, h_add / 2.0),
+                            upgrade_button_w + w_add, upgrade_button_h + h_add, 
+                            pallete.white_color.clone(), 
+                            false,
+                            Some(upg.image),
+                            "".to_string()
+                        );
+                        ingame_ui.primitives.push(
+                            Primitive {
+                                kind: PrimitiveKind::Text(Text {
+                                    position: Point2::new(current_point.x + upgrade_button_h / 2.0, upgrade_button_h + 2.0 * shift),
+                                    text: upg.name.clone()
+                                }),
+                                with_projection: false,
+                                image: None
+                            }
+                        );
+                        // upg.name.clone()
+                        if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
+                            // choosed_upgrade = Some(upg.upgrade_type);
+                            choosed_upgrade.0 = Some(*upg_id);
+                            // *app_state = AppState::Play(PlayState::Action);
+                            // with multytouch things it's not cheatable
+                        }
+                    }
+                }
+                let select_upgrade = Button::new(
+                    Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
+                    choose_button_w, choose_button_h, 
+                    pallete.grey_color.clone(), 
+                    false,
+                    Some(Image(preloaded_images.upg_bar)),
+                    "Upgrade!".to_string()
+                );
+
+                if spawned_upgrades.len() > 0 {
+                    if let Some(upgrade) = choosed_upgrade.0 {
+                        ingame_ui.primitives.push(
+                            Primitive {
+                                kind: PrimitiveKind::Text(Text {
+                                    position: Point2::new(w / 2.0, upgrade_button_h + 4.0 * shift),
+                                    text: avaliable_upgrades[upgrade].description.clone()
+                                }),
+                                with_projection: false,
+                                image: None
+                            }
+                        );
+                        if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
+                            current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
+                            choosed_upgrade.0 = None;
+                            spawned_upgrades.pop();
+                        }
+                    }
+                }
+                let done_button = Button::new(
+                    Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
+                    choose_button_w, choose_button_h, 
+                    pallete.grey_color.clone(), 
+                    false,
+                    Some(Image(preloaded_images.upg_bar)),
+                    "Done".to_string()
+                );
+                if done_button.place_and_check(&mut ingame_ui, &*mouse) {
+                    *app_state = AppState::Play(PlayState::Action);
+                }
+            }
+            _ => ()
+        }
+
+
+        match current_upgrade {
+            Some(choosed_upgrade) => {
+                match choosed_upgrade {
+                    UpgradeType::AttackSpeed => {
+                        match blasters.get_mut(character) {
+                            Some(gun) => {
+                                let recharge_time_millis = (gun.recharge_time.as_millis() as f32 * 0.9) as u64;
+                                gun.recharge_time = Duration::from_millis(recharge_time_millis);
+                            }
+                            None => ()
+                        }
+                    }
+                    UpgradeType::ShipSpeed => {
+                        ship_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
+                    }
+                    UpgradeType::ShipRotationSpeed => {
+                        ship_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
+                    }
+                    UpgradeType::BulletSpeed => {
+                        match blasters.get_mut(character) {
+                            Some(gun) => {
+                                gun.bullet_speed += 0.1 * BULLET_SPEED_INIT;
+                            }
+                            None => ()
+                        }
+                    }
+                    UpgradeType::HealthRegen => {
+                        ship_stats.health_regen += 1;
+                    }
+                    UpgradeType::ShieldRegen => {
+                        ship_stats.shield_regen += 1;
+                    }
+                    UpgradeType::HealthSize => {
+                        ship_stats.max_health += 20;
+                    }
+                    UpgradeType::ShieldSize => {
+                        ship_stats.max_shield += 20;
+                    }
+                }
+            }
+            None => ()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct GUISystem;
 
@@ -325,130 +519,63 @@ impl<'a> System<'a> for GUISystem {
     type SystemData = (
         (
             Entities<'a>,
-            ReadStorage<'a, Isometry>,
-            WriteStorage<'a, Velocity>,
-            ReadStorage<'a, PhysicsComponent>,
             ReadStorage<'a, CharacterMarker>,
-            ReadStorage<'a, ShipMarker>,
             ReadStorage<'a, Lifes>,
             ReadStorage<'a, Shield>,
-            WriteStorage<'a, Spin>,
-            WriteStorage<'a, Blaster>,
             WriteStorage<'a, ShipStats>,
             ReadExpect<'a, red::Viewport>,
         ),
-        Write<'a, World<f32>>,
-        Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         Read<'a, Progress>,
-        Write<'a, AppState>,
         Read<'a, Mouse>,
         WriteExpect<'a, PreloadedImages>,
-        ReadExpect<'a, PreloadedSounds>,
-        Write<'a, Touches>,
-        Write<'a, EventChannel<Sound>>,
-        Write<'a, EventChannel<InsertEvent>>,
-        Read<'a, AvaliableUpgrades>,
         Write<'a, SpawnedUpgrades>,
-        WriteExpect<'a, ChoosedUpgrade>,
         Read<'a, CurrentWave>,
+        ReadExpect<'a, Pallete>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
           let (
             (
                 entities,
-                _isometries,
-                _velocities,
-                _physics,
                 character_markers,
-                _ship_markers,
                 lifes,
                 shields,
-                _spins,
-                mut blasters,
                 mut ships_stats,
                 viewport,
             ),
             // preloaded_particles,
-            _world,
-            _primitives_channel,
             mut ingame_ui,
             progress,
-            mut app_state,
             mouse,
             preloaded_images,
-            _preloaded_sounds,
-            _touches,
-            _sounds_channel,
-            _insert_channel,
-            avaliable_upgrades,
-            mut spawned_upgrades,
-            mut choosed_upgrade,
-            current_wave
+            spawned_upgrades,
+            current_wave,
+            pallete
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let d = (w * w + h * h).sqrt();
-        let life_color = Point3::new(0.5, 0.9, 0.7); // TODO move in consts?
-        let shield_color = Point3::new(0.5, 0.7, 0.9); 
-        let experience_color = Point3::new(0.8, 0.8, 0.8);
-        let white_color = Point3::new(1.0, 1.0, 1.0);
-        let grey_color = Point3::new(0.5, 0.5, 0.5);
-
         //contorls
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
         let stick_size = w / 80.0;
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
         let ctrl_size = stick_size * 10.0;
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
         let move_controller = VecController::new(
             Point2::new(ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
             Image(preloaded_images.circle)
         );
+        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
         let attack_controller = VecController::new(
             Point2::new(w - ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
             Image(preloaded_images.circle)
-        );
-
-            // UNCOMMENT TO ADD LIFE BARS
-        // lifes and shields bars
-        // for (entity, isometry, life, ship_stats, _ship) in (&entities, &isometries, &lifes, &ships_stats, &ship_markers).join() {
-        //     let shield = shields.get(entity);
-        //     // dbg!("draw lifes and shields");
-        //     let position = isometry.0.translation.vector;
-        //     let ship_lifes_bar = Rectangle {
-        //         position: Point2::new(position.x, position.y),
-        //         width: (life.0 as f32/ ship_stats.max_health as f32) * 1.5,
-        //         height: 0.1,
-        //         color: life_color.clone()
-        //     };
-            // if let Some(shield) = shield  {
-            //     let ship_shield_bar = Rectangle {
-            //         position: Point2::new(position.x, position.y - 1.0),
-            //         width: (shield.0 as f32/ ship_stats.max_shield as f32) * 1.5,
-            //         height: 0.1,
-            //         color: shield_color.clone()
-            //     };
-            //     ingame_ui.primitives.push(
-            //         Primitive {
-            //             kind: PrimitiveKind::Rectangle(ship_shield_bar),
-            //             with_projection: true,
-            //             image: None
-            //         }
-            //     )
-            // }
-            // ingame_ui.primitives.push(
-            //     Primitive {
-            //         kind: PrimitiveKind::Rectangle(ship_lifes_bar),
-            //         with_projection: true,
-            //         image: None
-            //     }
-            // );
-        // }
-        
-        let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
+        );        
+        let (_character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
         // move controller
         #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
         {  
@@ -560,22 +687,7 @@ impl<'a> System<'a> for GUISystem {
             }
         );
 
-        ingame_ui.primitives.push(
-            Primitive {
-                kind: PrimitiveKind::Text(Text {
-                    position: Point2::new(w/20.0, h / 20.0), 
-                    text: format!(
-                        "Experience: {} %, \n Level {}",
-                        100 * progress.experience / progress.current_max_experience() as usize, 
-                        progress.level
-                    ).to_string()
-                }),
-                with_projection: false,
-                image: None
-            }
-        );
-
-        let (character, _) = (&entities, &character_markers).join().next().unwrap();
+        let (_character, _) = (&entities, &character_markers).join().next().unwrap();
         // "UI" things
         // experience and level bars
         let experiencebar_w = w / 5.0;
@@ -585,21 +697,34 @@ impl<'a> System<'a> for GUISystem {
             position: experience_position,
             width: (progress.experience as f32 / progress.current_max_experience() as f32) * experiencebar_w,
             height: experiencebar_h,
-            color: experience_color.clone()
+            color: pallete.experience_color.clone()
         };
-        let experience_bar_back = Rectangle {
-            position: experience_position,
-            width: experiencebar_w,
-            height: experiencebar_h,
-            color: white_color.clone()
-        };
-        ingame_ui.primitives.push(
-            Primitive {
-                kind: PrimitiveKind::Rectangle(experience_bar_back),
-                with_projection: false,
-                image: None
-            }
+
+        let border = d / 200f32;
+        let back_bar = Button::new(
+            experience_position + Vector2::new(-border/2.0, -border/2.0),
+            experiencebar_w + border,
+            experiencebar_h + border,
+            Point3::new(0f32, 0f32, 0f32),
+            false,
+            Some(Image(preloaded_images.bar)),
+            "".to_string()
         );
+        back_bar.place_and_check(&mut ingame_ui, &*mouse);
+
+        // let experience_bar_back = Rectangle {
+        //     position: experience_position,
+        //     width: experiencebar_w,
+        //     height: experiencebar_h,
+        //     color: pallete.white_color.clone()
+        // };
+        // ingame_ui.primitives.push(
+        //     Primitive {
+        //         kind: PrimitiveKind::Rectangle(experience_bar_back),
+        //         with_projection: false,
+        //         image: None
+        //     }
+        // );
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Rectangle(experience_bar),
@@ -613,127 +738,6 @@ impl<'a> System<'a> for GUISystem {
         //     height: 0.1,
         //     color: white_color
         // };
-
-        // upgrade UI
-        let mut current_upgrade = None;
-        let upgrade_button_w = (w/4f32).min(h/2f32);
-        let upgrade_button_h = upgrade_button_w;
-        let (choose_button_w, choose_button_h) = (w/6f32, h/12f32);
-        let shift = upgrade_button_h / 10f32;
-        match *app_state {
-            AppState::Play(PlayState::Upgrade) => {
-                let upgrades = spawned_upgrades.last();
-                if let Some(upgrades) = upgrades {
-                    for (i, upg_id) in upgrades.iter().enumerate() {
-                        let upg = &avaliable_upgrades[*upg_id];
-                        let current_point = 
-                            Point2::new(
-                                w / 2.0 - upgrade_button_w - shift 
-                                + i as f32 * (upgrade_button_w + shift), 
-                                upgrade_button_h / 2.0 + shift
-                            );
-                        let upgrade_button = Button::new(
-                            current_point,
-                            upgrade_button_w, upgrade_button_h, 
-                            white_color.clone(), 
-                            false,
-                            Some(upg.image),
-                            upg.name.clone()
-                        );
-                        if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
-                            // choosed_upgrade = Some(upg.upgrade_type);
-                            choosed_upgrade.0 = Some(*upg_id);
-                            // *app_state = AppState::Play(PlayState::Action);
-                            // with multytouch things it's not cheatable
-                        }
-                    }
-                }
-                let select_upgrade = Button::new(
-                    Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
-                    choose_button_w, choose_button_h, 
-                    grey_color.clone(), 
-                    false,
-                    None,
-                    "Upgrade!".to_string()
-                );
-
-                if spawned_upgrades.len() > 0 {
-                    if let Some(upgrade) = choosed_upgrade.0 {
-                        ingame_ui.primitives.push(
-                            Primitive {
-                                kind: PrimitiveKind::Text(Text {
-                                    position: Point2::new(w/4.0, upgrade_button_h + shift),
-                                    text: avaliable_upgrades[upgrade].description.clone()
-                                }),
-                                with_projection: false,
-                                image: None
-                            }
-                        );                    
-                        if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
-                            current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
-                            choosed_upgrade.0 = None;
-                            spawned_upgrades.pop();
-                        }
-                    }
-                }
-                let done_button = Button::new(
-                    Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
-                    choose_button_w, choose_button_h, 
-                    grey_color.clone(), 
-                    false,
-                    None,
-                    "Done".to_string()
-                );
-                if done_button.place_and_check(&mut ingame_ui, &*mouse) {
-                    *app_state = AppState::Play(PlayState::Action);
-                }
-            }
-            _ => ()
-        }
-
-
-        match current_upgrade {
-            Some(choosed_upgrade) => {
-                match choosed_upgrade {
-                    UpgradeType::AttackSpeed => {
-                        match blasters.get_mut(character) {
-                            Some(gun) => {
-                                gun.recharge_time = (gun.recharge_time as f32 * 0.9) as usize;
-                            }
-                            None => ()
-                        }
-                    }
-                    UpgradeType::ShipSpeed => {
-                        ship_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
-                    }
-                    UpgradeType::ShipRotationSpeed => {
-                        ship_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
-                    }
-                    UpgradeType::BulletSpeed => {
-                        match blasters.get_mut(character) {
-                            Some(gun) => {
-                                gun.bullet_speed += 0.1 * BULLET_SPEED_INIT;
-                            }
-                            None => ()
-                        }
-                    }
-                    UpgradeType::HealthRegen => {
-                        ship_stats.health_regen += 1;
-                    }
-                    UpgradeType::ShieldRegen => {
-                        ship_stats.shield_regen += 1;
-                    }
-                    UpgradeType::HealthSize => {
-                        ship_stats.max_health += 20;
-                    }
-                    UpgradeType::ShieldSize => {
-                        ship_stats.max_shield += 20;
-                    }
-                }
-            }
-            None => ()
-        }
-
         if spawned_upgrades.len() > 0 {
         // {
             let (upgrade_bar_w, upgrade_bar_h) = (w / 3f32, h / 10.0);
@@ -743,7 +747,7 @@ impl<'a> System<'a> for GUISystem {
                 upgrade_bar_h,
                 Point3::new(0f32, 0f32, 0f32),
                 false,
-                Some(Image(preloaded_images.bar)),
+                Some(Image(preloaded_images.upg_bar)),
                 "Upgrade avaliable!".to_string()
             );
             upgrade_bar.place_and_check(&mut ingame_ui, &*mouse);
@@ -753,7 +757,7 @@ impl<'a> System<'a> for GUISystem {
         let shields_y = health_y + h / 13.0;
         for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
             {   // upgrade bar
-                let border = d / 106f32;
+                let border = d / 200f32;
                 let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
                 let back_bar = Button::new(
                     Point2::new(w/2.0 - health_back_w / 2.0, health_y - border / 2.0),
@@ -766,7 +770,6 @@ impl<'a> System<'a> for GUISystem {
                 );
                 back_bar.place_and_check(&mut ingame_ui, &*mouse);
 
-                let border = d / 200f32;
                 let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
                 let back_bar = Button::new(
                     Point2::new(w/2.0 - health_back_w / 2.0, shields_y - border / 2.0),
@@ -785,13 +788,13 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, health_y),
                 width: (life.0 as f32 / ship_stats.max_health as f32) * lifebar_w,
                 height: lifebar_h,
-                color: life_color.clone()
+                color: pallete.life_color.clone()
             };
             let shields_bar = Rectangle {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, shields_y),
                 width: (shield.0 as f32 / ship_stats.max_shield as f32) * lifebar_w,
                 height: lifebar_h,
-                color: shield_color
+                color: pallete.shield_color
             };
             ingame_ui.primitives.push(
                 Primitive {
@@ -848,7 +851,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Coin>,
             ReadStorage<'a, Exp>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
-            WriteStorage<'a, MultyLazer>,
+            ReadStorage<'a, MultyLazer>,
         ),
         Read<'a, Mouse>,
         ReadExpect<'a, ThreadPin<red::GL>>,
@@ -859,7 +862,6 @@ impl<'a> System<'a> for RenderingSystem {
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
-        WriteExpect<'a, NebulaGrid>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -887,7 +889,7 @@ impl<'a> System<'a> for RenderingSystem {
                 coins,
                 exps,
                 mut particles_datas,
-                mut multy_lazers,
+                multy_lazers,
             ),
             mouse,
             gl,
@@ -898,16 +900,14 @@ impl<'a> System<'a> for RenderingSystem {
             mut primitives_channel,
             mut ingame_ui,
             mut text_data,
-            nebula_grid
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.015, 0.004, 0.0, 1.0);
         // frame.set_clear_color(0.15, 0.004, 0.0, 1.0);
         frame.set_clear_stencil(0);
         frame.clear_color_and_stencil();
-        let (char_iso, char_pos, char_vel) = {
+        let (_char_iso, char_pos) = {
             let mut opt_iso = None;
-            let mut opt_vel = None;
             for (iso, vel, _) in (&isometries, &velocities, &character_markers).join() {
                 canvas.update_observer(
                     Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
@@ -915,12 +915,10 @@ impl<'a> System<'a> for RenderingSystem {
                     Vector2::new(mouse.x01, mouse.y01).normalize()
                 );
                 opt_iso = Some(iso);
-                opt_vel = Some(vel);
             }
             (
                 opt_iso.unwrap().0,
                 opt_iso.unwrap().0.translation.vector,
-                opt_vel.unwrap().0
             )
         };
         for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
@@ -941,13 +939,15 @@ impl<'a> System<'a> for RenderingSystem {
                     &shadow_triangulation.indicies)
                 .unwrap();
                 let iso = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
+                // draw shadows
                 canvas
                     .render_geometry(
                         &gl, &viewport,
                         &mut frame,
                         &geometry_data,
                         &iso,
-                        RenderMode::StencilWrite
+                        RenderMode::StencilWrite,
+                        Point3::new(0f32, 0f32, 0f32)
                     );
             }
         }
@@ -997,54 +997,27 @@ impl<'a> System<'a> for RenderingSystem {
                 );
         };
 
-
-
-        {
-            for (entity, particles_data) in (&entities, &mut particles_datas).join() {
-                match **particles_data {
-                    ParticlesData::Engine(ref mut particles) => {
-                        let mut direction = Vector3::new(0f32, 1f32, 0f32);
-                        direction = char_iso * direction;
-                        if particles.update(
-                            Vector2::new(char_pos.x, char_pos.y),
-                            Vector2::new(char_vel.x, char_vel.y),
-                            Vector2::new(direction.x, direction.y)
-                        ) {
-                            canvas
-                                .render_instancing(
-                                    &gl,
-                                    &viewport,
-                                    &mut frame,
-                                    &particles.instancing_data,
-                                    &Isometry3::new(
-                                        Vector3::new(0f32, 0f32, 0f32),
-                                        Vector3::new(0f32, 0f32, 0f32),
-                                    ),
-                                );
-                        } else {
-                            entities.delete(entity).unwrap();
-                        }
+        for (entity, particles_data) in (&entities, &mut particles_datas).join() {
+            match **particles_data {
+                ParticlesData::Explosion(ref mut particles) => {
+                    if particles.update() {
+                        canvas
+                            .render_instancing(
+                                &gl,
+                                &viewport,
+                                &mut frame,
+                                &particles.instancing_data,
+                                &Isometry3::new(
+                                    Vector3::new(0f32, 0f32, 0f32),
+                                    Vector3::new(0f32, 0f32, 0f32),
+                                )
+                            );
+                    } else {
+                        entities.delete(entity).unwrap();
                     }
-                    ParticlesData::Explosion(ref mut particles) => {
-                        if particles.update() {
-                            canvas
-                                .render_instancing(
-                                    &gl,
-                                    &viewport,
-                                    &mut frame,
-                                    &particles.instancing_data,
-                                    &Isometry3::new(
-                                        Vector3::new(0f32, 0f32, 0f32),
-                                        Vector3::new(0f32, 0f32, 0f32),
-                                    )
-                                );
-                        } else {
-                            entities.delete(entity).unwrap();
-                        }
-                }
-                    _ => ()
-                };
             }
+                _ => ()
+            };
         }
 
         for (_entity, iso, image, size, _light) in
@@ -1089,8 +1062,48 @@ impl<'a> System<'a> for RenderingSystem {
             };
         }
 
-
-
+        let mut render_lazer = |
+            iso: &Isometry,
+            lazer: &Lazer,
+            rotation
+        | {
+            if lazer.active {
+                let h = lazer.current_distance;
+                let w = 0.05f32;
+                let positions = vec![
+                    Vector2::new(-w / 2.0, 0f32),
+                    Vector2::new(w / 2.0, 0f32),
+                    Vector2::new(0.0, -h) // hmmmmm, don't know why minus
+                ];
+                let positions: Vec<Point2> = positions
+                    .into_iter()
+                    .map(|v: Vector2| Point2::from(rotation * v))
+                    .collect();
+                let indices = [0u16, 1, 2];
+                let geometry_data = GeometryData::new(
+                    &gl, &positions, &indices
+                ).unwrap();
+                canvas.render_geometry(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &geometry_data,
+                    &iso.0,
+                    RenderMode::Draw,
+                    Point3::new(1.0, 0.0, 0.0)
+                );
+            }
+        };
+        for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
+            for (i, lazer) in multy_lazer.lazers.iter().enumerate() {
+                let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+                render_lazer(iso, lazer, rotation);
+            }
+        };
+        let zero_rotation = Rotation2::new(0.0);
+        for (iso, lazer) in (&isometries, &lazers).join() {
+            render_lazer(iso, lazer, zero_rotation);
+        };
         for (_entity, iso, image, size, _projectile) in
             (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
         {
@@ -1136,6 +1149,7 @@ impl<'a> System<'a> for RenderingSystem {
         )
             .join()
         {
+            let polygon = polygon.clone().into_rounded();
             let triangulation = polygon.triangulate();
             let geom_data =
                 GeometryData::new(&gl, &triangulation.points, &triangulation.indicies).unwrap();
@@ -1145,7 +1159,8 @@ impl<'a> System<'a> for RenderingSystem {
                     &mut frame, 
                     &geom_data, 
                     &iso.0,
-                    RenderMode::Draw
+                    RenderMode::Draw,
+                    Point3::new(0.8, 0.8, 0.8)
                 )
         }
         for (iso, size, image, _coin) in (&isometries, &sizes, &image_ids, &coins).join() {
@@ -1176,7 +1191,7 @@ impl<'a> System<'a> for RenderingSystem {
                     Some(red::Blend)
                 )
         }
-        let mut render_line = |
+        let _render_line = |
             a: Point2,
             b: Point2
         | {
@@ -1204,61 +1219,20 @@ impl<'a> System<'a> for RenderingSystem {
                 &mut frame,
                 &geometry_data,
                 &iso,
-                RenderMode::Draw
+                RenderMode::Draw,
+                Point3::new(1f32, 1f32, 1f32)
             );
         };
         // debug grid drawing
-        for i in 0..nebula_grid.grid.size {
-            for j in 0..nebula_grid.grid.size {
-                let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
-                render_line(Point2::new(min_w, min_h), Point2::new(min_w, max_h));
-                render_line(Point2::new(min_w, max_h), Point2::new(max_w, max_h));
-                render_line(Point2::new(max_w, max_h), Point2::new(max_w, min_h));                
-                render_line(Point2::new(max_w, min_h), Point2::new(min_w, min_h));
-            }
-        }
-
-        let mut render_lazer = |
-            iso: &Isometry,
-            lazer: &Lazer,
-            rotation
-        | {
-            if lazer.active {
-                let h = lazer.current_distance;
-                let w = 0.05f32;
-                let positions = vec![
-                    Vector2::new(-w / 2.0, 0f32),
-                    Vector2::new(w / 2.0, 0f32),
-                    Vector2::new(0.0, -h) // hmmmmm, don't know why minus
-                ];
-                let positions: Vec<Point2> = positions
-                    .into_iter()
-                    .map(|v: Vector2| Point2::from(rotation * v))
-                    .collect();
-                let indices = [0u16, 1, 2];
-                let geometry_data = GeometryData::new(
-                    &gl, &positions, &indices
-                ).unwrap();
-                canvas.render_geometry(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &geometry_data,
-                    &iso.0,
-                    RenderMode::Draw
-                );
-            }
-        };
-        for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
-            for (i, lazer) in multy_lazer.lazers.iter().enumerate() {
-                let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
-                render_lazer(iso, lazer, rotation);
-            }
-        };
-        let zero_rotation = Rotation2::new(0.0);
-        for (iso, lazer) in (&isometries, &lazers).join() {
-            render_lazer(iso, lazer, zero_rotation);
-        };
+        // for i in 0..nebula_grid.grid.size {
+        //     for j in 0..nebula_grid.grid.size {
+        //         let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
+        //         render_line(Point2::new(min_w, min_h), Point2::new(min_w, max_h));
+        //         render_line(Point2::new(min_w, max_h), Point2::new(max_w, max_h));
+        //         render_line(Point2::new(max_w, max_h), Point2::new(max_w, min_h));                
+        //         render_line(Point2::new(max_w, min_h), Point2::new(min_w, min_h));
+        //     }
+        // }
         for (iso, size, animation) in (&isometries, &sizes, &mut animations).join() {
             let animation_frame = animation.next_frame();
             if let Some(animation_frame) = animation_frame {

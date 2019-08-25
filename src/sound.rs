@@ -46,16 +46,6 @@ pub struct SoundSave {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SoundsSave(Vec<SoundSave>);
 
-pub enum SoundEffect {
-    Shot,
-    Explosion,
-    EnemyBlaster,
-    EnemyShotgun,
-    Collision,
-    Coin,
-    Exp
-}
-
 pub struct SoundData(pub sdl2::mixer::Chunk);
 
 pub struct PreloadedSounds {

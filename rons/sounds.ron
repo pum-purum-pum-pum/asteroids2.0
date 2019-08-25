@@ -17,7 +17,7 @@
 		),
 		(
 			name: "explosion_",
-			count: 3,
+			count: 6,
 			gap: (secs: 0, nanos: 20_000_000)
 		),
 		(

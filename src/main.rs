@@ -9,7 +9,7 @@ mod test;
 mod gui;
 mod types;
 mod run;
-
+extern crate cfg_if;
 pub use specs_derive;
 pub use specs;
 pub use sdl2;

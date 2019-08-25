@@ -1,6 +1,7 @@
 use crate::components::{Geometry, BlockSegment};
 use crate::types::{*};
 use ncollide2d::transformation::convex_hull_idx;
+// use ncollide2d::query::closest_points_line_line_parameters;
 use rand::prelude::*;
 use specs::prelude::*;
 use specs_derive::Component;
@@ -109,12 +110,6 @@ impl<T> Grid<T> where T: Default + Clone {
         (self.n as i32 + ((self.rh + y - self.y) / (2.0 * self.rh)).floor() as i32) as usize
     }
 
-    pub fn get(&self, point: Point2) -> &T {
-        let id = self.size * self.get_row(point.y) + 
-            self.get_column(point.x);
-        &self.bricks[id]
-    }
-
     pub fn get_rectangle(&self, row: usize, col: usize) -> ((f32, f32), (f32, f32)) {        
         let point = self.get_cell_point(row, col);
         return (
@@ -127,12 +122,6 @@ impl<T> Grid<T> where T: Default + Clone {
                 point.y + self.rh - self.rbh
             )
         )
-    }
-
-    pub fn get_ids(&self, id: usize) -> (usize, usize) {
-        let row = id / self.size;
-        let col = id % self.size;
-        (row, col)        
     }
 
     pub fn get_cell_point(&self, row: usize, column: usize) -> Point2 {
@@ -233,7 +222,7 @@ pub trait TriangulateFromCenter {
                 si = 1u16
             };
             indicies.push(si);
-        }
+        }   
         Triangulation {
             points: points,
             indicies: indicies,
@@ -251,6 +240,63 @@ pub struct Polygon {
 }
 
 impl Polygon {
+    pub fn into_rounded(self) -> Self {
+        let mut res = vec![];
+        for i in 0..self.points.len() {
+            let prev = self.points[
+                if i == 0 {self.points.len() - 1} 
+                else {(i - 1)%self.points.len()}
+            ];
+            let p = self.points[i];
+            let next = self.points[(i + 1) % self.points.len()];
+            let edge_vec1 = p.coords - prev.coords;
+            let edge_vec2 = next.coords - p.coords;
+            let segment1 = Segment::new(prev, prev + edge_vec1);
+            // let d = self.min_r * 0.4;
+            let inside_vec = (-edge_vec1.normalize() + edge_vec2.normalize()) / 2.0;
+            let d = 1.0 * inside_vec.dot(&edge_vec1).abs().min(inside_vec.dot(&edge_vec2).abs());
+            let inside_vec = d * inside_vec;
+            let o = p + inside_vec;
+            let mut h1 = Vector2::new(-edge_vec1.y, edge_vec1.x).normalize();
+            let mut dbg_flag = false;
+            { // try different direction of perpendicular
+                let ray1 = Ray::new(o, h1);
+                let ray2 = Ray::new(o, -h1);
+                // dbg!((&ray1, &segment1));
+                let toi1 = segment1.toi_with_ray(&Isometry2::identity(), &ray1, true);
+                let toi2 = segment1.toi_with_ray(&Isometry2::identity(), &ray2, true);
+                match (toi1, toi2) {
+                    (Some(toi), _) => {
+                        h1 = h1 * toi;
+                        dbg_flag = true;
+                    }
+                    (_, Some(toi)) => {
+                        h1 = -h1 * toi;
+                        dbg_flag = true;
+                    }
+                    _ => ()
+                }
+            };
+            // match toi1 {
+            //     Some(toi1) => {
+            if dbg_flag {
+                let angle = edge_vec1.angle(&edge_vec2);
+                let points_num = 5;
+                let rotation = Rotation2::new(-angle / (points_num as f32));
+                for _ in 0..=points_num {
+                    res.push(o + h1);
+                    h1 = rotation * h1;
+                }
+            } else {
+                res.push(p)
+            }
+                // }
+                // None => ()
+            // }
+        }
+        Self::new(res)
+    }
+
     // pub fn get_block_polygon(&self) -> BlockPolygon {
     //     let mut rng = thread_rng();
     //     let mut segments = vec![];
@@ -271,7 +317,7 @@ impl Polygon {
     //     }
     // }
 
-    pub fn new(points: Vec<Point2>) -> Self {
+    pub fn new(mut points: Vec<Point2>) -> Self {
         let w = 1.0 / (points.len() as f32);
         let mut center = Point2::new(0f32, 0f32);
         let mut min_x = 100f32;
@@ -292,6 +338,9 @@ impl Polygon {
         let mut min_r = 10f32;
         for p in points.iter() {
             min_r = min_r.min((p - center).norm())
+        }
+        if (points[0].coords - center.coords).perp(&(points[1].coords - center.coords)) > 0.0 {
+            points.reverse();
         }
         Polygon {
             points: points,
@@ -360,33 +409,6 @@ impl TriangulateFromCenter for Polygon {
     }
 }
 
-/// Polygon for light rendering(just render light on this rctngl)
-/// coordinates are in world 3d space
-/// Orientation is clockwise
-#[derive(Debug)]
-pub struct LightningPolygon {
-    pub points: Vec<Point2>,
-    x_min: f32,
-    y_min: f32,
-    x_max: f32,
-    y_max: f32,
-    pub center: Point2, // position of the light
-}
-
-impl TriangulateFromCenter for LightningPolygon {
-    fn points(&self) -> &[Point2] {
-        &self.points
-    }
-
-    fn center(&self) -> Point2 {
-        self.center
-    }
-}
-
-pub fn cross(a: Vector2, b: Vector2) -> f32 {
-    a.x * b.y - a.y * b.x
-}
-
 fn x_angle(vec: Vector2) -> f32 {
     let a = vec.y.atan2(vec.x);
     // if a < 0.0 {
@@ -422,152 +444,6 @@ pub fn poly_to_segment(poly: Polygon, position: Point2) -> BlockSegment {
     }
 }
 
-impl LightningPolygon {
-    pub fn new_rectangle(x_min: f32, y_min: f32, x_max: f32, y_max: f32, center: Point2) -> Self {
-        // by default we have one big rectangle with no clipping(shadows)
-        LightningPolygon {
-            points: vec![
-                Point2::new(x_min, y_min),
-                Point2::new(x_min, y_max),
-                Point2::new(x_max, y_max),
-                Point2::new(x_max, y_min),
-            ],
-            x_min,
-            y_min,
-            x_max,
-            y_max,
-            center: center,
-        }
-    }
-
-    fn clip_segment(
-        &mut self, 
-        BlockSegment{ point1: mut shape_point1, point2: mut shape_point2}: BlockSegment, 
-    ) {
-        if cross(shape_point1.coords, shape_point2.coords) > 0f32 {
-            std::mem::swap(&mut shape_point1, &mut shape_point2)
-        }
-        let dir1 = shape_point1.coords - self.center.coords;
-        let dir2 = shape_point2.coords - self.center.coords;
-        let ray1 = Ray::new(self.center, dir1);
-        let ray2 = Ray::new(self.center, dir2);
-        let (point1, pid1, point2, pid2) = {
-            // pid1 -- first point of the edge
-            // pid2 -- first point of the edge
-            let mut pi_result1 = None;
-            let mut pi_result2 = None;
-            let mut point_id1 = None;
-            let mut point_id2 = None;
-            for i in 0..self.points.len() {
-                let j = (i + 1) % self.points.len();
-                let p1 = self.points[i];
-                let p2 = self.points[j];
-                let segment = Segment::new(p1, p2);
-                let point_intersect1 =
-                    segment.toi_with_ray(&Isometry2::identity(), &ray1, true);
-                let point_intersect2 =
-                    segment.toi_with_ray(&Isometry2::identity(), &ray2, true);
-                match point_intersect1 {
-                    Some(pi) => {
-                        pi_result1 = Some(ray1.point_at(pi));
-                        point_id1 = Some(i);
-                    }
-                    None => (),
-                }
-                match point_intersect2 {
-                    Some(pi) => {
-                        pi_result2 = Some(ray2.point_at(pi));
-                        point_id2 = Some(j);
-                    }
-                    None => (),
-                }
-            }
-            if pi_result1.is_none() || pi_result2.is_none() {
-                return;
-            };
-            (
-                pi_result1.unwrap(),
-                point_id1.unwrap(),
-                pi_result2.unwrap(),
-                point_id2.unwrap(),
-            )
-        };
-        if pid1 <= pid2 {
-            self.points.insert(pid1 + 1, point1);
-            self.points.insert(pid1 + 2, shape_point1);
-            self.points.insert(pid1 + 3, shape_point2);
-            self.points.insert((pid2 + 3) % self.points.len(), point2);
-            // remove all points in polygon between them
-            let mut index = -1i32;
-            self.points.retain(|_| {
-                index += 1;
-                !(index > pid1 as i32 + 3 && index < pid2 as i32 + 3)
-            });
-        } else {
-            self.points.insert(pid2, point2);
-            self.points.insert(pid1 + 2, point1);
-            self.points.insert(pid1 + 3, shape_point1);
-            self.points.insert(pid1 + 4, shape_point2);
-            let mut index = -1i32;
-            self.points.retain(|_| {
-                index += 1;
-                !(index < pid2 as i32 || index > pid1 as i32 + 4)
-            });
-        }
-    }
-
-    // slow-ugly-simple version of polygon clipping
-    pub fn clip_one(&mut self, geom: Geometry, position: Point2) {
-        // PLAN
-        // Write clipping with segment
-        // then write other primitives with that
-        // create rays from center to shape borders
-
-        match geom {
-            Geometry::Circle { radius } => {
-                let (dir1, dir2) = match get_tangent(position, radius, self.center) {
-                    (Some(p1), Some(p2)) => (
-                        Vector2::new(p2.x - self.center.x, p2.y - self.center.y),
-                        Vector2::new(p1.x - self.center.x, p1.y - self.center.y),
-                    ),
-                    _ => return,
-                };
-                let shape_point1 = self.center + dir1;
-                let shape_point2 = self.center + dir2;
-                self.clip_segment(
-                    BlockSegment{point1: shape_point1, point2: shape_point2}, 
-                );
-            }
-            Geometry::Segment(block_segment) => {
-                self.clip_segment(
-                    block_segment,
-                )
-            }
-            Geometry::Polygon(block_polygon) => {
-                let BlockSegment {
-                    point1,
-                    point2
-                } = poly_to_segment(block_polygon, position);
-                self.clip_segment(
-                    BlockSegment {
-                        point1: point1 + position.coords,
-                        point2: point2 + position.coords
-                    },
-                )
-                // for segment in block_polygon.segments.iter() {
-                //     self.clip_segment(
-                //         BlockSegment{
-                //             point1: segment.point1 + rvec2(position),
-                //             point2: segment.point2 + rvec2(position)
-                //         }, 
-                //     );
-                // }
-            }
-        }
-    }
-}
-
-
 pub fn shadow_geometry(
     center: Point2, geom: Geometry, position: Point2, rotation: Rotation2<f32>
 ) -> Option<Triangulation> {
@@ -587,9 +463,6 @@ pub fn shadow_geometry(
             } else {
                 None
             }
-        }
-        Geometry::Segment(block_segment) => {
-            Some(block_segment)
         }
         Geometry::Polygon(mut block_polygon) => {
             let points: Vec<Point2> = block_polygon.points.iter().map(|x| rotation * x).collect();

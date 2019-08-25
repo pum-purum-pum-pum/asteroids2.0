@@ -25,7 +25,7 @@ use crate::sound::{init_sound, };
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
-    GUISystem, ScoreTableRendering
+    GUISystem, ScoreTableRendering, UpgradeGUI
 };
 use glyph_brush::{*};
 use crate::gfx::{ParticlesData, MovementParticles};
@@ -33,7 +33,6 @@ use crate::gui::{IngameUI, Primitive};
 
 
 const NEBULAS_NUM: usize = 3usize;
-const PLANETS_NUM: usize = 1usize;
 pub const FINGER_NUMBER: usize = 20;
 
 pub fn run() -> Result<(), String> {
@@ -107,6 +106,7 @@ pub fn run() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     let touches: Touches = [None; FINGER_NUMBER];
     let spawned_upgrades: SpawnedUpgrades = vec![];
+    specs_world.add_resource(Pallete::new());
     specs_world.add_resource(ChoosedUpgrade(None));
     specs_world.add_resource(text_data);
     // specs_world.add_resource(glyph_brush);
@@ -167,6 +167,7 @@ pub fn run() -> Result<(), String> {
         "light",
         "light_sea",
         "projectile",
+        "enemy_shotgun_projectile",
         "bomb",
         "enemy_projectile",
         "player_projectile",
@@ -180,7 +181,7 @@ pub fn run() -> Result<(), String> {
         "fire_rate",
         "direction",
         "circle",
-        "rotation_speed",
+        "ship_rotation",
         "shield_regen",
         "health_regen",
         "health_size",
@@ -195,14 +196,16 @@ pub fn run() -> Result<(), String> {
         "bomber",
         "bomberman",
         "charging",
-        "bar"
+        "bar",
+        "upg_bar"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
         let animations = [
-            "explosion1",
+            "explosion",
             "explosion2",
-            "bullet_contact"
+            "blast2",
+            "bullet_contact",
         ];
         for animation_name in animations.iter() {
             // let animation_full = &format!("assets/{}", animation_name);
@@ -425,8 +428,9 @@ pub fn run() -> Result<(), String> {
         coin: name_to_image["coin"],
         exp: name_to_image["exp"],
         bar: name_to_image["bar"],
-        explosion: name_to_animation["explosion1"].clone(),
-        blast: name_to_animation["explosion2"].clone(),
+        upg_bar: name_to_image["upg_bar"],
+        explosion: name_to_animation["explosion"].clone(),
+        blast: name_to_animation["blast2"].clone(),
         bullet_contact: name_to_animation["bullet_contact"].clone(),
     };
 
@@ -487,6 +491,9 @@ pub fn run() -> Result<(), String> {
     let mut sound_dispatcher = DispatcherBuilder::new()
         .with_thread_local(sound_system)
         .build();
+    let mut rendering_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(rendering_system)
+        .build();
     let mut dispatcher = DispatcherBuilder::new()
         // .with(control_system, "control_system", &[])
         .with_thread_local(control_system)
@@ -504,12 +511,17 @@ pub fn run() -> Result<(), String> {
             ],
         )
         .with(KinematicSystem {}, "kinematic_system", &["physics_system"])
-        .with_thread_local(gui_system)
         // .with_thread_local(insert_system)
-        .with_thread_local(rendering_system)
         .build();
     let mut insert_dispatcher = DispatcherBuilder::new()
         .with_thread_local(insert_system)
+        .build();
+    let mut gui_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(gui_system)
+        .build();
+    let upgrade_gui_system = UpgradeGUI::default();
+    let mut upgrade_gui_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(upgrade_gui_system)
         .build();
     specs_world.add_resource(keys_channel);
     specs_world.add_resource(sounds_channel);
@@ -522,7 +534,6 @@ pub fn run() -> Result<(), String> {
     });
     specs_world.add_resource(ThreadPin::new(canvas));
     specs_world.add_resource(preloaded_images);
-    specs_world.add_resource(Stat::default());
     specs_world.add_resource(AppState::Menu);
     specs_world.add_resource(IngameUI::default());
     specs_world.add_resource(primitives_channel);
@@ -616,8 +627,14 @@ pub fn run() -> Result<(), String> {
             AppState::Menu => {
                 menu_dispatcher.dispatch(&specs_world.res)
             }
-            AppState::Play(_) => {
-                dispatcher.dispatch(&specs_world.res);
+            AppState::Play(play_state) => {
+                if let PlayState::Action = play_state {
+                    dispatcher.dispatch(&specs_world.res);
+                    gui_dispatcher.dispatch(&specs_world.res);
+                } else {
+                    upgrade_gui_dispatcher.dispatch(&specs_world.res);
+                }
+                rendering_dispatcher.dispatch(&specs_world.res);
             }
             AppState::ScoreTable => {
                 score_table_dispatcher.dispatch(&specs_world.res);
