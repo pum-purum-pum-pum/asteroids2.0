@@ -1,39 +1,24 @@
-<!-- * fix kamikadze \/ -->
-<!-- * add planet rotation \/ -->
-<!-- * effect on bullet impact \/ -->
-<!-- * bullet lifetime in gun desc \/ -->
-<!-- * menu \/ -->
-* video<!-- 
-* * show blaster
-* * show lazer
-* * show shotgun
-* * show destruction
-* * show upgrades
-* * show boss fight
-* * struggle (oo -->ps)
-
-
-
  HUGE REFACTORING:
- * warnings \/
- * undersigns \/
- * fix timers
- * * think about animations
- * fix progress file
- * one struct for blaster and shotgun
+ <!-- * warnings \/ -->
+ <!-- * undersigns \/ -->
+ <!-- * fix timers \/ -->
+ <!-- * one struct for blaster and shotgun \/ -->
+ <!-- * damage processing simplify \/ -->
  * comments 
  * move high level gfx into different crate?
  * gui simplify
  * go through TODO tags
  * rendering simplify
- * damage processing simplifyz
-* debug stuff rendering separately
-
- This week devlog todo
-
-
+ * debug stuff rendering separately
+ * think about timers in animations
+ * fix progress file
+ * fix done button
+ * rename enemies
 
 VIDEO
+
+* Drawing ships videos (no license haha... :( ) (mb export as images and then make cartoonish thing)
+
 
 PEOPLE
 * handmade network
@@ -46,24 +31,20 @@ PEOPLE
 * * make vk group
 * * indiecator
 
-<!-- PREVIEW: -->
-<!-- * score table \/ -->
-<!-- * scores by exp :) \/ -->
-<!-- * different sounds for different explosions \/ -->
-<!-- * sound position \sort of/ -->
-<!-- * different coins sound collect tone \/ -->
-<!-- * avaliable upgrade primitive \/ -->
-<!-- * lifes and shields bars \/ -->
-<!-- * remove upgrade primitive when in selection process \/ -->
-<!-- * make better stars \/ -->
-<!-- * fix ui text \/ -->
-* heal collectables from asteroids and remove regeneration
-* new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading?
+TODO
+* health collectables from asteroids and remove regeneration \/
+* rotation fire ship \/
+
+* loot abilities 
+* * double coins
+* * double exp
+
+* ?new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading?
 * add taran upgrade
-* ui selection
-* coins
+<!-- * ui selection \/ -->
+<!-- * coins \/ -->
 * buy sound
-* better lazer sound
+<!-- * better lazer sound \/ -->
 * fix cheating when upgrading
 * fix stars spawning bug
 * fix bug lazers dead

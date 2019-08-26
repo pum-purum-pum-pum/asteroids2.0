@@ -4,14 +4,14 @@
         image: "fire_rate",
         name: "Attack speed",
         description: "+ X% attack speed",
-        assigned: [ToGun(Blaster), ToGun(ShotGun)]
+        assigned: [ToGun(ShotGun)]
     ),
     (
         upgrade_type: BulletSpeed,
         image: "bullet_speed",
         name: "Bullet speed",
         description: "+ X% bullet speed. Also by law of physics bullets go futher",
-        assigned: [ToGun(Blaster), ToGun(ShotGun)]
+        assigned: [ToGun(ShotGun)]
     ),
     (
         upgrade_type: ShipSpeed,
@@ -31,13 +31,6 @@
         upgrade_type: ShieldRegen,
         image: "shield_regen",
         name: "Shield reneration",
-        description: "+ 60 hp per sec",
-        assigned: [General]
-    ),
-    (
-        upgrade_type: HealthRegen,
-        image: "health_regen",
-        name: "Health regeneration",
         description: "+ 60 hp per sec",
         assigned: [General]
     ),

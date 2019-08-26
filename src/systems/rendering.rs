@@ -334,8 +334,8 @@ impl<'a> System<'a> for UpgradeGUI {
         (
             Entities<'a>,
             ReadStorage<'a, CharacterMarker>,
-            WriteStorage<'a, Blaster>,
             WriteStorage<'a, ShipStats>,
+            WriteStorage<'a, ShotGun>,
             ReadExpect<'a, red::Viewport>,
         ),
         Write<'a, IngameUI>,
@@ -353,8 +353,8 @@ impl<'a> System<'a> for UpgradeGUI {
             (
                 entities,
                 character_markers,
-                mut blasters,
                 mut ships_stats,
+                mut shotguns,
                 viewport,
             ),
             // preloaded_particles,
@@ -471,7 +471,7 @@ impl<'a> System<'a> for UpgradeGUI {
             Some(choosed_upgrade) => {
                 match choosed_upgrade {
                     UpgradeType::AttackSpeed => {
-                        match blasters.get_mut(character) {
+                        match shotguns.get_mut(character) {
                             Some(gun) => {
                                 let recharge_time_millis = (gun.recharge_time.as_millis() as f32 * 0.9) as u64;
                                 gun.recharge_time = Duration::from_millis(recharge_time_millis);
@@ -486,15 +486,12 @@ impl<'a> System<'a> for UpgradeGUI {
                         ship_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
                     }
                     UpgradeType::BulletSpeed => {
-                        match blasters.get_mut(character) {
+                        match shotguns.get_mut(character) {
                             Some(gun) => {
                                 gun.bullet_speed += 0.1 * BULLET_SPEED_INIT;
                             }
                             None => ()
                         }
-                    }
-                    UpgradeType::HealthRegen => {
-                        ship_stats.health_regen += 1;
                     }
                     UpgradeType::ShieldRegen => {
                         ship_stats.shield_regen += 1;
@@ -848,8 +845,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Polygon>,
             ReadStorage<'a, Lazer>,
             ReadStorage<'a, Geometry>,
-            ReadStorage<'a, Coin>,
-            ReadStorage<'a, Exp>,
+            ReadStorage<'a, CollectableMarker>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
             ReadStorage<'a, MultyLazer>,
         ),
@@ -886,8 +882,7 @@ impl<'a> System<'a> for RenderingSystem {
                 polygons,
                 lazers,
                 geometries,
-                coins,
-                exps,
+                collectables,
                 mut particles_datas,
                 multy_lazers,
             ),
@@ -1163,7 +1158,7 @@ impl<'a> System<'a> for RenderingSystem {
                     Point3::new(0.8, 0.8, 0.8)
                 )
         }
-        for (iso, size, image, _coin) in (&isometries, &sizes, &image_ids, &coins).join() {
+        for (iso, size, image, _coin) in (&isometries, &sizes, &image_ids, &collectables).join() {
             let image_data = image_datas.get(image.0).unwrap();
             canvas
                 .render(
@@ -1175,20 +1170,6 @@ impl<'a> System<'a> for RenderingSystem {
                         size.0,
                         true,
                         None
-                )
-        }
-        for (iso, size, image, _exps) in (&isometries, &sizes, &image_ids, &exps).join() {
-            let image_data = image_datas.get(image.0).unwrap();
-            canvas
-                .render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_data,
-                    &iso.0,
-                    size.0,
-                    true,
-                    Some(red::Blend)
                 )
         }
         let _render_line = |

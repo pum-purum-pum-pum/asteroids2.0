@@ -126,7 +126,6 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
-    specs_world.register::<Blaster>();
     specs_world.register::<ShotGun>();
     specs_world.register::<Cannon>();
     specs_world.register::<Lazer>();
@@ -141,6 +140,8 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<ShipMarker>();
     specs_world.register::<Coin>();
     specs_world.register::<Exp>();
+    specs_world.register::<Health>();
+    specs_world.register::<CollectableMarker>();
     specs_world.register::<PhysicsComponent>();
     specs_world.register::<Polygon>();
     specs_world.register::<ThreadPin<sdl2::mixer::Chunk>>();
@@ -190,6 +191,7 @@ pub fn run() -> Result<(), String> {
         "blaster_gun",
         "shotgun",
         "coin",
+        "health",
         "exp",
         "lazer_boss",
         "random_ship",
@@ -426,6 +428,7 @@ pub fn run() -> Result<(), String> {
         blaster: name_to_image["blaster_gun"],
         shotgun: name_to_image["shotgun"],
         coin: name_to_image["coin"],
+        health: name_to_image["health"],
         exp: name_to_image["exp"],
         bar: name_to_image["bar"],
         upg_bar: name_to_image["upg_bar"],
