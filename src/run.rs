@@ -171,6 +171,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<ShipStats>();
     specs_world.register::<Animation>();
     specs_world.register::<Charge>();
+    specs_world.register::<Chain>();
     specs_world.register::<SoundPlacement>();
     // TODO: load all this imagea automagicly (assets pack?)
     let images = [
@@ -195,6 +196,9 @@ pub fn run() -> Result<(), String> {
         "fire_rate",
         "direction",
         "circle",
+        "circle2",
+        "chain_standart",
+        "chain_lazer",
         "ship_rotation",
         "shield_regen",
         "health_regen",
@@ -204,7 +208,9 @@ pub fn run() -> Result<(), String> {
         "blaster_gun",
         "shotgun",
         "coin",
-        "side_bullets",
+        "side_bullets_ability",
+        "double_coin",
+        "double_exp",
         "health",
         "exp",
         "lazer_boss",
@@ -335,7 +341,8 @@ pub fn run() -> Result<(), String> {
                 gun_kind: enemy_save.gun_kind.convert(name_to_image),
                 ship_stats: enemy_save.ship_stats,
                 size: enemy_save.size,
-                image: Image(name_to_image[&enemy_save.image_name])
+                image: Image(name_to_image[&enemy_save.image_name]),
+                snake: enemy_save.snake
             }
         }
         #[derive(Debug, Serialize, Deserialize)]
@@ -345,6 +352,7 @@ pub fn run() -> Result<(), String> {
             pub ship_stats: ShipStats,
             pub size: f32,
             pub image_name: String,
+            pub snake: Option<usize>
         };
         // let file = File::open("desc.ron").unwrap();
         let file = include_str!("../rons/desc.ron");
@@ -448,13 +456,15 @@ pub fn run() -> Result<(), String> {
         shotgun: name_to_image["shotgun"],
         coin: name_to_image["coin"],
         health: name_to_image["health"],
-        side_bullet_ability: name_to_image["side_bullets"],
+        side_bullet_ability: name_to_image["side_bullets_ability"],
         exp: name_to_image["exp"],
         bar: name_to_image["bar"],
         upg_bar: name_to_image["upg_bar"],
         explosion: name_to_animation["explosion"].clone(),
         blast: name_to_animation["blast2"].clone(),
         bullet_contact: name_to_animation["bullet_contact"].clone(),
+        double_coin: name_to_image["double_coin"],
+        double_exp: name_to_image["double_exp"],
     };
 
 

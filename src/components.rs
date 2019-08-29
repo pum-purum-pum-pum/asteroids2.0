@@ -113,6 +113,7 @@ pub struct EnemyKind {
     pub ship_stats: ShipStats,
     pub size: f32,
     pub image: Image,
+    pub snake: Option<usize>
 }
 
 #[derive(Clone, Copy)]
@@ -143,6 +144,7 @@ pub enum InsertEvent {
         ship_stats: ShipStats,
         image: Image,
         size: f32,
+        snake: Option<usize>
     },
     Bullet {
         kind: EntityType,
@@ -322,6 +324,11 @@ pub enum Geometry {
 }
 
 #[derive(Component, Debug, Clone, Copy)]
+pub struct Chain {
+    pub follow: specs::Entity,
+}
+
+#[derive(Component, Debug, Clone, Copy)]
 pub struct Charge {
     pub recharge_start: Instant,
     pub recharge_time: Duration,
@@ -461,6 +468,8 @@ pub struct PreloadedImages {
     pub coin: specs::Entity,
     pub exp: specs::Entity,
     pub health: specs::Entity,
+    pub double_coin: specs::Entity,
+    pub double_exp: specs::Entity,
     pub side_bullet_ability: specs::Entity,
     pub bar: specs::Entity,
     pub upg_bar: specs::Entity,

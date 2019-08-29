@@ -702,14 +702,14 @@ impl<'a> System<'a> for GUISystem {
 
         if double_coins_cnt > 0 {
             let ability = Ability {
-                icon: Image(preloaded_images.coin),
+                icon: Image(preloaded_images.double_coin),
                 text: format!("x{}", double_coins_cnt).to_string(),
             };
             abilities.push(ability);
         }
         if double_exp_cnt > 0 {
             let ability = Ability {
-                icon: Image(preloaded_images.exp),
+                icon: Image(preloaded_images.double_exp),
                 text: format!("x{}", double_exp_cnt).to_string(),
             };
             abilities.push(ability);
@@ -912,6 +912,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, CollectableMarker>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
             ReadStorage<'a, MultyLazer>,
+            ReadStorage<'a, Chain>
         ),
         Read<'a, Mouse>,
         ReadExpect<'a, ThreadPin<red::GL>>,
@@ -950,6 +951,7 @@ impl<'a> System<'a> for RenderingSystem {
                 collectables,
                 mut particles_datas,
                 multy_lazers,
+                chains,
             ),
             mouse,
             gl,
@@ -1142,9 +1144,10 @@ impl<'a> System<'a> for RenderingSystem {
         let mut render_lazer = |
             iso: &Isometry,
             lazer: &Lazer,
+            force_rendering: bool,
             rotation
         | {
-            if lazer.active {
+            if lazer.active || force_rendering {
                 let h = lazer.current_distance;
                 let w = 0.05f32;
                 let positions = vec![
@@ -1174,12 +1177,13 @@ impl<'a> System<'a> for RenderingSystem {
         for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
             for (i, lazer) in multy_lazer.lazers.iter().enumerate() {
                 let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
-                render_lazer(iso, lazer, rotation);
+                render_lazer(iso, lazer, false, rotation);
             }
         };
         let zero_rotation = Rotation2::new(0.0);
-        for (iso, lazer) in (&isometries, &lazers).join() {
-            render_lazer(iso, lazer, zero_rotation);
+        for (_entity, iso, lazer) in (&entities, &isometries, &lazers).join() {
+            // let force_rendering = chains.get(entity).is_some();
+            render_lazer(iso, lazer, false, zero_rotation);
         };
         for (_entity, iso, image, size, _projectile) in
             (&entities, &isometries, &image_ids, &sizes, &projectiles).join()

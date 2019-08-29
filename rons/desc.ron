@@ -114,6 +114,55 @@
             ai_kind: AI(kinds:[Shoot, Follow, Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
+                recharge_time: (secs: 0, nanos: 400_000_000),
+                bullets_damage: 100,
+                side_projectiles_number: 0,
+                angle_shift: 0.25,
+                bullet_speed: 0.2,
+                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_image: "enemy_projectile"
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 50,
+                max_shield: 0,
+                damage: 100
+            ),
+            size: 0.3,
+            image_name: "chain_standart",
+            snake: Some(20)
+        ),
+
+
+        (
+            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
+            gun_kind: Lazer((
+                damage: 2,
+                active: false,
+                distance: 3,
+                current_distance: 8,
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 50,
+                max_shield: 0,
+                damage: 100
+            ),
+            size: 0.3,
+            image_name: "chain_lazer",
+            snake: Some(20)
+        ),
+
+        (
+            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
+            gun_kind: ShotGun((
+                recharge_state: 0,
                 recharge_time: (secs: 3, nanos: 0),
                 bullets_damage: 200,
                 side_projectiles_number: 4,

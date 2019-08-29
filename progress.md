@@ -30,12 +30,13 @@ PEOPLE
 * * russia rust community forum??
 * russia
 * * make vk group
-* * indiecator
+* * indiecator?
 
 TODO
 <!-- * health collectables from asteroids and remove regeneration \/ -->
 <!-- * rotation fire ship \/ -->
 <!-- * add rotation ship with cannon -->
+* bullet contact sound
 <!-- menu music -->
 * loot abilities 
 * * ring ability
@@ -50,11 +51,13 @@ TODO
 <!-- * voronoi lazer point \just center/ -->
 
 * new enemies
+<!-- * * snake \/ -->
 <!-- * * missiles ship \/ -->
 
 * Menu
 * * particles towards player
-
+* * better weapon icons
+* * ship selection
 
 <!-- * ?new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading? \/ -->
 * add taran upgrade

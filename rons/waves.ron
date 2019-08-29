@@ -5,7 +5,7 @@
 			],
 			ships_number: 15,
 			const_distribution : [
-				("fish", 1),
+				("chain_lazer", 1),
 			],
 			iterations: 1
 		),
@@ -25,6 +25,7 @@
 				("rotship", 1),
 				("random_ship", 1),
 				("fish", 1),
+				("chain_standart", 1),
 			],
 			iterations: 1
 		),

@@ -54,7 +54,7 @@ const EXPLOSION_LIFETIME_SECS: u64 = 1;
 const BLAST_LIFETIME_SECS: u64 = 1;
 const BULLET_CONTACT_LIFETIME_SECS: u64 = 1;
 const COLLECTABLE_SIDE_BULLET: u64 = 5;
-const SIDE_BULLET_LIFETIME_SEC: u64 = 20;
+const SIDE_BULLET_LIFETIME_SEC: u64 = 13;
 const DOUBLE_COINS_LIFETIME_SEC: u64 = 5;
 const COLLECTABLE_DOUBLE_COINS_SEC: u64 = 5;
 
@@ -166,6 +166,7 @@ impl<'a> System<'a> for PhysicsSystem {
         ReadStorage<'a, EnemyMarker>,
         ReadStorage<'a, Rocket>,
         ReadStorage<'a, Charge>,
+        ReadStorage<'a, Chain>,
         Write<'a, World<f32>>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
@@ -182,6 +183,7 @@ impl<'a> System<'a> for PhysicsSystem {
             enemies,
             rockets,
             chargings,
+            chains,
             mut world,
             mut nebula_grid,
             mut planet_grid,
@@ -230,6 +232,9 @@ impl<'a> System<'a> for PhysicsSystem {
                         break
                     }
                     if chargings.get(*e1).is_some() || chargings.get(*e2).is_some() {
+                        continue
+                    }
+                    if chains.get(*e1).is_some() || chains.get(*e2).is_some() {
                         continue
                     }
                     let phys1 = physics.get(*e1).unwrap();
@@ -514,7 +519,7 @@ pub fn spawn_asteroids<'a>(
                 position: spawn_position
             });
         }
-        if rng.gen_range(0.0, 1.0) < 0.02 {
+        if rng.gen_range(0.0, 1.0) < 0.05 {
             insert_channel.single_write(InsertEvent::SideBulletCollectable{position: spawn_position});
         }
         if rng.gen_range(0.0, 1.0) < 0.5 {
@@ -1078,120 +1083,113 @@ impl<'a> System<'a> for InsertSystem {
                     ship_stats,
                     size,
                     image,
+                    snake
                 } => {
-                    let size = *size;
-                    let enemy_shape = 
-                        Geometry::Circle { radius: size };
-                    let enemy_physics_shape = 
-                        ncollide2d::shape::Ball::new(size);
-                    let mut enemy_collision_groups = CollisionGroups::new();
-                    enemy_collision_groups.set_membership(&[CollisionId::EnemyShip as usize]);
-                    enemy_collision_groups.set_whitelist(&[
-                        CollisionId::Asteroid as usize,
-                        CollisionId::EnemyShip as usize,
-                        CollisionId::PlayerShip as usize,
-                        CollisionId::PlayerBullet as usize,
-                    ]);
-                    enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
-                    let enemy = entities.create();
+                    let num = if let Some(chains) = snake {*chains} else {1};
+                    let mut last_entity = None;
+                    for i in 0..num {
+                        let size = *size;
+                        let enemy_shape = 
+                            Geometry::Circle { radius: size };
+                        let enemy_physics_shape = 
+                            ncollide2d::shape::Ball::new(size);
+                        let mut enemy_collision_groups = CollisionGroups::new();
+                        enemy_collision_groups.set_membership(&[CollisionId::EnemyShip as usize]);
+                        enemy_collision_groups.set_whitelist(&[
+                            CollisionId::Asteroid as usize,
+                            CollisionId::EnemyShip as usize,
+                            CollisionId::PlayerShip as usize,
+                            CollisionId::PlayerBullet as usize,
+                        ]);
+                        enemy_collision_groups.set_blacklist(&[CollisionId::EnemyBullet as usize]);
+                        let enemy = entities.create();
 
 
-                    // let mut enemy = entities
-                    //     .build_entity();
-                    match gun_kind {
-                        GunKind::ShotGun(shotgun) => {
-                            let side_num = 3usize;
-                            let _shift = std::f32::consts::PI / (side_num as f32 + 1.0);
-                            lazy_update.insert(enemy, *shotgun);
-                            // enemy = enemy
-                            //     .with(*shotgun, &mut shotguns)
-                        }
-                        GunKind::Lazer(lazer) => {
-                            lazy_update.insert(enemy, *lazer);
-                            // enemy = enemy
-                            //     .with(*lazer, &mut lazers)
-                        }
-                        GunKind::MultyLazer(multy_lazer) => {
-                            lazy_update.insert(enemy, multy_lazer.clone());
-                            // enemy = enemy
-                            //     .with(multy_lazer.clone(), &mut multy_lazers)
-                        }
-                        GunKind::Cannon(cannon) => {
-                            lazy_update.insert(enemy, cannon.clone());
-                            // enemy = enemy
-                            //     .with(cannon.clone(), &mut cannons)
-                        }
-                        GunKind::RocketGun(rocket_gun) => {
-                            // enemy = enemy
-                            //     .with(rocket_gun.clone(), &mut rocket_guns)
-                            lazy_update.insert(enemy, *rocket_gun);
-                        }
-                    }
-                    for kind in kind.kinds.iter() {
-                        match kind {
-                            AIType::Charging(time) => {
-                                lazy_update.insert(enemy, Charge::new(*time));
+                        // let mut enemy = entities
+                        //     .build_entity();
+                        match gun_kind {
+                            GunKind::ShotGun(shotgun) => {
+                                let side_num = 3usize;
+                                let _shift = std::f32::consts::PI / (side_num as f32 + 1.0);
+                                lazy_update.insert(enemy, *shotgun);
                                 // enemy = enemy
-                                //     .with(Charge::new(*time), &mut chargings)
+                                //     .with(*shotgun, &mut shotguns)
                             }
-                            _ => ()
-                        }                        
+                            GunKind::Lazer(lazer) => {
+                                lazy_update.insert(enemy, *lazer);
+                                // enemy = enemy
+                                //     .with(*lazer, &mut lazers)
+                            }
+                            GunKind::MultyLazer(multy_lazer) => {
+                                lazy_update.insert(enemy, multy_lazer.clone());
+                                // enemy = enemy
+                                //     .with(multy_lazer.clone(), &mut multy_lazers)
+                            }
+                            GunKind::Cannon(cannon) => {
+                                lazy_update.insert(enemy, cannon.clone());
+                                // enemy = enemy
+                                //     .with(cannon.clone(), &mut cannons)
+                            }
+                            GunKind::RocketGun(rocket_gun) => {
+                                // enemy = enemy
+                                //     .with(rocket_gun.clone(), &mut rocket_guns)
+                                lazy_update.insert(enemy, *rocket_gun);
+                            }
+                        }
+                        for kind in kind.kinds.iter() {
+                            match kind {
+                                AIType::Charging(time) => {
+                                    lazy_update.insert(enemy, Charge::new(*time));
+                                    // enemy = enemy
+                                    //     .with(Charge::new(*time), &mut chargings)
+                                }
+                                _ => ()
+                            }                        
+                        }
+                        let iso = Point3::new(iso.x + i as f32, iso.y, iso.z);
+                        lazy_update.insert(enemy, Isometry::new(iso.x, iso.y, iso.z));
+                        lazy_update.insert(enemy, Velocity::new(0f32, 0f32));
+                        lazy_update.insert(enemy, EnemyMarker::default());
+                        lazy_update.insert(enemy, ShipMarker::default());
+                        lazy_update.insert(enemy, *image);
+                        lazy_update.insert(enemy, Damage(ship_stats.damage));
+                        lazy_update.insert(enemy, Lifes(ship_stats.max_health));
+                        lazy_update.insert(enemy, *ship_stats);
+                        lazy_update.insert(enemy, kind.clone());
+                        lazy_update.insert(enemy, Spin::default());
+                        lazy_update.insert(enemy, enemy_shape);
+                        lazy_update.insert(enemy, Size(size));
+                        PhysicsComponent::safe_insert(
+                            &mut physics,
+                            enemy,
+                            ShapeHandle::new(enemy_physics_shape),
+                            Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
+                            Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
+                            BodyStatus::Dynamic,
+                            &mut world,
+                            &mut bodies_map,
+                            enemy_collision_groups,
+                            0.5f32,
+                        );
+                        // snake thing
+                        if let Some(last_entity) = last_entity {
+                            lazy_update.insert(enemy, Chain{follow: last_entity})
+                        }
+                        last_entity = Some(enemy);
+                        // with light
+                        //     {
+                        // let _light = entities
+                        //     .build_entity()
+                        //     .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
+                        //     .with(Velocity::new(0f32, 0f32), &mut velocities)
+                        //     .with(Spin::default(), &mut spins)
+                        //     .with(AttachPosition(enemy), &mut attach_positions)
+                        //     .with(Image(preloaded_images.light_sea), &mut images)
+                        //     .with(Size(1f32), &mut sizes)
+                        //     .with(LightMarker, &mut lights)
+                        //     .build();
+                        // }
                     }
-                    lazy_update.insert(enemy, Isometry::new(iso.x, iso.y, iso.z));
-                    lazy_update.insert(enemy, Velocity::new(0f32, 0f32));
-                    lazy_update.insert(enemy, EnemyMarker::default());
-                    lazy_update.insert(enemy, ShipMarker::default());
-                    lazy_update.insert(enemy, *image);
-                    lazy_update.insert(enemy, Damage(ship_stats.damage));
-                    lazy_update.insert(enemy, Lifes(ship_stats.max_health));
-                    lazy_update.insert(enemy, *ship_stats);
-                    lazy_update.insert(enemy, kind.clone());
-                    lazy_update.insert(enemy, Spin::default());
-                    lazy_update.insert(enemy, enemy_shape);
-                    lazy_update.insert(enemy, Size(size));
-                    // lazy_update.insert(enemy, );
-                    // lazy_update.insert(enemy, );
-
-                    // let enemy = enemy
-                    //     .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                    //     .with(Velocity::new(0f32, 0f32), &mut velocities)
-                    //     .with(EnemyMarker::default(), &mut enemies)
-                    //     .with(ShipMarker::default(), &mut ships)
-                    //     .with(*image, &mut images)
-                    //     .with(Damage(ship_stats.damage), &mut damages)
-                    //     .with(Lifes(ship_stats.max_health), &mut lifes)
-                    //     .with(*ship_stats, &mut ships_stats)
-                    //     // .with(Shield(ENEMY_MAX_SHIELDS), &mut shields)
-                    //     .with(kind.clone(), &mut ais)
-                    //     .with(Spin::default(), &mut spins)
-                    //     .with(enemy_shape, &mut geometries)
-                    //     .with(Size(size), &mut sizes)
-                    //     .build();
-                    PhysicsComponent::safe_insert(
-                        &mut physics,
-                        enemy,
-                        ShapeHandle::new(enemy_physics_shape),
-                        Isometry2::new(Vector2::new(iso.x, iso.y), iso.z),
-                        Velocity2::new(Vector2::new(0f32, 0f32), 0f32),
-                        BodyStatus::Dynamic,
-                        &mut world,
-                        &mut bodies_map,
-                        enemy_collision_groups,
-                        0.5f32,
-                    );
-                    // with light
-                    //     {
-                    // let _light = entities
-                    //     .build_entity()
-                    //     .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
-                    //     .with(Velocity::new(0f32, 0f32), &mut velocities)
-                    //     .with(Spin::default(), &mut spins)
-                    //     .with(AttachPosition(enemy), &mut attach_positions)
-                    //     .with(Image(preloaded_images.light_sea), &mut images)
-                    //     .with(Size(1f32), &mut sizes)
-                    //     .with(LightMarker, &mut lights)
-                    //     .build();
-                    // }
                 }
                 InsertEvent::Bullet {
                     kind,
@@ -1316,7 +1314,7 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(entity, Lifetime::new(Duration::from_secs(COLLECTABLE_DOUBLE_COINS_SEC)));
                     lazy_update.insert(entity, iso);
                     lazy_update.insert(entity, Size(0.5));
-                    lazy_update.insert(entity, Image(preloaded_images.coin));
+                    lazy_update.insert(entity, Image(preloaded_images.double_coin));
                 }
                 InsertEvent::DoubleCoinsAbility => {
                     let _entity = entities
@@ -1336,7 +1334,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Lifetime::new(Duration::from_secs(COLLECTABLE_DOUBLE_COINS_SEC)), &mut lifetimes)
                         .with(iso, &mut isometries)
                         .with(Size(0.5), &mut sizes)
-                        .with(Image(preloaded_images.exp), &mut images)
+                        .with(Image(preloaded_images.double_exp), &mut images)
                         .with(Lifetime::new(Duration::from_secs(COIN_LIFETIME_SECS)), &mut lifetimes)
                         .build();
                 }
@@ -1780,6 +1778,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 ship_stats: enemy.ship_stats,
                 size: enemy.size,
                 image: enemy.image,
+                snake: enemy.snake,
             }
         };
         for _ in 0..add_cnt {
@@ -1793,10 +1792,13 @@ impl<'a> System<'a> for GamePlaySystem {
         };
         if const_spawn {
             for kind in wave.const_distribution.iter() {
-                let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
-                let ships = &description.enemies;
-                let ship_id = kind.0;
-                insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
+                // dbg!(kind);
+                for _ in 0..kind.1 {
+                    let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
+                    let ships = &description.enemies;
+                    let ship_id = kind.0;
+                    insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
+                }
             }
         }
         // TOOOOOO MANY COOPY PASTE %-P
@@ -2369,6 +2371,7 @@ impl<'a> System<'a> for AISystem {
         WriteStorage<'a, Charge>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AI>,
+        ReadStorage<'a, Chain>,
         Write<'a, World<f32>>,
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, BodiesMap>,
@@ -2392,6 +2395,7 @@ impl<'a> System<'a> for AISystem {
             mut chargings,
             character_markers,
             ais,
+            chains,
             mut world,
             mut insert_channel,
             bodies_map,
@@ -2513,19 +2517,40 @@ impl<'a> System<'a> for AISystem {
                     }
                     AIType::Follow => {
                         let speed = 0.1f32;
-                        if diff.norm() > follow_area {
-                            if character_noticed {
-                                let ai_vel = speed * dir;
-                                *vel = Velocity::new(ai_vel.x, ai_vel.y);
+                        let mut is_chain = false;
+                        if let Some(chain) = chains.get(entity) {
+                            if let Some(iso) = isometries.get(chain.follow) {
+                                is_chain = true;
+                                let follow_vector = iso.0.translation.vector;
+                                let follow_pos = Point2::new(follow_vector.x, follow_vector.y);
+                                let diff = follow_pos - pos;
+                                // if diff.norm() > 1.5f32 { // for not overlap
+                                    let dir = diff.normalize();
+                                    let ai_vel = speed * dir;
+                                    *vel = Velocity::new(ai_vel.x, ai_vel.y);
+                                    let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                                    let mut velocity = *body.velocity();
+                                    *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                                    body.set_velocity(velocity);
+                                // }
                             }
-                        } else {
-                            let vel_vec = DAMPING_FACTOR * vel.0;
-                            *vel = Velocity::new(vel_vec.x, vel_vec.y);
+                        };
+                        if !is_chain {
+                            if diff.norm() > follow_area {
+                                if character_noticed {
+                                    let ai_vel = speed * dir;
+                                    *vel = Velocity::new(ai_vel.x, ai_vel.y);
+                                }
+                            } else {
+                                let vel_vec = DAMPING_FACTOR * vel.0;
+                                *vel = Velocity::new(vel_vec.x, vel_vec.y);
+                            }
+                            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                            let mut velocity = *body.velocity();
+                            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                            body.set_velocity(velocity);
                         }
-                        let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
-                        let mut velocity = *body.velocity();
-                        *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
-                        body.set_velocity(velocity);
+
                     }
                     AIType::Aim => {
                         let ship_torque = DT
