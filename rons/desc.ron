@@ -136,6 +136,28 @@
         ),
 
         (
+            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
+            gun_kind: RocketGun((
+                recharge_time: (secs: 1, nanos: 100_000_000),
+                bullets_damage: 200,
+                bullet_speed: 0.08,
+                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_image: "rocket"
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            size: 0.4,
+            image_name: "fish",
+        ),
+
+        (
             ai_kind: AI(kinds:[Shoot, Follow, Rotate(0.03)]),
             gun_kind: MultyLazer((
                 lazers: [
@@ -189,6 +211,29 @@
                 bullet_speed: 0.1,
                 bullet_lifetime: (secs: 2, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
+            )),
+            ship_stats: (
+                thrust_force: 0.003,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 100,
+                max_shield: 0,
+                damage: 10
+            ),
+            size: 0.4,
+            image_name: "rotship",
+        ),
+        (
+            ai_kind: AI(kinds:[Shoot, Follow, Rotate(0.1)]),
+            gun_kind: Cannon((
+                recharge_state: 0,
+                recharge_time: (secs: 1, nanos: 300_000_000),
+                bullets_damage: 0,
+                bullet_speed: 0.12,
+                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0),
+                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_image: "bomb"
             )),
             ship_stats: (
                 thrust_force: 0.003,

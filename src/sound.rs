@@ -142,8 +142,8 @@ pub fn init_sound<'a>(
     let mut name_to_music: HashMap<String, Music> = HashMap::new();
     {   // load music
         let names = [
-            "short_bells",
-            "short_bells2"
+            "menu",
+            "short_bells"
         ];
         for name in names.iter() {
             let file = format!("assets/music/{}.wav", name);
@@ -154,8 +154,8 @@ pub fn init_sound<'a>(
         }
     }
     let music_data = MusicData {
-        menu_music: name_to_music.remove("short_bells").unwrap(),
-        battle_music: vec![name_to_music.remove("short_bells2").unwrap()]
+        menu_music: name_to_music.remove("menu").unwrap(),
+        battle_music: vec![name_to_music.remove("short_bells").unwrap()]
     };
     sdl2::mixer::Channel::all().set_volume(EFFECT_MAX_VOLUME);
     sdl2::mixer::Music::set_volume(MUSIC_MAX_VOLUME);

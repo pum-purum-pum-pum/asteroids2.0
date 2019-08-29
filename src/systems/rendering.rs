@@ -519,6 +519,9 @@ impl<'a> System<'a> for GUISystem {
             ReadStorage<'a, CharacterMarker>,
             ReadStorage<'a, Lifes>,
             ReadStorage<'a, Shield>,
+            ReadStorage<'a, SideBulletAbility>,
+            ReadStorage<'a, DoubleCoinsAbility>,
+            ReadStorage<'a, DoubleExpAbility>,
             WriteStorage<'a, ShipStats>,
             ReadExpect<'a, red::Viewport>,
         ),
@@ -538,6 +541,9 @@ impl<'a> System<'a> for GUISystem {
                 character_markers,
                 lifes,
                 shields,
+                side_bullet_abilities,
+                double_coins_abilities,
+                double_exp_abilities,
                 mut ships_stats,
                 viewport,
             ),
@@ -683,6 +689,63 @@ impl<'a> System<'a> for GUISystem {
                 image: None
             }
         );
+
+        let side_bullets_cnt = side_bullet_abilities.count();
+        let double_coins_cnt = double_coins_abilities.count();
+        let double_exp_cnt = double_exp_abilities.count();
+        let icon_size = w/20.0;
+        struct Ability {
+            pub icon: Image,
+            pub text: String
+        };
+        let mut abilities = vec![];
+
+        if double_coins_cnt > 0 {
+            let ability = Ability {
+                icon: Image(preloaded_images.coin),
+                text: format!("x{}", double_coins_cnt).to_string(),
+            };
+            abilities.push(ability);
+        }
+        if double_exp_cnt > 0 {
+            let ability = Ability {
+                icon: Image(preloaded_images.exp),
+                text: format!("x{}", double_exp_cnt).to_string(),
+            };
+            abilities.push(ability);
+        }
+        if side_bullets_cnt > 0 {
+            let ability = Ability {
+                icon: Image(preloaded_images.side_bullet_ability),
+                text: format!("+{}", side_bullets_cnt).to_string()
+            };
+            abilities.push(ability);
+        }
+
+        for (i, ability) in abilities.iter().enumerate() {
+            let x_pos = w - w/7.0;
+            let y_pos = (i as f32 + 1.0) * h / 7.0 + h / 20.0;
+            let side_bullet_icon = Button::new(
+                Point2::new(x_pos, y_pos),
+                icon_size,
+                icon_size,
+                Point3::new(0f32, 0f32, 0f32),
+                false,
+                Some(ability.icon),
+                "".to_string()
+            );
+            side_bullet_icon.place_and_check(&mut ingame_ui, &*mouse);
+            ingame_ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Text(Text {
+                        position: Point2::new(x_pos + 2.0 * icon_size, y_pos + icon_size / 2.0), 
+                        text: ability.text.clone()
+                    }),
+                    with_projection: false,
+                    image: None
+                }
+            );            
+        }
 
         let (_character, _) = (&entities, &character_markers).join().next().unwrap();
         // "UI" things
@@ -837,6 +900,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, StarsMarker>,
             ReadStorage<'a, NebulaMarker>,
             ReadStorage<'a, PlanetMarker>,
+            ReadStorage<'a, BigStarMarker>,
             ReadStorage<'a, Projectile>,
             ReadStorage<'a, ThreadPin<ImageData>>,
             ReadStorage<'a, Image>,
@@ -874,6 +938,7 @@ impl<'a> System<'a> for RenderingSystem {
                 stars,
                 nebulas,
                 planets,
+                big_star_markers,
                 projectiles,
                 image_datas,
                 image_ids,
@@ -961,6 +1026,23 @@ impl<'a> System<'a> for RenderingSystem {
                         None
                 );
         };
+
+        // for (_entity, iso, image, size, _stars) in
+        //     (&entities, &isometries, &image_ids, &sizes, &big_star_markers).join() {
+        //     let image_data = image_datas.get(image.0).unwrap();
+        //     canvas
+        //         .render(
+        //                 &gl,
+        //                 &viewport,
+        //                 &mut frame,
+        //                 &image_data,
+        //                 &iso.0,
+        //                 size.0,
+        //                 false,
+        //                 None
+        //         );
+        // };
+
         for (_entity, iso, image, size, _nebula) in
             (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
             let image_data = image_datas.get(image.0).unwrap();

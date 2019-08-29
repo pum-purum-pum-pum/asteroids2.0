@@ -32,12 +32,12 @@
 		),
 		(
 			name: "shot2",
-			count: 1,
+			count: 3,
 			gap: (secs: 0, nanos: 100_000_000)
 		),
 		(
 			name: "shot3",
-			count: 1,
+			count: 3,
 			gap: (secs: 0, nanos: 100_000_000)
 		),
 		(

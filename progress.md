@@ -4,7 +4,8 @@
  <!-- * fix timers \/ -->
  <!-- * one struct for blaster and shotgun \/ -->
  <!-- * damage processing simplify \/ -->
- * comments 
+ * on struct for lazer and multylazer
+ * comments
  * move high level gfx into different crate?
  * gui simplify
  * go through TODO tags
@@ -32,23 +33,39 @@ PEOPLE
 * * indiecator
 
 TODO
-* health collectables from asteroids and remove regeneration \/
-* rotation fire ship \/
-
+<!-- * health collectables from asteroids and remove regeneration \/ -->
+<!-- * rotation fire ship \/ -->
+<!-- * add rotation ship with cannon -->
+<!-- menu music -->
 * loot abilities 
-* * double coins
-* * double exp
+* * ring ability
+<!-- * * double exp \/ -->
+* * side lazers(the same upgrade as side bullets) 
+<!-- * * rendering \/ -->
+<!-- * * double coins \/ -->
+<!-- * * side bullets \/ -->
+<!-- * add big stars \it's bad/-->
+* lazy updater for InsertSystem
+<!-- * voronoi bullet point \/ -->
+<!-- * voronoi lazer point \just center/ -->
 
-* ?new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading?
+* new enemies
+<!-- * * missiles ship \/ -->
+
+* Menu
+* * particles towards player
+
+
+<!-- * ?new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading? \/ -->
 * add taran upgrade
 <!-- * ui selection \/ -->
 <!-- * coins \/ -->
-* buy sound
+<!-- * buy sound \/ -->
 <!-- * better lazer sound \/ -->
-* fix cheating when upgrading
+<!-- * fix cheating when upgrading \/ -->
 * fix stars spawning bug
 * fix bug lazers dead
-* fix bug asteroid spawn
+<!-- * fix bug asteroid spawn -->
 * make better animations
 * add harder placeholder waves at the end (mb just loop with improved stats..?)
 * ship buying on coins
@@ -68,7 +85,7 @@ TODO
 * ship trace
 * bullet trace
 * add rotation behaviour
-* add rockets
+<!-- * add rockets \/ -->
 <!-- * image borders fix \sort of. Nearest filter average white colors around/ -->
 * bullet sound in gun desc
 
@@ -96,7 +113,7 @@ FUN IDEAS TO TRY(TO SWITCH FROM WORK FOR FUN)
 * * bomb thrower \/
 * * bomberman \/
 * * bomb trace
-* * rockets enemy
+<!-- * * rockets enemy \/ -->
 * add boss2
 * add score table
 <!-- * agressive only if noticed \/ -->
@@ -106,8 +123,8 @@ FUN IDEAS TO TRY(TO SWITCH FROM WORK FOR FUN)
 * circular style? circular pixel art?
 
 * new projectiles
-* * rocketes
-* * granades \/
+<!-- * * rocketes \/ -->
+<!-- * * granades \/ -->
 * * * animations
 * * * custom image
 ws bullets around

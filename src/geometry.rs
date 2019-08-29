@@ -50,6 +50,20 @@ impl StarsGrid {
     }
 }
 
+pub struct BigStarGrid {
+    pub grid: Grid<bool>
+}
+
+impl BigStarGrid {
+    pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
+        let grid = Grid::new(n, rw, rh, rbw, rbh);
+        BigStarGrid {
+            grid: grid
+        }
+    }
+}
+
+
 pub struct Grid<T> {
     bricks: Vec<T>,
     x: f32, 
@@ -351,7 +365,7 @@ impl Polygon {
         }
     }
 
-    pub fn deconstruct(&self) -> Vec<Polygon> {
+    pub fn deconstruct(&self, bullet: Point2) -> Vec<Polygon> {
         if self.min_r < 0.8 {
             return vec![]
         }
@@ -364,7 +378,11 @@ impl Polygon {
             p.y += self.height / 2.0;
             p.y /= h_div;
         }
-        let (polys, _, _) = destruction(&transofrmed_points, self.center(), 10);
+        let mut bullet = bullet + Vector2::new(self.width / 2.0, self.height / 2.0);
+        bullet.x /= w_div;
+        bullet.y /= h_div;
+        let bullet = Point2::from(5.0 * bullet.coords);
+        let (polys, _, _) = destruction(&transofrmed_points, bullet, 10);
         let mut res = vec![];
         for poly in polys.iter() {
             let mut poly = poly.clone();

@@ -2,7 +2,7 @@ use std::ops::AddAssign;
 use std::collections::{HashMap};
 use std::time::{Instant, Duration};
 
-pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid};
+pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, BigStarGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use crate::gfx::{ImageData};
 pub use crate::sound::{SoundData, SoundPlacement};
@@ -154,10 +154,29 @@ pub enum InsertEvent {
         bullet_image: Image,
         blast: Option<Blast>
     },
+    Rocket {
+        kind: EntityType,
+        iso: Point3,
+        damage: usize,
+        owner: specs::Entity,
+        rocket_image: Image,
+    },
     Coin {
         value: usize,
         position: Point2
     },
+    DoubleCoinsAbility,
+    DoubleCoinsCollectable {
+        position: Point2
+    },
+    DoubleExpAbility,
+    DoubleExpCollectable {
+        position: Point2
+    },
+    SideBulletCollectable {
+        position: Point2
+    },
+    SideBulletAbility,
     Exp {
         value: usize,
         position: Point2,
@@ -183,6 +202,9 @@ pub enum InsertEvent {
         iso: Point3
     },
     Stars {
+        iso: Point3
+    },
+    BigStar {
         iso: Point3
     },
     Planet {
@@ -424,6 +446,7 @@ pub struct PreloadedImages {
     pub nebulas: Vec<specs::Entity>,
     pub planets: Vec<specs::Entity>,
     pub stars: Vec<specs::Entity>,
+    pub big_star: specs::Entity,
     pub ship_speed_upgrade: specs::Entity,
     pub bullet_speed_upgrade: specs::Entity,
     pub attack_speed_upgrade: specs::Entity,
@@ -438,6 +461,7 @@ pub struct PreloadedImages {
     pub coin: specs::Entity,
     pub exp: specs::Entity,
     pub health: specs::Entity,
+    pub side_bullet_ability: specs::Entity,
     pub bar: specs::Entity,
     pub upg_bar: specs::Entity,
     pub explosion: Animation,
@@ -540,6 +564,10 @@ pub struct StarsMarker;
 
 #[derive(Default, Component, Clone, Copy)]
 #[storage(NullStorage)]
+pub struct BigStarMarker;
+
+#[derive(Default, Component, Clone, Copy)]
+#[storage(NullStorage)]
 pub struct PlanetMarker;
 
 #[derive(Default, Component)]
@@ -564,7 +592,28 @@ pub struct Projectile {
 }
 
 #[derive(Component)]
+pub struct Rocket(pub Instant);
+
+#[derive(Component)]
 pub struct Coin(pub usize);
+
+#[derive(Component)]
+pub struct DoubleCoinsCollectable;
+
+#[derive(Component)]
+pub struct DoubleCoinsAbility;
+
+#[derive(Component)]
+pub struct DoubleExpCollectable;
+
+#[derive(Component)]
+pub struct DoubleExpAbility;
+
+#[derive(Component)]
+pub struct SideBulletCollectable;
+
+#[derive(Component)]
+pub struct SideBulletAbility;
 
 #[derive(Component)]
 pub struct Exp(pub usize);
@@ -593,6 +642,10 @@ impl Lifetime {
     pub fn delete(&self) -> bool {
         Instant::now() - self.start_time > self.lifetime
     }
+
+    pub fn rest(&self) -> Duration {
+        Instant::now() - self.start_time
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -600,7 +653,8 @@ pub enum GunKindMarker {
     Lazer,
     ShotGun,
     MultyLazer,
-    Cannon
+    Cannon,
+    RocketGun
 }
 
 impl Into<GunKindMarker> for &GunKind {
@@ -610,6 +664,7 @@ impl Into<GunKindMarker> for &GunKind {
             GunKind::Lazer(_) => GunKindMarker::Lazer,
             GunKind::MultyLazer(_) => GunKindMarker::MultyLazer,
             GunKind::Cannon(_) => GunKindMarker::Cannon,
+            GunKind::RocketGun(_) => GunKindMarker::RocketGun,
         }
     }
 }
@@ -662,7 +717,8 @@ pub enum GunKind {
     Lazer(Lazer),
     ShotGun(ShotGun),
     MultyLazer(MultyLazer),
-    Cannon(Cannon)
+    Cannon(Cannon),
+    RocketGun(RocketGun),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -670,7 +726,8 @@ pub enum GunKindSave {
     Lazer(Lazer),
     ShotGun(ShotGunSave),
     MultyLazer(MultyLazer),
-    Cannon(CannonSave)
+    Cannon(CannonSave),
+    RocketGun(RocketGunSave),
 }
 
 impl GunKindSave {
@@ -687,6 +744,9 @@ impl GunKindSave {
             }
             GunKindSave::Cannon(cannon_save) => {
                 GunKind::Cannon(cannon_save.convert(name_to_image))
+            }
+            GunKindSave::RocketGun(rocket_save) => {
+                GunKind::RocketGun(rocket_save.convert(name_to_image))
             }
         }
         // name_to_image[]
@@ -898,6 +958,52 @@ pub struct Cannon {
     pub bullet_image: Image
 }
 
+#[derive(Component, Debug, Clone, Copy)]
+pub struct RocketGun {
+    recharge_start: Instant,
+    pub recharge_time: Duration,
+    pub bullets_damage: usize,
+    pub bullet_speed: f32,
+    pub bullet_image: Image
+}
+
+impl RocketGun {
+    pub fn new(
+        recharge_time: Duration, 
+        bullets_damage: usize, 
+        bullet_speed: f32, 
+        bullet_image: Image,
+    ) -> Self {
+        Self {
+            recharge_start: Instant::now(),
+            recharge_time: recharge_time,
+            bullets_damage: bullets_damage,
+            bullet_speed: bullet_speed,
+            bullet_image: bullet_image
+        }
+    }
+}
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct RocketGunSave {
+    pub recharge_time: Duration,
+    pub bullets_damage: usize,
+    pub bullet_speed: f32,
+    pub bullet_lifetime: Duration,
+    pub bullet_image: String
+}
+
+impl RocketGunSave {
+    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> RocketGun {
+        RocketGun::new(
+            self.recharge_time,
+            self.bullets_damage,
+            self.bullet_speed,
+            Image(name_to_image[&self.bullet_image])
+        )
+    }
+}
+
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct CannonSave {
     pub recharge_time: Duration,
@@ -939,6 +1045,52 @@ impl Cannon {
             bullet_lifetime: bullet_lifetime,
             bullet_image: bullet_image
         }
+    }
+}
+
+impl Gun for RocketGun {
+    fn recharge_start(&self) -> Instant {
+        self.recharge_start
+    }
+
+    fn set_recharge_start(&mut self, recharge_start: Instant) {
+        self.recharge_start = recharge_start;
+    }
+
+    fn recharge_time(&self) -> Duration {
+        self.recharge_time
+    }
+
+    fn spawn_bullets(
+        &self,
+        entity_type: EntityType,
+        isometry: Isometry3,
+        _bullet_speed: f32,
+        bullet_damage: usize,
+        _ship_velocity: Vector2,
+        owner: specs::Entity
+    ) -> Vec<InsertEvent> {
+        let mut res = vec![];
+        {
+            let position = isometry.translation.vector;
+            // let mut rng = rand::thread_rng();
+            // let shift = rng.gen_range(-0.2f32, 0.2f32);
+            // let direction = isometry * Vector3::new(shift, -1f32, 0f32).normalize();
+            // let velocity_rel = bullet_speed * direction;
+            // let projectile_velocity = Velocity::new(
+            //     ship_velocity.x + velocity_rel.x,
+            //     ship_velocity.y + velocity_rel.y,
+            // );
+            let insert_event = InsertEvent::Rocket {
+                kind: entity_type,
+                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                damage: bullet_damage,
+                owner: owner,
+                rocket_image: self.bullet_image,
+            };
+            res.push(insert_event)
+        }
+        res
     }
 }
 

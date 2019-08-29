@@ -56,6 +56,10 @@ pub fn run() -> Result<(), String> {
     let viewport = red::Viewport::for_window(window_w as i32, window_h as i32);
     let mut phys_world: World<f32> = World::new();
     phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
+    {   // nphysics whatever parameters tuning
+        phys_world.integration_parameters_mut().erp = 0.01;
+        phys_world.integration_parameters_mut().max_linear_correction = 10.0;
+    }
     let sdl_context = sdl2::init().unwrap();
     let video = sdl_context.video().unwrap();
     let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
@@ -121,6 +125,8 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Velocity>();
     specs_world.register::<CharacterMarker>();
     specs_world.register::<AsteroidMarker>();
+    specs_world.register::<Rocket>();
+    specs_world.register::<RocketGun>();
     specs_world.register::<Projectile>();
     specs_world.register::<Blast>();
     specs_world.register::<ThreadPin<ImageData>>();
@@ -139,6 +145,12 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<LightMarker>();
     specs_world.register::<ShipMarker>();
     specs_world.register::<Coin>();
+    specs_world.register::<SideBulletCollectable>();
+    specs_world.register::<SideBulletAbility>();
+    specs_world.register::<DoubleCoinsCollectable>();
+    specs_world.register::<DoubleCoinsAbility>();
+    specs_world.register::<DoubleExpCollectable>();
+    specs_world.register::<DoubleExpAbility>();
     specs_world.register::<Exp>();
     specs_world.register::<Health>();
     specs_world.register::<CollectableMarker>();
@@ -151,6 +163,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
     specs_world.register::<StarsMarker>();
+    specs_world.register::<BigStarMarker>();
     specs_world.register::<PlanetMarker>();
     specs_world.register::<Damage>();
     specs_world.register::<AI>();
@@ -191,15 +204,20 @@ pub fn run() -> Result<(), String> {
         "blaster_gun",
         "shotgun",
         "coin",
+        "side_bullets",
         "health",
         "exp",
         "lazer_boss",
+        "rotship",
         "random_ship",
         "bomber",
         "bomberman",
         "charging",
         "bar",
-        "upg_bar"
+        "upg_bar",
+        "big_star",
+        "rocket",
+        "fish"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -415,6 +433,7 @@ pub fn run() -> Result<(), String> {
         background: name_to_image["back"],
         nebulas: nebula_images,
         stars: stars_images,
+        big_star: name_to_image["big_star"],
         planets: planet_images,
         ship_speed_upgrade: name_to_image["ship_speed"],
         bullet_speed_upgrade: name_to_image["bullet_speed"],
@@ -429,6 +448,7 @@ pub fn run() -> Result<(), String> {
         shotgun: name_to_image["shotgun"],
         coin: name_to_image["coin"],
         health: name_to_image["health"],
+        side_bullet_ability: name_to_image["side_bullets"],
         exp: name_to_image["exp"],
         bar: name_to_image["bar"],
         upg_bar: name_to_image["upg_bar"],
@@ -470,6 +490,7 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
     specs_world.add_resource(StarsGrid::new(3, 40f32, 40f32, 4f32, 4f32));
+    specs_world.add_resource(BigStarGrid::new(1, 150f32, 150f32, 30f32, 30f32));
     specs_world.add_resource(MacroGame{coins: 0, score: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
