@@ -311,26 +311,6 @@ impl Polygon {
         Self::new(res)
     }
 
-    // pub fn get_block_polygon(&self) -> BlockPolygon {
-    //     let mut rng = thread_rng();
-    //     let mut segments = vec![];
-    //     for i in 0..self.points.len() {
-    //         let p1 = self.points[i];
-    //         let p2 = self.points[(i + 1) % self.points.len()];
-    //         // TODO: it's kludge for clipping algo which has some bug when working with collision points :)
-    //         // FIX ME
-    //         let noise = Vector2::new(rng.gen_range(0.02, 0.05), rng.gen_range(0.02, 0.05));
-    //         let block_segment = BlockSegment {
-    //             point1: p1 - rvec2(self.mass_center) + noise,
-    //             point2: p2 - rvec2(self.mass_center) + noise
-    //         };
-    //         segments.push(block_segment);
-    //     }
-    //     BlockPolygon {
-    //         segments: segments
-    //     }
-    // }
-
     pub fn new(mut points: Vec<Point2>) -> Self {
         let w = 1.0 / (points.len() as f32);
         let mut center = Point2::new(0f32, 0f32);
@@ -363,6 +343,15 @@ impl Polygon {
             width: width,
             height: height
         }
+    }
+
+    pub fn centralize(&mut self, rot: Rotation2<f32>) {
+        for p in self.points.iter_mut() {
+            *p = rot * *p;
+            p.x -= self.mass_center.x;
+            p.y -= self.mass_center.y;
+        }
+        self.mass_center = Point2::new(0f32, 0f32);
     }
 
     pub fn deconstruct(&self, bullet: Point2) -> Vec<Polygon> {

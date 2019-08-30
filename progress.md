@@ -33,6 +33,7 @@ PEOPLE
 * * indiecator?
 
 TODO
+<!-- * rockets rotation \/ -->
 <!-- * health collectables from asteroids and remove regeneration \/ -->
 <!-- * rotation fire ship \/ -->
 <!-- * add rotation ship with cannon -->

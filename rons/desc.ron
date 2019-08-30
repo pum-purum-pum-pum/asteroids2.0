@@ -138,12 +138,16 @@
 
 
         (
-            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
-            gun_kind: Lazer((
-                damage: 2,
-                active: false,
-                distance: 3,
-                current_distance: 8,
+            ai_kind: AI(kinds:[Follow, Aim]),
+            gun_kind: ShotGun((
+                recharge_state: 0,
+                recharge_time: (secs: 3, nanos: 0),
+                bullets_damage: 200,
+                side_projectiles_number: 4,
+                angle_shift: 0.35,
+                bullet_speed: 0.08,
+                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_image: "enemy_shotgun_projectile"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -187,8 +191,8 @@
         (
             ai_kind: AI(kinds:[Shoot, Follow, Aim]),
             gun_kind: RocketGun((
-                recharge_time: (secs: 1, nanos: 100_000_000),
-                bullets_damage: 200,
+                recharge_time: (secs: 6, nanos: 100_000_000),
+                bullets_damage: 350,
                 bullet_speed: 0.08,
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "rocket"
@@ -202,7 +206,7 @@
                 max_shield: 0,
                 damage: 10
             ),
-            size: 0.4,
+            size: 0.6,
             image_name: "fish",
         ),
 

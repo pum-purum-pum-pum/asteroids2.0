@@ -54,7 +54,7 @@ const EXPLOSION_LIFETIME_SECS: u64 = 1;
 const BLAST_LIFETIME_SECS: u64 = 1;
 const BULLET_CONTACT_LIFETIME_SECS: u64 = 1;
 const COLLECTABLE_SIDE_BULLET: u64 = 5;
-const SIDE_BULLET_LIFETIME_SEC: u64 = 13;
+const SIDE_BULLET_LIFETIME_SEC: u64 = 6;
 const DOUBLE_COINS_LIFETIME_SEC: u64 = 5;
 const COLLECTABLE_DOUBLE_COINS_SEC: u64 = 5;
 
@@ -167,6 +167,7 @@ impl<'a> System<'a> for PhysicsSystem {
         ReadStorage<'a, Rocket>,
         ReadStorage<'a, Charge>,
         ReadStorage<'a, Chain>,
+        WriteStorage<'a, Spin>,
         Write<'a, World<f32>>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
@@ -184,6 +185,7 @@ impl<'a> System<'a> for PhysicsSystem {
             rockets,
             chargings,
             chains,
+            mut spins,
             mut world,
             mut nebula_grid,
             mut planet_grid,
@@ -201,7 +203,7 @@ impl<'a> System<'a> for PhysicsSystem {
         };
         let char_vec = character_position.translation.vector;
         { // rockets movements logic
-            for (_entity, iso, vel, phys, rocket) in (&entities, &isometries, &velocities, &physics, &rockets).join() {
+            for (_entity, iso, vel, spin, phys, rocket) in (&entities, &isometries, &velocities, &mut spins, &physics, &rockets).join() {
                 let rocket_vec = iso.0.translation.vector;
                 let rocket_pos = Point2::new(rocket_vec.x, rocket_vec.y);
                 // let _middle = (rocket_pos + char_vec) / 2.0;
@@ -218,6 +220,17 @@ impl<'a> System<'a> for PhysicsSystem {
                     rigid_body.apply_force(0, &force, ForceType::Force, true);
                 }
                 // rigid_body.activate();
+
+                let rocket_torque = DT
+                    * calculate_player_ship_spin_for_aim(
+                        Vector2::new(char_vec.x, char_vec.y)
+                            - Vector2::new(rocket_pos.x, rocket_pos.y),
+                        iso.rotation(),
+                        spin.0,
+                    );
+                spin.0 += rocket_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                // TODO move to Kinematic system?
+                rigid_body.set_angular_velocity(spin.0);
             }
         }
 
@@ -493,12 +506,10 @@ pub fn spawn_asteroids<'a>(
     let mut rng = thread_rng();
     if new_polygons.len() > 1 {
         for poly in new_polygons.iter() {
-            let asteroid_shape = Geometry::Polygon(poly.clone());
             let insert_event = InsertEvent::Asteroid {
                 iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
                 velocity: initial_asteroid_velocity(),
                 polygon: poly.clone(),
-                light_shape: asteroid_shape,
                 spin: rng.gen_range(-1E-2, 1E-2),
             };
             insert_channel.single_write(insert_event);
@@ -506,14 +517,14 @@ pub fn spawn_asteroids<'a>(
     } else {
         // spawn coins and stuff
         let spawn_position = Point2::new(position.x, position.y);
-        if rng.gen_range(0.0, 1.0) < 0.51 {
+        if rng.gen_range(0.0, 1.0) < 0.11 {
             insert_channel.single_write(InsertEvent::Health{
                 value: 100,
                 position: spawn_position
             })
         }
 
-        if rng.gen_range(0.0, 1.0) < 0.2 {
+        if rng.gen_range(0.0, 1.0) < 0.02 {
             insert_channel.single_write(InsertEvent::Coin{
                 value: 1,
                 position: spawn_position
@@ -522,10 +533,10 @@ pub fn spawn_asteroids<'a>(
         if rng.gen_range(0.0, 1.0) < 0.05 {
             insert_channel.single_write(InsertEvent::SideBulletCollectable{position: spawn_position});
         }
-        if rng.gen_range(0.0, 1.0) < 0.5 {
+        if rng.gen_range(0.0, 1.0) < 0.02 {
             insert_channel.single_write(InsertEvent::DoubleCoinsCollectable{position: spawn_position});
         }
-        if rng.gen_range(0.0, 1.0) < 0.5 {
+        if rng.gen_range(0.0, 1.0) < 0.02 {
             insert_channel.single_write(InsertEvent::DoubleExpCollectable{position: spawn_position});
         }
     }
@@ -1027,9 +1038,13 @@ impl<'a> System<'a> for InsertSystem {
                     iso,
                     velocity,
                     polygon,
-                    light_shape,
                     spin,
                 } => {
+                    let mut polygon = polygon.clone();
+                    let center = polygon.center();
+                    polygon.centralize(Rotation2::new(iso.z));
+                    let light_shape = Geometry::Polygon(polygon.clone());
+                    let iso = Point3::new(iso.x + center.x, iso.y + center.y, 0.0);
                     let physics_polygon =
                         if let Some(physics_polygon) = ncollide2d::shape::ConvexPolygon::try_from_points(&polygon.points()) {
                             physics_polygon
@@ -1045,7 +1060,7 @@ impl<'a> System<'a> for InsertSystem {
                         .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
                         .with(Velocity::new(velocity.linear.x, velocity.linear.y), &mut velocities)
                         .with(Lifes((ASTEROID_MAX_LIFES as f32 * polygon.min_r / ASTEROID_MAX_RADIUS) as usize), &mut lifes)
-                        .with(polygon.clone(), &mut polygons)
+                        .with(polygon, &mut polygons)
                         .with(AsteroidMarker::default(), &mut asteroid_markers)
                         .with(Image(preloaded_images.asteroid), &mut images)
                         .with(Spin(*spin), &mut spins)
@@ -1728,9 +1743,7 @@ impl<'a> System<'a> for GamePlaySystem {
             let mut rng = thread_rng();
             let size = rng.gen_range(ASTEROID_MIN_RADIUS, ASTEROID_MAX_RADIUS);
             let r = size;
-            // let asteroid_shape = Geometry::Circle { radius: r };
             let poly = generate_convex_polygon(10, r);
-            let asteroid_shape = Geometry::Polygon(poly.clone());
             let spin = rng.gen_range(-1E-2, 1E-2);
             // let ball = ncollide2d::shape::Ball::new(r);
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
@@ -1742,7 +1755,6 @@ impl<'a> System<'a> for GamePlaySystem {
                 ),
                 velocity: initial_asteroid_velocity(),
                 polygon: poly,
-                light_shape: asteroid_shape,
                 spin: spin,
             });
         }
@@ -2025,7 +2037,7 @@ fn bullet_contact(
 
 fn asteroid_explode(
     explode_position: Point2,
-    _insert_channel: &mut Write<EventChannel<InsertEvent>>,
+    insert_channel: &mut Write<EventChannel<InsertEvent>>,
     sounds_channel: &mut Write<EventChannel<Sound>>,
     preloaded_sounds: &ReadExpect<PreloadedSounds>,
     _preloaded_images: &ReadExpect<PreloadedImages>,
@@ -2036,6 +2048,18 @@ fn asteroid_explode(
             explode_position
         )
     );
+    let effect = InsertEvent::Explosion {
+        position: Point2::new(explode_position.x, explode_position.y),
+        num: 10usize,
+        lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
+        with_animation: true
+    };
+    insert_channel.single_write(effect);
+    sounds_channel.single_write(Sound(
+        preloaded_sounds.asteroid_explosion,
+        Point2::new(explode_position.x, explode_position.y)
+    ));
+
 }
 
 fn blast_explode(
@@ -2166,13 +2190,13 @@ impl<'a> System<'a> for CollisionSystem {
                     let proj_pos = isometries.get(entity2).unwrap().0.translation.vector;
                     let proj_pos2d = Point2::new(proj_pos.x, proj_pos.y);
                     bullet_position = Some(proj_pos2d);
-                    let animation = InsertEvent::Animation {
-                        animation: preloaded_images.bullet_contact.clone(),
-                        lifetime: Duration::from_secs(BULLET_CONTACT_LIFETIME_SECS),
-                        pos: proj_pos2d,
-                        size: 1f32
-                    };
-                    insert_channel.single_write(animation);
+                    bullet_contact(
+                        proj_pos2d,
+                        &mut insert_channel,
+                        &mut sounds_channel,
+                        &preloaded_sounds,
+                        &preloaded_images,
+                    );
                     let projectile = entity2;
                     let projectile_damage = damages.get(projectile).unwrap().0;
                     if projectile_damage != 0 {
@@ -2213,17 +2237,24 @@ impl<'a> System<'a> for CollisionSystem {
                     insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                     let isometry = isometries.get(asteroid).unwrap().0;
                     let position = isometry.translation.vector;
-                    let effect = InsertEvent::Explosion {
-                        position: Point2::new(position.x, position.y),
-                        num: 10usize,
-                        lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-                        with_animation: true
-                    };
-                    insert_channel.single_write(effect);
-                    sounds_channel.single_write(Sound(
-                        preloaded_sounds.asteroid_explosion,
-                        Point2::new(position.x, position.y)
-                    ));
+                    asteroid_explode(
+                        Point2::new(position.x, position.y),
+                        &mut insert_channel,
+                        &mut sounds_channel,
+                        &preloaded_sounds,
+                        &preloaded_images
+                    );
+                    // let effect = InsertEvent::Explosion {
+                    //     position: Point2::new(position.x, position.y),
+                    //     num: 10usize,
+                    //     lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
+                    //     with_animation: true
+                    // };
+                    // insert_channel.single_write(effect);
+                    // sounds_channel.single_write(Sound(
+                    //     preloaded_sounds.asteroid_explosion,
+                    //     Point2::new(position.x, position.y)
+                    // ));
                     spawn_asteroids(
                         isometries.get(asteroid).unwrap().0, 
                         polygons.get(asteroid).unwrap(), 
@@ -2258,6 +2289,14 @@ impl<'a> System<'a> for CollisionSystem {
                         );
                         // delete character
                         entities.delete(ship).unwrap();
+                    } else {
+                        bullet_contact(
+                            projectile_pos,
+                            &mut insert_channel,
+                            &mut sounds_channel,
+                            &preloaded_sounds,
+                            &preloaded_images,
+                        );
                     }
                     insert_channel.single_write(InsertEvent::Wobble(0.1f32));
                 } else {

@@ -132,7 +132,6 @@ pub enum InsertEvent {
         iso: Point3,
         velocity: Velocity2,
         polygon: Polygon,
-        light_shape: Geometry,
         spin: f32,
     },
     Ship {
