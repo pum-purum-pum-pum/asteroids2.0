@@ -1200,13 +1200,13 @@ impl<'a> System<'a> for RenderingSystem {
                     Some(red::Blend)
                 );
         }
-        for (_entity, physics_component, image, size, _ship) in
-                    (&entities, &physics, &image_ids, &sizes, &ship_markers).join() {
-                let iso2 = world
-                    .rigid_body(physics_component.body_handle)
-                    .unwrap()
-                    .position();
-                let iso = iso2_iso3(iso2);
+        for (_entity, iso, _physics_component, image, size, _ship) in
+                    (&entities, &isometries, &physics, &image_ids, &sizes, &ship_markers).join() {
+                // let iso2 = world
+                //     .rigid_body(physics_component.body_handle)
+                //     .unwrap()
+                //     .position();
+                // let iso = iso2_iso3(iso2);
                 let image_data = &image_datas.get(image.0).unwrap();
                 canvas
                     .render(
@@ -1214,7 +1214,7 @@ impl<'a> System<'a> for RenderingSystem {
                         &viewport,
                         &mut frame,
                         &image_data,
-                        &iso,
+                        &iso.0,
                         size.0,
                         true,
                         None
