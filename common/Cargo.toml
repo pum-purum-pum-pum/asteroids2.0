@@ -1,25 +1,12 @@
-cargo-features = ["profile-overrides"]
-[build]
-incremental = true
 [package]
-name = "sdl-app"
+name = "common"
 version = "0.1.0"
 authors = ["vlad <vladzhukovtirko@gmail.com>"]
 edition = "2018"
 
-[lib]
-crate-type = ["cdylib"]
-
-[target.'cfg(target_os="android")'.dependencies]
-android_log = "*"
-log = "*"
-
-[workspace]
-members = ["gfx_h", "common"]
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-common = {path = "common"}
-gfx_h = {path = "gfx_h"}
 cfg-if = "*"
 noise = "0.5.1"
 backtrace = "0.3.32"
@@ -37,24 +24,12 @@ hibitset = "0.5.0"
 fnv = "1.0.6"
 derive_deref = "1.1.0"
 num_enum = "0.1.1"
-red = {path = "red"}
+red = {path = "../red"}
 glyph_brush = "0.5.3"
 ron = "0.5.1"
 serde = "1.0.97"
-vorod = {path="voronois"}
 
 [dependencies.sdl2]
 version = "0.32.2"
 default-features = false
 features = ["image", "mixer"]
-
-[profile.dev]
-opt-level = 0
-debug = true
-
-[profile.dev.overrides."*"]
-opt-level = 3
-
-
-# [profile.release]
-# lto = true

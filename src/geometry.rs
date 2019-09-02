@@ -1,5 +1,5 @@
 use crate::components::{Geometry, BlockSegment};
-use crate::types::{*};
+use crate::common::*;
 use ncollide2d::transformation::convex_hull_idx;
 // use ncollide2d::query::closest_points_line_line_parameters;
 use rand::prelude::*;

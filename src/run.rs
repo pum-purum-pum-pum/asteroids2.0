@@ -17,9 +17,12 @@ use serde::{Serialize, Deserialize};
 
 
 use std::path::Path;
-use crate::types::{*};
+use crate::common::*;
 use crate::components::*;
-use crate::gfx::{Canvas, GlyphVertex, TextVertexBuffer, TextData};
+use gfx_h::{
+    Canvas, GlyphVertex, TextVertexBuffer, 
+    TextData, ParticlesData, MovementParticles
+};
 use crate::physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
 use crate::sound::{init_sound, };
 use crate::systems::{
@@ -28,7 +31,6 @@ use crate::systems::{
     GUISystem, ScoreTableRendering, UpgradeGUI
 };
 use glyph_brush::{*};
-use crate::gfx::{ParticlesData, MovementParticles};
 use crate::gui::{IngameUI, Primitive};
 
 

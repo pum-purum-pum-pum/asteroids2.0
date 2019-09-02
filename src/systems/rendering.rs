@@ -1,4 +1,4 @@
-use crate::gfx::{TextData, RenderMode};
+use gfx_h::{TextData, RenderMode};
 use std::collections::{HashMap};
 
 use super::*;

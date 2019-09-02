@@ -4,11 +4,12 @@ use std::time::{Instant, Duration};
 
 pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, BigStarGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
-pub use crate::gfx::{ImageData};
+pub use gfx_h::{Image, ImageData};
+pub use gfx_h::animation::{Animation, AnimationFrame};
+use gfx_h::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub use crate::sound::{SoundData, SoundPlacement};
 pub use crate::gui::{Button, Rectangle};
-pub use crate::gfx::animation::{Animation, AnimationFrame};
-use crate::types::{*};
+use crate::common::*;
 
 
 use specs::prelude::*;
@@ -25,7 +26,6 @@ pub const BULLET_SPEED_INIT: f32 = 0.5;
 pub const THRUST_FORCE_INIT: f32 = 0.01;
 pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 
-use crate::gfx::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
@@ -372,8 +372,6 @@ impl Gun for Charge {
 pub struct Size(pub f32);
 
 /// Index of Images structure
-#[derive(Debug, Component, Clone, Copy)]
-pub struct Image(pub specs::Entity);
 
 #[derive(Component, Clone, Copy)]
 pub struct Sound(pub specs::Entity, pub Point2);

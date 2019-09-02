@@ -1,12 +1,15 @@
-use crate::types::{*};
+pub use rand;
+pub use common;
 use rand::prelude::*;
 use noise::{NoiseFn, Perlin, Seedable};
+use specs::prelude::*;
+use specs_derive::Component;
 
 use std::io::{BufReader, Error as IOError, Read};
 
-
 use nalgebra::geometry::Orthographic3;
 
+use common::*;
 use red;
 use red::VertexAttribPointers;
 use red::glow::Context;
@@ -64,6 +67,10 @@ fn gl_err_to_str(err: u32) -> &'static str {
         _ => "Unknown error",
     }
 }
+
+#[derive(Debug, Component, Clone, Copy)]
+pub struct Image(pub specs::Entity);
+
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]

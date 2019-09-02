@@ -1,17 +1,16 @@
 
 mod components;
 mod geometry;
-mod gfx;
 mod physics;
 mod sound;
 mod systems;
 #[cfg(test)]
 mod test;
 mod gui;
-mod types;
 mod run;
 
-
+pub use common;
+pub use gfx_h;
 pub use specs_derive;
 pub use specs;
 pub use sdl2;

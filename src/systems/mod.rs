@@ -1,7 +1,7 @@
 
 use std::mem::swap;
 
-use crate::types::{*};
+use common::*;
 use rand::prelude::*;
 use sdl2::keyboard::Keycode;
 use std::time::{Instant, Duration};
@@ -20,7 +20,7 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, Polygon, TriangulateFromCenter, EPS};
-use crate::gfx::{GeometryData, ParticlesData, Explosion};
+use gfx_h::{GeometryData, ParticlesData, Explosion};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData, MusicData, EFFECT_MAX_VOLUME};
 use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};

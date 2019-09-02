@@ -1,0 +1,24 @@
+[package]
+name = "gfx_h"
+version = "0.1.0"
+authors = ["vlad <vladzhukovtirko@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rand = "0.6.5"
+red = {path = "../red"}
+noise = "0.5.1"
+nalgebra = "0.18.0"
+image = "0.21.1"
+glyph_brush = "0.5.3"
+common = {path = "../common"}
+specs = {version="0.14.3", features=["nightly"]}
+specs-derive = "0.4.0"
+
+[dependencies.sdl2]
+version = "0.32.2"
+default-features = false
+features = ["image", "mixer"]
+

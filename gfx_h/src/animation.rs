@@ -1,5 +1,7 @@
-use crate::components::*;use specs::prelude::*;
+use specs::prelude::*;
 use specs_derive::Component;
+
+use crate::Image;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationFrame {

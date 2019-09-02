@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
-use crate::types::{*};
+use crate::common::*;
 use serde::{Serialize, Deserialize};
 
 use sdl2::mixer::{InitFlag, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS, Music};
