@@ -383,7 +383,7 @@ impl<'a> System<'a> for SoundSystem {
                     let music_id = rng.gen_range(0, music_data.battle_music.len());
                     sdl2::mixer::Music::halt();
                     music.menu_play = false;
-                    music_data.battle_music[music_id].play(-1).unwrap();
+                    // music_data.battle_music[music_id].play(-1).unwrap();
                     music.current_battle = Some(music_id);
                 }
             }
@@ -394,7 +394,7 @@ impl<'a> System<'a> for SoundSystem {
                     music.current_battle = None;
                 }
                 if !music.menu_play {
-                    music_data.menu_music.play(-1).unwrap();
+                    // music_data.menu_music.play(-1).unwrap();
                     music.menu_play = true;
                 }
             }
@@ -517,7 +517,7 @@ pub fn spawn_asteroids<'a>(
     } else {
         // spawn coins and stuff
         let spawn_position = Point2::new(position.x, position.y);
-        if rng.gen_range(0.0, 1.0) < 0.11 {
+        if rng.gen_range(0.0, 1.0) < 0.41 {
             insert_channel.single_write(InsertEvent::Health{
                 value: 100,
                 position: spawn_position
@@ -838,7 +838,6 @@ impl<'a> System<'a> for ControlSystem {
     }
 }
 
-// thread local system
 pub struct InsertSystem {
     reader: ReaderId<InsertEvent>,
 }
@@ -858,41 +857,15 @@ impl<'a> System<'a> for InsertSystem {
             WriteStorage<'a, Isometry>,
             WriteStorage<'a, Velocity>,
             WriteStorage<'a, Spin>,
-            WriteStorage<'a, MultyLazer>,
-            WriteStorage<'a, Lazer>,
-            WriteStorage<'a, ShotGun>,
-            WriteStorage<'a, Cannon>,
-            WriteStorage<'a, Damage>,
-            WriteStorage<'a, Lifes>,
-            WriteStorage<'a, Shield>,
-            WriteStorage<'a, Lifetime>,
-            WriteStorage<'a, AI>,
-            WriteStorage<'a, Charge>,
-            WriteStorage<'a, AsteroidMarker>,
-            WriteStorage<'a, EnemyMarker>,
-            WriteStorage<'a, ShipMarker>,
             WriteStorage<'a, Image>,
             WriteStorage<'a, Size>,
-            WriteStorage<'a, Polygon>,
-            WriteStorage<'a, Projectile>,
-            WriteStorage<'a, Blast>,
         ),
         (
             WriteStorage<'a, StarsMarker>,
             WriteStorage<'a, NebulaMarker>,
             WriteStorage<'a, PlanetMarker>,
             WriteStorage<'a, AttachPosition>,
-            WriteStorage<'a, Animation>,
-            WriteStorage<'a, CollectableMarker>,
-            WriteStorage<'a, Exp>,
-            WriteStorage<'a, Health>,
-            WriteStorage<'a, DoubleCoinsAbility>,
-            WriteStorage<'a, DoubleExpCollectable>,
-            WriteStorage<'a, DoubleExpAbility>,
             WriteStorage<'a, LightMarker>,
-            WriteStorage<'a, CharacterMarker>,
-            WriteStorage<'a, ThreadPin<ParticlesData>>,
-            WriteStorage<'a, ShipStats>,
         ),
         ReadExpect<'a, ThreadPin<red::GL>>,
         WriteExpect<'a, PreloadedImages>,
@@ -909,45 +882,19 @@ impl<'a> System<'a> for InsertSystem {
             (
                 entities,
                 mut physics,
-                mut geometries,
+                _geometries,
                 mut isometries,
                 mut velocities,
                 mut spins,
-                mut multy_lazers,
-                mut lazers,
-                mut shotguns,
-                mut cannons,
-                mut damages,
-                mut lifes,
-                mut shields,
-                mut lifetimes,
-                mut ais,
-                mut chargings,
-                mut asteroid_markers,
-                mut enemies,
-                mut ships,
                 mut images,
                 mut sizes,
-                mut polygons,
-                mut projectiles,
-                mut blasts,
             ),
             (
-                mut stars,
-                mut nebulas,
-                mut planets,
+                _stars,
+                _nebulas,
+                _planets,
                 mut attach_positions,
-                mut animations,
-                mut collectables,
-                mut exps,
-                mut healths,
-                mut double_coins_ability,
-                mut double_exp_collectable,
-                mut double_exp_ability,
                 mut lights,
-                mut character_markers,
-                mut particles_datas,
-                mut ships_stats,
             ),
             gl,
             preloaded_images,
@@ -971,33 +918,30 @@ impl<'a> System<'a> for InsertSystem {
                     let _enemy_shape = Geometry::Circle { radius: enemy_size };
                     let life = Lifes(ship_stats.max_health);
                     let shield = Shield(ship_stats.max_shield);
-                    let character = match gun_kind {
+                    let character = entities.create();
+                    match gun_kind {
                         GunKind::Lazer(lazer) => {
-                            entities.build_entity()
-                                .with(*lazer, &mut lazers)
+                            lazy_update.insert(character, *lazer);
                         }
                         GunKind::ShotGun(shotgun) => {
-                            entities.build_entity()
-                                .with(*shotgun, &mut shotguns)
+                            lazy_update.insert(character, *shotgun);
                         }
                         _ => {
                             unimplemented!()
                         }
                     };
-                    let character = character
-                        .with(life, &mut lifes)
-                        .with(shield, &mut shields)
-                        .with(Isometry::new(0f32, 0f32, 0f32), &mut isometries)
-                        .with(Velocity::new(0f32, 0f32), &mut velocities)
-                        .with(CharacterMarker::default(), &mut character_markers)
-                        .with(Damage(ship_stats.damage), &mut damages)
-                        .with(ShipMarker::default(), &mut ships)
-                        .with(Image(preloaded_images.character), &mut images)
-                        .with(Spin::default(), &mut spins)
-                        .with(character_shape, &mut geometries)
-                        .with(Size(char_size), &mut sizes)
-                        .with(*ship_stats, &mut ships_stats)
-                        .build();
+                    lazy_update.insert(character, life);
+                    lazy_update.insert(character, shield);
+                    lazy_update.insert(character, Isometry::new(0f32, 0f32, 0f32));
+                    lazy_update.insert(character, Velocity::new(0f32, 0f32));
+                    lazy_update.insert(character, CharacterMarker::default());
+                    lazy_update.insert(character, Damage(ship_stats.damage));
+                    lazy_update.insert(character, ShipMarker::default());
+                    lazy_update.insert(character, Image(preloaded_images.character));
+                    lazy_update.insert(character, Spin::default());
+                    lazy_update.insert(character, character_shape);
+                    lazy_update.insert(character, Size(char_size));
+                    lazy_update.insert(character, *ship_stats);
                     let character_physics_shape = ncollide2d::shape::Ball::new(char_size);
 
                     let mut character_collision_groups = CollisionGroups::new();
@@ -1054,18 +998,29 @@ impl<'a> System<'a> for InsertSystem {
                             break
                             // panic!();
                         };
-                    let asteroid = entities
-                        .build_entity()
-                        .with(light_shape.clone(), &mut geometries)
-                        .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                        .with(Velocity::new(velocity.linear.x, velocity.linear.y), &mut velocities)
-                        .with(Lifes((ASTEROID_MAX_LIFES as f32 * polygon.min_r / ASTEROID_MAX_RADIUS) as usize), &mut lifes)
-                        .with(polygon, &mut polygons)
-                        .with(AsteroidMarker::default(), &mut asteroid_markers)
-                        .with(Image(preloaded_images.asteroid), &mut images)
-                        .with(Spin(*spin), &mut spins)
-                        .with(Size(1f32), &mut sizes)
-                        .build();
+                    let asteroid = entities.create();
+                    lazy_update.insert(asteroid, light_shape.clone());
+                    lazy_update.insert(asteroid, Isometry::new(iso.x, iso.y, iso.z));
+                    lazy_update.insert(asteroid, Velocity::new(velocity.linear.x, velocity.linear.y));
+                    lazy_update.insert(asteroid, Lifes((ASTEROID_MAX_LIFES as f32 * polygon.min_r / ASTEROID_MAX_RADIUS) as usize));
+                    lazy_update.insert(asteroid, polygon);
+                    lazy_update.insert(asteroid, AsteroidMarker::default());
+                    lazy_update.insert(asteroid, Image(preloaded_images.asteroid));
+                    lazy_update.insert(asteroid, Spin(*spin));
+                    lazy_update.insert(asteroid, Size(1f32));
+                    
+                    // let asteroid = entities
+                    //     .build_entity()
+                    //     .with(light_shape.clone(), &mut geometries)
+                    //     .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
+                    //     .with(Velocity::new(velocity.linear.x, velocity.linear.y), &mut velocities)
+                    //     .with(Lifes((ASTEROID_MAX_LIFES as f32 * polygon.min_r / ASTEROID_MAX_RADIUS) as usize), &mut lifes)
+                    //     .with(polygon, &mut polygons)
+                    //     .with(AsteroidMarker::default(), &mut asteroid_markers)
+                    //     .with(Image(preloaded_images.asteroid), &mut images)
+                    //     .with(Spin(*spin), &mut spins)
+                    //     .with(Size(1f32), &mut sizes)
+                    //     .build();
 
                     let mut asteroid_collision_groups = CollisionGroups::new();
                     asteroid_collision_groups.set_membership(&[CollisionId::Asteroid as usize]);
@@ -1120,34 +1075,22 @@ impl<'a> System<'a> for InsertSystem {
                         let enemy = entities.create();
 
 
-                        // let mut enemy = entities
-                        //     .build_entity();
                         match gun_kind {
                             GunKind::ShotGun(shotgun) => {
                                 let side_num = 3usize;
                                 let _shift = std::f32::consts::PI / (side_num as f32 + 1.0);
                                 lazy_update.insert(enemy, *shotgun);
-                                // enemy = enemy
-                                //     .with(*shotgun, &mut shotguns)
                             }
                             GunKind::Lazer(lazer) => {
                                 lazy_update.insert(enemy, *lazer);
-                                // enemy = enemy
-                                //     .with(*lazer, &mut lazers)
                             }
                             GunKind::MultyLazer(multy_lazer) => {
                                 lazy_update.insert(enemy, multy_lazer.clone());
-                                // enemy = enemy
-                                //     .with(multy_lazer.clone(), &mut multy_lazers)
                             }
                             GunKind::Cannon(cannon) => {
                                 lazy_update.insert(enemy, cannon.clone());
-                                // enemy = enemy
-                                //     .with(cannon.clone(), &mut cannons)
                             }
                             GunKind::RocketGun(rocket_gun) => {
-                                // enemy = enemy
-                                //     .with(rocket_gun.clone(), &mut rocket_guns)
                                 lazy_update.insert(enemy, *rocket_gun);
                             }
                         }
@@ -1217,22 +1160,33 @@ impl<'a> System<'a> for InsertSystem {
                     blast
                 } => {
                     let r = 0.2;
-                    let mut bullet = entities
-                        .build_entity()
-                        .with(Damage(*damage), &mut damages)
-                        .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
-                        .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
-                        .with(Image(bullet_image.0), &mut images)
-                        .with(Spin::default(), &mut spins)
-                        .with(Projectile { owner: *owner }, &mut projectiles)
-                        .with(Lifetime::new(*lifetime), &mut lifetimes)
-                        .with(Size(r), &mut sizes);
+                    let bullet = entities.create();
+                    lazy_update.insert(bullet, Damage(*damage));
+                    lazy_update.insert(bullet, Velocity::new(velocity.x, velocity.y));
+                    lazy_update.insert(bullet, Isometry::new(iso.x, iso.y, iso.z));
+                    lazy_update.insert(bullet, Image(bullet_image.0));
+                    lazy_update.insert(bullet, Spin::default());
+                    lazy_update.insert(bullet, Projectile { owner: *owner });
+                    lazy_update.insert(bullet, Lifetime::new(*lifetime));
+                    lazy_update.insert(bullet, Size(r));
+
+                    // let mut bullet = entities
+                    //     .build_entity()
+                    //     .with(Damage(*damage), &mut damages)
+                    //     .with(Velocity::new(velocity.x, velocity.y), &mut velocities)
+                    //     .with(Isometry::new(iso.x, iso.y, iso.z), &mut isometries)
+                    //     .with(Image(bullet_image.0), &mut images)
+                    //     .with(Spin::default(), &mut spins)
+                    //     .with(Projectile { owner: *owner }, &mut projectiles)
+                    //     .with(Lifetime::new(*lifetime), &mut lifetimes)
+                    //     .with(Size(r), &mut sizes);
                     if let Some(blast) = blast {
-                        bullet = bullet
-                            .with(*blast, &mut blasts)
+                        lazy_update.insert(bullet, *blast);
+                        // bullet = bullet
+                        //     .with(*blast, &mut blasts)
                     }
-                    let bullet = bullet
-                        .build();
+                    // let bullet = bullet
+                    //     .build();
                     let bullet_collision_groups = get_collision_groups(kind);
                     let ball = ncollide2d::shape::Ball::new(r);
                     let bullet_physics_component = PhysicsComponent::safe_insert(
@@ -1332,62 +1286,52 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(entity, Image(preloaded_images.double_coin));
                 }
                 InsertEvent::DoubleCoinsAbility => {
-                    let _entity = entities
-                        .build_entity()
-                        .with(DoubleCoinsAbility, &mut double_coins_ability)
-                        .with(Lifetime::new(Duration::from_secs(DOUBLE_COINS_LIFETIME_SEC)), &mut lifetimes)
-                        .build();
+                    let entity = entities.create();
+                    lazy_update.insert(entity, DoubleCoinsAbility);
+                    lazy_update.insert(entity, Lifetime::new(Duration::from_secs(DOUBLE_COINS_LIFETIME_SEC)));
                 }
                 InsertEvent::DoubleExpCollectable {
                     position
                 } => {
                     let iso = Isometry::new(position.x, position.y, 0f32);
-                    let _coin_entity = entities
-                        .build_entity()
-                        .with(CollectableMarker, &mut collectables)
-                        .with(DoubleExpCollectable{}, &mut double_exp_collectable)
-                        .with(Lifetime::new(Duration::from_secs(COLLECTABLE_DOUBLE_COINS_SEC)), &mut lifetimes)
-                        .with(iso, &mut isometries)
-                        .with(Size(0.5), &mut sizes)
-                        .with(Image(preloaded_images.double_exp), &mut images)
-                        .with(Lifetime::new(Duration::from_secs(COIN_LIFETIME_SECS)), &mut lifetimes)
-                        .build();
+                    let coin_entity = entities.create();
+                    lazy_update.insert(coin_entity, CollectableMarker);
+                    lazy_update.insert(coin_entity, DoubleExpCollectable);
+                    lazy_update.insert(coin_entity, Lifetime::new(Duration::from_secs(COLLECTABLE_DOUBLE_COINS_SEC)));
+                    lazy_update.insert(coin_entity, iso);
+                    lazy_update.insert(coin_entity, Size(0.5));
+                    lazy_update.insert(coin_entity, Image(preloaded_images.double_exp));
+                    lazy_update.insert(coin_entity, Lifetime::new(Duration::from_secs(COIN_LIFETIME_SECS)));
                 }
                 InsertEvent::DoubleExpAbility => {
-                    let _entity = entities
-                        .build_entity()
-                        .with(DoubleExpAbility, &mut double_exp_ability)
-                        .with(Lifetime::new(Duration::from_secs(DOUBLE_COINS_LIFETIME_SEC)), &mut lifetimes)
-                        .build();
+                    let entity = entities.create();
+                    lazy_update.insert(entity, DoubleExpAbility);
+                    lazy_update.insert(entity, Lifetime::new(Duration::from_secs(DOUBLE_COINS_LIFETIME_SEC)));
                 }
                 InsertEvent::Health {
                     value,
                     position,
                 } => {
                     let iso = Isometry::new(position.x, position.y, 0f32);
-                    let _coin_entity = entities
-                        .build_entity()
-                        .with(CollectableMarker, &mut collectables)
-                        .with(Health(*value), &mut healths)
-                        .with(iso, &mut isometries)
-                        .with(Size(0.25), &mut sizes)
-                        .with(Image(preloaded_images.health), &mut images)
-                        .with(Lifetime::new(Duration::from_secs(COIN_LIFETIME_SECS)), &mut lifetimes)
-                        .build();                    
+                    let coin_entity = entities.create();
+                    lazy_update.insert(coin_entity, CollectableMarker);
+                    lazy_update.insert(coin_entity, Health(*value));
+                    lazy_update.insert(coin_entity, iso);
+                    lazy_update.insert(coin_entity, Size(0.25));
+                    lazy_update.insert(coin_entity, Image(preloaded_images.health));
+                    lazy_update.insert(coin_entity, Lifetime::new(Duration::from_secs(COIN_LIFETIME_SECS)));
                 }
                 InsertEvent::Exp {
                     value,
                     position
                 } => {
                     let iso = Isometry::new(position.x, position.y, 0f32);
-                    let _coin_entity = entities
-                        .build_entity()
-                        .with(CollectableMarker, &mut collectables)
-                        .with(Exp(*value), &mut exps)
-                        .with(iso, &mut isometries)
-                        .with(Size(0.25), &mut sizes)
-                        .with(Image(preloaded_images.exp), &mut images)
-                        .build();
+                    let exp_entity = entities.create();
+                    lazy_update.insert(exp_entity, CollectableMarker);
+                    lazy_update.insert(exp_entity, Exp(*value));
+                    lazy_update.insert(exp_entity, iso);
+                    lazy_update.insert(exp_entity, Size(0.25));
+                    lazy_update.insert(exp_entity, Image(preloaded_images.exp));
                 }
                 InsertEvent::Explosion {
                     position,
@@ -1397,13 +1341,11 @@ impl<'a> System<'a> for InsertSystem {
                 } => {
                     let iso = Isometry::new(position.x, position.y, 0f32);
                     if *with_animation {
-                        let _animation_entity = entities
-                            .build_entity()
-                            .with(iso, &mut isometries)
-                            .with(preloaded_images.explosion.clone(), &mut animations)
-                            .with(Lifetime::new(Duration::from_secs(EXPLOSION_LIFETIME_SECS)), &mut lifetimes)
-                            .with(Size(2f32), &mut sizes)        
-                            .build();            
+                        let animation_entity = entities.create();
+                        lazy_update.insert(animation_entity, iso);
+                        lazy_update.insert(animation_entity, preloaded_images.explosion.clone());
+                        lazy_update.insert(animation_entity, Lifetime::new(Duration::from_secs(EXPLOSION_LIFETIME_SECS)));
+                        lazy_update.insert(animation_entity, Size(2f32));
                     }
                     // particles of explosion                        
                     let explosion_particles = ThreadPin::new(ParticlesData::Explosion(Explosion::new(
@@ -1412,10 +1354,8 @@ impl<'a> System<'a> for InsertSystem {
                         *num,
                         Some(*lifetime),
                     )));
-                    let _explosion_particles_entity = entities
-                        .build_entity()
-                        .with(explosion_particles, &mut particles_datas)
-                        .build();
+                    let explosion_particles_entity = entities.create();
+                    lazy_update.insert(explosion_particles_entity, explosion_particles);
                 }
                 InsertEvent::Animation {
                     animation,
@@ -1424,13 +1364,11 @@ impl<'a> System<'a> for InsertSystem {
                     size
                 } => {
                     let iso = Isometry::new(pos.x, pos.y, 0f32);
-                    let _animation_entity = entities
-                        .build_entity()
-                        .with(iso, &mut isometries)
-                        .with(animation.clone(), &mut animations)
-                        .with(Lifetime::new(*lifetime), &mut lifetimes)
-                        .with(Size(*size), &mut sizes)        
-                        .build();            
+                    let animation_entity = entities.create();
+                    lazy_update.insert(animation_entity, iso);
+                    lazy_update.insert(animation_entity, animation.clone());
+                    lazy_update.insert(animation_entity, Lifetime::new(*lifetime));
+                    lazy_update.insert(animation_entity, Size(*size));        
                 }
                 InsertEvent::Nebula {
                     iso
@@ -1439,13 +1377,11 @@ impl<'a> System<'a> for InsertSystem {
                     let z = rng.gen_range(-120f32, -80f32);
                     let nebulas_num = preloaded_images.nebulas.len();
                     let nebula_id = rng.gen_range(0, nebulas_num);
-                    let _nebula = entities
-                        .build_entity()
-                        .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
-                        .with(Image(preloaded_images.nebulas[nebula_id]), &mut images)
-                        .with(NebulaMarker::default(), &mut nebulas)
-                        .with(Size(60f32), &mut sizes)
-                        .build();
+                    let nebula = entities.create();
+                    lazy_update.insert(nebula, Isometry::new3d(iso.x, iso.y, z, iso.z));
+                    lazy_update.insert(nebula, Image(preloaded_images.nebulas[nebula_id]));
+                    lazy_update.insert(nebula, NebulaMarker::default());
+                    lazy_update.insert(nebula, Size(60f32));
                 }
                 InsertEvent::Stars {
                     iso
@@ -1454,13 +1390,11 @@ impl<'a> System<'a> for InsertSystem {
                     let z = rng.gen_range(-180f32, -140f32);
                     let stars_num = preloaded_images.stars.len();
                     let stars_id = rng.gen_range(0, stars_num);
-                    let _stars = entities
-                        .build_entity()
-                        .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
-                        .with(Image(preloaded_images.stars[stars_id]), &mut images)
-                        .with(StarsMarker, &mut stars)
-                        .with(Size(30f32), &mut sizes)
-                        .build();
+                    let stars = entities.create();
+                    lazy_update.insert(stars, Isometry::new3d(iso.x, iso.y, z, iso.z));
+                    lazy_update.insert(stars, Image(preloaded_images.stars[stars_id]));
+                    lazy_update.insert(stars, StarsMarker);
+                    lazy_update.insert(stars, Size(30f32));
                 }
                 InsertEvent::BigStar {
                     iso
@@ -1480,13 +1414,11 @@ impl<'a> System<'a> for InsertSystem {
                     let z = -45.0;
                     let planets_num = preloaded_images.planets.len();
                     let planet_id = rng.gen_range(0, planets_num);
-                    let _nebula = entities
-                        .build_entity()
-                        .with(Isometry::new3d(iso.x, iso.y, z, iso.z), &mut isometries)
-                        .with(Image(preloaded_images.planets[planet_id]), &mut images)
-                        .with(PlanetMarker::default(), &mut planets)
-                        .with(Size(25f32), &mut sizes)
-                        .build();
+                    let nebula = entities.create();
+                    lazy_update.insert(nebula, Isometry::new3d(iso.x, iso.y, z, iso.z));
+                    lazy_update.insert(nebula, Image(preloaded_images.planets[planet_id]));
+                    lazy_update.insert(nebula, PlanetMarker::default());
+                    lazy_update.insert(nebula, Size(25f32));
                 }
                 InsertEvent::Wobble(wobble) => {
                     canvas.add_wobble(*wobble)
