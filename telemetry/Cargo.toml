@@ -1,0 +1,18 @@
+[package]
+name = "telemetry"
+version = "0.1.0"
+authors = ["vlad <vladzhukovtirko@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = {path = "../common"}
+gfx_h = {path = "../gfx_h"}
+red = {path = "../red"}
+rand = "0.6.5"
+
+[dependencies.sdl2]
+version = "0.32.2"
+default-features = false
+features = ["image", "mixer"]
