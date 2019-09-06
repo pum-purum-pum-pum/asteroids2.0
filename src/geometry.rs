@@ -249,6 +249,7 @@ pub struct Polygon {
     pub points: Vec<Point2>,
     mass_center: Point2,
     pub min_r: f32,
+    pub max_r: f32,
     pub width: f32,
     pub height: f32,
 }
@@ -330,8 +331,10 @@ impl Polygon {
         let width = max_x - min_x;
         let height = max_y - min_y;
         let mut min_r = 10f32;
+        let mut max_r = 0f32;
         for p in points.iter() {
-            min_r = min_r.min((p - center).norm())
+            min_r = min_r.min((p - center).norm());
+            max_r = max_r.max((p - center).norm());
         }
         if (points[0].coords - center.coords).perp(&(points[1].coords - center.coords)) > 0.0 {
             points.reverse();
@@ -340,6 +343,7 @@ impl Polygon {
             points: points,
             mass_center: center,
             min_r,
+            max_r,
             width: width,
             height: height
         }

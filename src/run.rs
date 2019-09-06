@@ -12,16 +12,23 @@ use backtrace::Backtrace;
 #[cfg(any(target_os = "android"))]
 use std::panic;
 use std::collections::{HashMap};
+use std::time::Duration;
 use ron::de::{from_str};
 use serde::{Serialize, Deserialize};
+// use rand::prelude::*;
+use slog::o;
+use log::info;
 
 
 use std::path::Path;
-use crate::common::*;
+use std::fs::File;
+use telemetry::{TeleGraph, TimeSpans};
+use common::*;
 use crate::components::*;
 use gfx_h::{
     Canvas, GlyphVertex, TextVertexBuffer, 
-    TextData, ParticlesData, MovementParticles
+    TextData, ParticlesData, MovementParticles,
+    effects::MenuParticles
 };
 use crate::physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
 use crate::sound::{init_sound, };
@@ -38,11 +45,35 @@ const NEBULAS_NUM: usize = 3usize;
 pub const FINGER_NUMBER: usize = 20;
 
 pub fn run() -> Result<(), String> {
+    // LOGGING
+
+        use std::fs::OpenOptions;
+        use slog::Drain;
+        let log_path = "game.log";
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(log_path)
+            .unwrap();
+
+        // create logger
+        let decorator = slog_term::PlainSyncDecorator::new(file);
+        let drain = slog_term::FullFormat::new(decorator).build().fuse();
+        let logger = slog::Logger::root(drain, o!());
+
+        // slog_stdlog uses the logger from slog_scope, so set a logger there
+        let _guard = slog_scope::set_global_logger(logger);
+
+        // register slog_stdlog as the log handler with the log crate
+        slog_stdlog::init().unwrap();
+    info!("asteroids: logging crazyness");
     let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
-    // let path_str = format!("assets/{}.png", );
-    // let dejavu = RWops::from_file(Path::new(&"assets/fonts/DejaVuSans.ttf"), "r").unwrap();
-    // let dejavu: Vec<u8> = dejavu.bytes().map(|x| x.unwrap() ).collect();
-    // let dejavu = dejavu.as_slice();
+    let mut telegraph = TeleGraph::new(Duration::from_secs(5));
+    telegraph.set_color("rendering".to_string(), Point3::new(1.0, 0.0, 0.0));
+    telegraph.set_color("physics".to_string(), Point3::new(0.0, 1.0, 0.0));
+
+    let time_spans = TimeSpans::new();
     let glyph_brush: GlyphBrush<GlyphVertex, _> = GlyphBrushBuilder::using_font_bytes(dejavu).build();
     #[cfg(any(target_os = "android"))]
     panic::set_hook(Box::new(|panic_info| {
@@ -65,7 +96,7 @@ pub fn run() -> Result<(), String> {
     let sdl_context = sdl2::init().unwrap();
     let video = sdl_context.video().unwrap();
     let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
-        let gl_attr = video.gl_attr();
+    let gl_attr = video.gl_attr();
     #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]        
     let glsl_version = "#version 330";
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
@@ -103,7 +134,7 @@ pub fn run() -> Result<(), String> {
         glyph_brush
     });
 
-    let canvas = Canvas::new(&context, &glsl_version).unwrap();
+    let canvas = Canvas::new(&context, "", &glsl_version).unwrap();
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
@@ -112,6 +143,7 @@ pub fn run() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
     let touches: Touches = [None; FINGER_NUMBER];
     let spawned_upgrades: SpawnedUpgrades = vec![];
+    specs_world.add_resource(DevInfo::new());
     specs_world.add_resource(Pallete::new());
     specs_world.add_resource(ChoosedUpgrade(None));
     specs_world.add_resource(text_data);
@@ -130,13 +162,13 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Rocket>();
     specs_world.register::<RocketGun>();
     specs_world.register::<Projectile>();
+    specs_world.register::<Reflection>();
     specs_world.register::<Blast>();
     specs_world.register::<ThreadPin<ImageData>>();
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
     specs_world.register::<ShotGun>();
     specs_world.register::<Cannon>();
-    specs_world.register::<Lazer>();
     specs_world.register::<MultyLazer>();
     specs_world.register::<Image>();
     specs_world.register::<Sound>();
@@ -196,6 +228,8 @@ pub fn run() -> Result<(), String> {
         "bullet_speed",
         "ship_speed",
         "fire_rate",
+        "bullet_damage",
+        "bullet_reflection",
         "direction",
         "circle",
         "circle2",
@@ -225,7 +259,9 @@ pub fn run() -> Result<(), String> {
         "upg_bar",
         "big_star",
         "rocket",
-        "fish"
+        "fish",
+        "player",
+        "enemy_projectile_old"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -313,7 +349,7 @@ pub fn run() -> Result<(), String> {
     {   // load .ron files with tweaks
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
-            player_ships_stats: Vec<ShipStats>,
+            player_ships: Vec<ShipKindSave>,
             player_guns: Vec<GunKindSave>,
             enemies: Vec<EnemyKindSave>
         }
@@ -323,7 +359,7 @@ pub fn run() -> Result<(), String> {
             name_to_image: &HashMap<String, specs::Entity>
         ) -> Description {
             Description {
-                player_ships_stats: description_save.player_ships_stats,
+                player_ships: description_save.player_ships.iter().map(|x| x.clone().load(name_to_image)).collect(),
                 player_guns: description_save.player_guns
                     .iter()
                     .map(|gun| gun.convert(name_to_image))
@@ -467,6 +503,7 @@ pub fn run() -> Result<(), String> {
         bullet_contact: name_to_animation["bullet_contact"].clone(),
         double_coin: name_to_image["double_coin"],
         double_exp: name_to_image["double_exp"],
+        basic_ship: name_to_image["basic"],
     };
 
 
@@ -512,6 +549,12 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
+    specs_world.add_resource(
+        ThreadPin::new(
+            MenuParticles::new_quad(&context, -size, -size, size, size, -20.0, 20.0, 200)
+        )
+    );
+    specs_world.add_resource(GlobalParams::default());
     {
         let file = include_str!("../assets/scores.ron");
         let score_table: ScoreTable = match from_str(file) {
@@ -574,6 +617,8 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(IngameUI::default());
     specs_world.add_resource(primitives_channel);
     specs_world.add_resource(Progress::default());
+    specs_world.add_resource(telegraph);
+    specs_world.add_resource(time_spans);
     // ------------------------------
 
     let mut events_loop = sdl_context.event_pump().unwrap();
@@ -581,6 +626,9 @@ pub fn run() -> Result<(), String> {
     safe_maintain(&mut specs_world);
 
     render_loop.run(move |running: &mut bool| {
+        flame::start("loop");
+        info!("asteroids: start loop");
+        specs_world.write_resource::<DevInfo>().update();
         let keys_iter: Vec<Keycode> = events_loop
             .keyboard_state()
             .pressed_scancodes()
@@ -590,6 +638,8 @@ pub fn run() -> Result<(), String> {
             .write_resource::<EventChannel<Keycode>>()
             .iter_write(keys_iter);
         // Create a set of pressed Keys.
+        flame::start("control crazyness");
+        info!("asteroids: control crazyness");
         {
             let state = events_loop.mouse_state();
             let buttons: Vec<_> = state.pressed_mouse_buttons().collect();
@@ -658,27 +708,50 @@ pub fn run() -> Result<(), String> {
                 }
             }
         }
+        flame::end("control crazyness");
         let app_state = *specs_world.read_resource::<AppState>();
         match app_state {
             AppState::Menu => {
+                info!("asteroids: menu dispatcher");
                 menu_dispatcher.dispatch(&specs_world.res)
             }
             AppState::Play(play_state) => {
                 if let PlayState::Action = play_state {
-                    dispatcher.dispatch(&specs_world.res);
+                    flame::start("dispatch");
+                    info!("asteroids: main dispatcher");
+                    dispatcher.dispatch_seq(&specs_world.res);
+                    dispatcher.dispatch_thread_local(&specs_world.res);
                     gui_dispatcher.dispatch(&specs_world.res);
+                    flame::end("dispatch");
                 } else {
+                    info!("asteroids: upgrade dispatcher");
                     upgrade_gui_dispatcher.dispatch(&specs_world.res);
                 }
+                // specs_world.write_resource::<TimeSpans>().begin("rendering".to_string());
+                info!("asteroids: rendering dispatcher");
+                flame::start("rendering");
                 rendering_dispatcher.dispatch(&specs_world.res);
+                flame::end("rendering");
+                // specs_world.write_resource::<TimeSpans>().end("rendering".to_string())
             }
             AppState::ScoreTable => {
                 score_table_dispatcher.dispatch(&specs_world.res);
             }
         }
+        info!("asteroids: insert dispatcher");
+        flame::start("insert");
         insert_dispatcher.dispatch(&specs_world.res);
+        flame::end("insert");
+        info!("asteroids: sounds dispatcher");
+        flame::start("sounds");
         sound_dispatcher.dispatch(&specs_world.res);
+        flame::end("sounds");
+        flame::start("maintain");
+        info!("asteroids: maintain");
         safe_maintain(&mut specs_world);
+        flame::end("maintain");
+        flame::start("events loop");
+        info!("asteroids: events loop");
         for event in events_loop.poll_iter() {
             use sdl2::event::Event;
             match event {
@@ -686,7 +759,10 @@ pub fn run() -> Result<(), String> {
                 | Event::KeyDown {
                     keycode: Some(Keycode::Escape),
                     ..
-                } => *running = false,
+                } => {
+                    *running = false;
+                    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+                },
                 sdl2::event::Event::Window {
                     win_event: sdl2::event::WindowEvent::Resized(w, h),
                     ..
@@ -700,7 +776,12 @@ pub fn run() -> Result<(), String> {
             }
 
         }
+        flame::end("events loop");
         // ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
+        flame::end("loop");
+        if flame::spans().len() > 10 {
+            flame::clear();
+        }
     });
         
         

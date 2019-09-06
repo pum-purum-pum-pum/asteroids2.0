@@ -9,7 +9,7 @@ use std::time::{Instant, Duration};
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
 use ncollide2d::world::CollisionObjectHandle;
-use ncollide2d::query::{Ray};
+use ncollide2d::query::{Ray, ContactManifold};
 use nphysics2d::object::{Body, BodyStatus, BodyHandle};
 use nphysics2d::world::World;
 use nphysics2d::algebra::ForceType;
@@ -45,6 +45,7 @@ const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
 
 const EXPLOSION_WOBBLE: f32 = 0.4;
+const DAMAGED_RED: f32 = 0.2;
 
 const MAGNETO_RADIUS: f32 = 4f32;
 const COLLECT_RADIUS: f32 = 0.2;
@@ -191,6 +192,7 @@ impl<'a> System<'a> for PhysicsSystem {
             mut planet_grid,
             app_state
         ) = data;
+        flame::start("physics");
         let (character_position, character_prev_position) = {
             let (character, isometry, _) = (&entities, &isometries, &character_markers).join().next().unwrap();
             let body = world
@@ -300,6 +302,7 @@ impl<'a> System<'a> for PhysicsSystem {
                 world.step();
             }
         }
+        flame::end("physics");
     }
 }
 
@@ -317,7 +320,7 @@ impl<'a> System<'a> for SoundSystem {
     type SystemData = (
         ReadStorage<'a, ThreadPin<SoundData>>,
         ReadStorage<'a, CharacterMarker>,
-        ReadStorage<'a, Lazer>,
+        ReadStorage<'a, MultyLazer>,
         WriteStorage<'a, SoundPlacement>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, EventChannel<Sound>>,
@@ -331,7 +334,7 @@ impl<'a> System<'a> for SoundSystem {
         let (
             sounds, 
             character_markers,
-            lazers,
+            multy_lazers,
             mut sound_placements,
             preloaded_sounds,
             sounds_channel,
@@ -359,8 +362,8 @@ impl<'a> System<'a> for SoundSystem {
                 }
             }
         }
-        for (lazer, _character) in (&lazers, &character_markers).join() {
-            if lazer.active {
+        for (lazer, _character) in (&multy_lazers, &character_markers).join() {
+            if lazer.active() {
                 if loop_sound.player_lazer_channel.is_none() {
                     let channel = sdl2::mixer::Channel::all().play(
                         &sounds.get(preloaded_sounds.lazer).unwrap().0,
@@ -562,7 +565,6 @@ impl<'a> System<'a> for ControlSystem {
             WriteStorage<'a, Spin>,
             WriteStorage<'a, ShotGun>,
             WriteStorage<'a, MultyLazer>,
-            WriteStorage<'a, Lazer>,
             WriteStorage<'a, Lifes>,
             WriteStorage<'a, Shield>,
             WriteStorage<'a, Polygon>,
@@ -592,7 +594,6 @@ impl<'a> System<'a> for ControlSystem {
                 mut spins,
                 mut shotguns,
                 mut multiple_lazers,
-                mut lazers,
                 mut lifes,
                 mut shields,
                 polygons,
@@ -644,14 +645,13 @@ impl<'a> System<'a> for ControlSystem {
                     .unwrap();
                 (*character_body.position(), *character_body.velocity())
             };
-            if let Some(lazer) = lazers.get_mut(character) {
+            if let Some(multy_lazer) = multiple_lazers.get_mut(character) {
                 if mouse_state.left {
-                    lazer.active = true;
+                    multy_lazer.set_all(true);
                 } else {
-                    lazer.active = false;
+                    multy_lazer.set_all(false);
                 }
             }
-
             let mut process_lazer = |
                 physics_component: &PhysicsComponent,
                 lazer: &mut Lazer,
@@ -683,7 +683,6 @@ impl<'a> System<'a> for ControlSystem {
                     if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) {
                         if let Some(_) = lifes.get(*target_entity) {
                             let mut explosion_size = 1;
-                            let mut with_animation = false;
                             if process_damage(
                                 lifes.get_mut(*target_entity).unwrap(),
                                 shields.get_mut(*target_entity),
@@ -695,12 +694,14 @@ impl<'a> System<'a> for ControlSystem {
                                     Point2::new(explosion_position.x, explosion_position.y);
                                 if asteroid_markers.get(*target_entity).is_some() {
                                     let asteroid = *target_entity;
+                                    let polygon = polygons.get(asteroid).unwrap();
                                     asteroid_explode(
                                         explosion_position,
                                         &mut insert_channel,
                                         &mut sounds_channel,
                                         &preloaded_sounds,
-                                        &preloaded_images
+                                        &preloaded_images,
+                                        polygon.max_r
                                     );
                                     spawn_asteroids(
                                         explosion_isometry, 
@@ -719,7 +720,6 @@ impl<'a> System<'a> for ControlSystem {
                                     );
                                 }
                                 explosion_size = 20;
-                                with_animation = true;
                                 insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                                 entities.delete(*target_entity).unwrap();
                             }
@@ -728,7 +728,7 @@ impl<'a> System<'a> for ControlSystem {
                                 position: Point2::new(effect_position.x, effect_position.y),
                                 num: explosion_size,
                                 lifetime: Duration::from_millis(800),
-                                with_animation
+                                with_animation: None
                             };
                             insert_channel.single_write(effect);
                         }
@@ -739,8 +739,9 @@ impl<'a> System<'a> for ControlSystem {
             };
 
             for (entity, physics_component, multiple_lazers) in (&entities, &physics, &mut multiple_lazers).join() {
-                for (i, lazer) in multiple_lazers.lazers.iter_mut().enumerate() {
-                    let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+                for (angle, lazer) in multiple_lazers.iter_mut() {
+                    // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+                    let rotation = Rotation2::new(angle);
                     if !lazer.active {
                         continue
                     }
@@ -753,20 +754,6 @@ impl<'a> System<'a> for ControlSystem {
                         rotation
                     )
                 }
-            }
-            let zero_rotation = Rotation2::new(0.0);
-            for (entity, physics_component, lazer) in (&entities, &physics, &mut lazers).join() {
-                if !lazer.active {
-                    continue
-                }
-                process_lazer(
-                    physics_component,
-                    lazer,
-                    &mut world,
-                    &bodies_map,
-                    character_markers.get(entity).is_some(),
-                    zero_rotation
-                )
             }
             let gun_position = Point2::new(
                     character_isometry.translation.vector.x, 
@@ -920,8 +907,8 @@ impl<'a> System<'a> for InsertSystem {
                     let shield = Shield(ship_stats.max_shield);
                     let character = entities.create();
                     match gun_kind {
-                        GunKind::Lazer(lazer) => {
-                            lazy_update.insert(character, *lazer);
+                        GunKind::MultyLazer(multy_lazer) => {
+                            lazy_update.insert(character, multy_lazer.clone())
                         }
                         GunKind::ShotGun(shotgun) => {
                             lazy_update.insert(character, *shotgun);
@@ -1081,9 +1068,6 @@ impl<'a> System<'a> for InsertSystem {
                                 let _shift = std::f32::consts::PI / (side_num as f32 + 1.0);
                                 lazy_update.insert(enemy, *shotgun);
                             }
-                            GunKind::Lazer(lazer) => {
-                                lazy_update.insert(enemy, *lazer);
-                            }
                             GunKind::MultyLazer(multy_lazer) => {
                                 lazy_update.insert(enemy, multy_lazer.clone());
                             }
@@ -1152,14 +1136,15 @@ impl<'a> System<'a> for InsertSystem {
                 InsertEvent::Bullet {
                     kind,
                     iso,
+                    size,
                     velocity,
                     damage,
                     owner,
                     lifetime,
                     bullet_image,
-                    blast
+                    blast,
+                    reflection
                 } => {
-                    let r = 0.2;
                     let bullet = entities.create();
                     lazy_update.insert(bullet, Damage(*damage));
                     lazy_update.insert(bullet, Velocity::new(velocity.x, velocity.y));
@@ -1168,7 +1153,10 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(bullet, Spin::default());
                     lazy_update.insert(bullet, Projectile { owner: *owner });
                     lazy_update.insert(bullet, Lifetime::new(*lifetime));
-                    lazy_update.insert(bullet, Size(r));
+                    lazy_update.insert(bullet, Size(*size));
+                    if let Some(reflection) = reflection {
+                        lazy_update.insert(bullet, *reflection);
+                    }
 
                     // let mut bullet = entities
                     //     .build_entity()
@@ -1188,7 +1176,7 @@ impl<'a> System<'a> for InsertSystem {
                     // let bullet = bullet
                     //     .build();
                     let bullet_collision_groups = get_collision_groups(kind);
-                    let ball = ncollide2d::shape::Ball::new(r);
+                    let ball = ncollide2d::shape::Ball::new(*size);
                     let bullet_physics_component = PhysicsComponent::safe_insert(
                         &mut physics,
                         bullet,
@@ -1340,12 +1328,12 @@ impl<'a> System<'a> for InsertSystem {
                     with_animation
                 } => {
                     let iso = Isometry::new(position.x, position.y, 0f32);
-                    if *with_animation {
+                    if let Some(size) = with_animation {
                         let animation_entity = entities.create();
                         lazy_update.insert(animation_entity, iso);
                         lazy_update.insert(animation_entity, preloaded_images.explosion.clone());
                         lazy_update.insert(animation_entity, Lifetime::new(Duration::from_secs(EXPLOSION_LIFETIME_SECS)));
-                        lazy_update.insert(animation_entity, Size(2f32));
+                        lazy_update.insert(animation_entity, Size(size * 2.0));
                     }
                     // particles of explosion                        
                     let explosion_particles = ThreadPin::new(ParticlesData::Explosion(Explosion::new(
@@ -1439,6 +1427,7 @@ impl<'a> System<'a> for GamePlaySystem {
             Entities<'a>,
             WriteStorage<'a, Isometry>,
             WriteStorage<'a, Blast>,
+            WriteStorage<'a, MultyLazer>,
             WriteStorage<'a, ShotGun>,
             WriteStorage<'a, Lifetime>,
             WriteStorage<'a, AsteroidMarker>,
@@ -1461,8 +1450,8 @@ impl<'a> System<'a> for GamePlaySystem {
             ReadStorage<'a, DoubleCoinsAbility>,
             ReadStorage<'a, DoubleExpCollectable>,
             ReadStorage<'a, CollectableMarker>,
-            ReadStorage<'a, Projectile>,
         ),
+        ReadStorage<'a, Projectile>,
         WriteExpect<'a, MacroGame>,
         ReadExpect<'a, PreloadedImages>,
         Write<'a, EventChannel<InsertEvent>>,
@@ -1480,6 +1469,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
         WriteExpect<'a, ScoreTable>,
+        WriteExpect<'a, GlobalParams>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1488,6 +1478,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 entities,
                 mut isometries,
                 blasts,
+                mut multiple_lazers,
                 mut shotguns,
                 mut lifetimes,
                 asteroid_markers,
@@ -1510,8 +1501,8 @@ impl<'a> System<'a> for GamePlaySystem {
                 _double_coins_ability,
                 double_exp_collectable,
                 collectables,
-                projectiles,
             ),
+            projectiles,
             mut macro_game,
             preloaded_images,
             mut insert_channel,
@@ -1528,7 +1519,8 @@ impl<'a> System<'a> for GamePlaySystem {
             mut stars_grid,
             mut nebula_grid,
             mut planet_grid,
-            mut score_table
+            mut score_table,
+            mut global_params
         ) = data;
         for (shield, life, ship_stats, _character) in (&mut shields, &mut lifes, &ships_stats, &character_markers).join() {
             shield.0 = (shield.0 + ship_stats.shield_regen).min(ship_stats.max_shield);
@@ -1554,6 +1546,9 @@ impl<'a> System<'a> for GamePlaySystem {
                 if side_bullet_ability.get(entity).is_some() {
                     if let Some(gun) = shotguns.get_mut(char_entity) {
                         gun.side_projectiles_number -= 1;
+                    }
+                    if let Some(multy_lazer) = multiple_lazers.get_mut(char_entity) {
+                        multy_lazer.minus_side_lazers();
                     }
                 }
                 if let Some(blast) = blasts.get(entity) {
@@ -1582,14 +1577,19 @@ impl<'a> System<'a> for GamePlaySystem {
                             is_character && owner != char_entity ||
                             entity != char_entity && (owner == char_entity || is_asteroid);
                         if affected && (blast_position - position).norm() < blast.blast_radius {
+                            if is_character {
+                                global_params.damaged(DAMAGED_RED);
+                            }
                             if process_damage(life, shields.get_mut(entity), blast.blast_damage) {
                                 if is_asteroid {
+                                    let polygon = polygons.get(entity).unwrap();
                                     asteroid_explode(
                                         Point2::new(position.x, position.y),
                                         &mut insert_channel,
                                         &mut sounds_channel,
                                         &preloaded_sounds,
-                                        &preloaded_images
+                                        &preloaded_images,
+                                        polygon.max_r
                                     );
                                     spawn_asteroids(
                                         isometry.0, 
@@ -1651,9 +1651,12 @@ impl<'a> System<'a> for GamePlaySystem {
                     // dbg!("wow");
                 }
                 if side_bullet_collectables.get(entity).is_some() {
+                    insert_channel.single_write(InsertEvent::SideBulletAbility);
                     if let Some(gun) = shotguns.get_mut(char_entity) {
-                        insert_channel.single_write(InsertEvent::SideBulletAbility);
                         gun.side_projectiles_number += 1;
+                    }
+                    if let Some(multy_lazer) = multiple_lazers.get_mut(char_entity) {
+                        multy_lazer.plus_side_lazers();
                     }
                 }
                 if double_coins_collectable.get(entity).is_some() {
@@ -1932,7 +1935,7 @@ fn ship_explode(
         position: ship_pos,
         num: 20,
         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-        with_animation: true
+        with_animation: Some(1f32)
     };
 
     insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
@@ -1955,11 +1958,11 @@ fn bullet_contact(
         position: contact_pos,
         num: 2,
         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-        with_animation: false
+        with_animation: None
     };
     let animation = InsertEvent::Animation {
         animation: preloaded_images.bullet_contact.clone(),
-        lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
+        lifetime: Duration::from_secs(BULLET_CONTACT_LIFETIME_SECS),
         pos: contact_pos,
         size: 1f32
     };
@@ -1973,6 +1976,7 @@ fn asteroid_explode(
     sounds_channel: &mut Write<EventChannel<Sound>>,
     preloaded_sounds: &ReadExpect<PreloadedSounds>,
     _preloaded_images: &ReadExpect<PreloadedImages>,
+    size: f32,
 ) {
     sounds_channel.single_write(
         Sound(
@@ -1984,7 +1988,7 @@ fn asteroid_explode(
         position: Point2::new(explode_position.x, explode_position.y),
         num: 10usize,
         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-        with_animation: true
+        with_animation: Some(size)
     };
     insert_channel.single_write(effect);
     sounds_channel.single_write(Sound(
@@ -2031,20 +2035,50 @@ pub fn to_menu(
     progress.score = 0;
 }
 
+fn reflect(d: Vector2, n: Vector2) -> Vector2 {
+    d - 2.0 * (d.dot(&n)) * n
+}
+
+fn reflect_bullet(
+    projectile: specs::Entity,
+    physics_components: &ReadStorage<PhysicsComponent>,
+    world: &mut Write<World<f32>>,
+    reflection: &Reflection,
+    normal: Vector2
+) {
+    let physics_component = physics_components.get(projectile).unwrap();
+    let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+    let position = body.position();
+    let mut velocity = *body.velocity();
+    let vel = reflection.speed * reflect(velocity.linear, normal.normalize()).normalize();
+    *velocity.as_vector_mut() = Vector3::new(vel.x, vel.y, 0.0);
+    let standart = Vector2::new(0.0, -1.0);
+    let alpha = Rotation2::rotation_between(&standart, &velocity.linear).angle();
+    let position = Isometry2::new(
+        Vector2::new(position.translation.vector.x, position.translation.vector.y),
+        alpha
+    );
+    body.set_position(position);
+    body.set_velocity(velocity);
+
+}
+
+
 #[derive(Default)]
 pub struct CollisionSystem {
-    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
-    colliding_end_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
+    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
 }
 
 impl<'a> System<'a> for CollisionSystem {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, Isometry>,
+        ReadStorage<'a, PhysicsComponent>,
         ReadStorage<'a, AsteroidMarker>,
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, Projectile>,
+        ReadStorage<'a, Reflection>,
         WriteStorage<'a, Lifes>,
         WriteStorage<'a, Shield>,
         ReadStorage<'a, Damage>,
@@ -2058,16 +2092,19 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, Progress>,
         Write<'a, AppState>,
         WriteExpect<'a, ScoreTable>,
+        WriteExpect<'a, GlobalParams>
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
             entities,
             isometries,
+            physics_components,
             asteroids,
             character_markers,
             ships,
             projectiles,
+            reflections,
             mut lifes,
             mut shields,
             damages,
@@ -2080,27 +2117,28 @@ impl<'a> System<'a> for CollisionSystem {
             preloaded_images,
             mut progress,
             mut app_state,
-            mut score_table
+            mut score_table,
+            mut global_params,
         ) = data;
         self.colliding_start_events.clear();
-        self.colliding_end_events.clear();
-        for event in world.contact_events() {
-            match event {
-                &ncollide2d::events::ContactEvent::Started(
-                    collision_handle1,
-                    collision_handle2,
-                ) => self
-                    .colliding_start_events
-                    .push((collision_handle1, collision_handle2)),
-                &ncollide2d::events::ContactEvent::Stopped(
-                    collision_handle1,
-                    collision_handle2,
-                ) => self
-                    .colliding_end_events
-                    .push((collision_handle1, collision_handle2)),
+        for (collider1, collider2, _, manifold) in world.collider_world_mut().contact_pairs(false) {
+            if let Some(tracked_contact) = manifold.deepest_contact() {
+                let contact_normal = tracked_contact.contact.normal;
+                self.colliding_start_events.push((collider1.handle(), collider2.handle(), *contact_normal));
             }
         }
-        for (handle1, handle2) in self.colliding_start_events.iter() {
+        // for event in world.contact_events() {
+        //     match event {
+        //         &ncollide2d::events::ContactEvent::Started(
+        //             collision_handle1,
+        //             collision_handle2,
+        //         ) => self
+        //             .colliding_start_events
+        //             .push((collision_handle1, collision_handle2)),
+        //         _ => ()
+        //     }
+        // }
+        for (handle1, handle2, normal) in self.colliding_start_events.iter() {
             let (body_handle1, body_handle2) = {
                 // get body handles
                 let collider_world = world.collider_world_mut();
@@ -2132,7 +2170,11 @@ impl<'a> System<'a> for CollisionSystem {
                     let projectile = entity2;
                     let projectile_damage = damages.get(projectile).unwrap().0;
                     if projectile_damage != 0 {
-                        entities.delete(projectile).unwrap();
+                        if let Some(reflection) = reflections.get(projectile) {
+                            reflect_bullet(projectile, &physics_components, &mut world, &reflection, *normal);
+                        } else {
+                            entities.delete(projectile).unwrap();
+                        }
                     }
                     let lifes = lifes.get_mut(asteroid).unwrap();
                     if lifes.0 > projectile_damage {
@@ -2153,7 +2195,7 @@ impl<'a> System<'a> for CollisionSystem {
                         position: Point2::new(position.x, position.y),
                         num: 3usize,
                         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-                        with_animation: false
+                        with_animation: None
                     };
                     insert_channel.single_write(effect);
                     if character_markers.get(ship).is_some() {
@@ -2169,24 +2211,15 @@ impl<'a> System<'a> for CollisionSystem {
                     insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                     let isometry = isometries.get(asteroid).unwrap().0;
                     let position = isometry.translation.vector;
+                    let polygon = polygons.get(asteroid).unwrap();
                     asteroid_explode(
                         Point2::new(position.x, position.y),
                         &mut insert_channel,
                         &mut sounds_channel,
                         &preloaded_sounds,
-                        &preloaded_images
+                        &preloaded_images,
+                        polygon.max_r
                     );
-                    // let effect = InsertEvent::Explosion {
-                    //     position: Point2::new(position.x, position.y),
-                    //     num: 10usize,
-                    //     lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-                    //     with_animation: true
-                    // };
-                    // insert_channel.single_write(effect);
-                    // sounds_channel.single_write(Sound(
-                    //     preloaded_sounds.asteroid_explosion,
-                    //     Point2::new(position.x, position.y)
-                    // ));
                     spawn_asteroids(
                         isometries.get(asteroid).unwrap().0, 
                         polygons.get(asteroid).unwrap(), 
@@ -2208,6 +2241,7 @@ impl<'a> System<'a> for CollisionSystem {
                 let projectile_pos = Point2::new(projectile_pos.x, projectile_pos.y);
                 let position = isometry.translation.vector;
                 if character_markers.get(ship).is_some() {
+                    global_params.damaged(DAMAGED_RED);
                     if process_damage(
                         lifes.get_mut(ship).unwrap(),
                         shields.get_mut(ship),
@@ -2222,6 +2256,7 @@ impl<'a> System<'a> for CollisionSystem {
                         // delete character
                         entities.delete(ship).unwrap();
                     } else {
+
                         bullet_contact(
                             projectile_pos,
                             &mut insert_channel,
@@ -2256,7 +2291,11 @@ impl<'a> System<'a> for CollisionSystem {
                 }
                 // Kludge
                 if projectile_damage != 0 {
-                    entities.delete(projectile).unwrap();
+                    if let Some(reflection) = reflections.get(projectile) {
+                        reflect_bullet(projectile, &physics_components, &mut world, &reflection, *normal);
+                    } else {
+                        entities.delete(projectile).unwrap();
+                    }
                 }
             }
             if ships.get(entity1).is_some() && ships.get(entity2).is_some() {
@@ -2288,6 +2327,7 @@ impl<'a> System<'a> for CollisionSystem {
                         );
                         entities.delete(other_ship).unwrap();
                     }
+                    global_params.damaged(DAMAGED_RED);
                     if process_damage(
                         lifes.get_mut(character_ship).unwrap(),
                         shields.get_mut(character_ship),
@@ -2334,7 +2374,6 @@ impl<'a> System<'a> for AISystem {
         ReadStorage<'a, PhysicsComponent>,
         WriteStorage<'a, Spin>,
         WriteStorage<'a, ShotGun>,
-        WriteStorage<'a, Lazer>,
         WriteStorage<'a, MultyLazer>,
         WriteStorage<'a, Cannon>,
         WriteStorage<'a, RocketGun>,
@@ -2358,7 +2397,6 @@ impl<'a> System<'a> for AISystem {
             physics,
             mut spins,
             mut shotguns,
-            mut lazers,
             mut multy_lazers,
             mut cannons,
             mut rocket_guns,
@@ -2401,7 +2439,9 @@ impl<'a> System<'a> for AISystem {
                     character_noticed = true;
                 }
             };
-            let follow_area = if let Some(lazer) = lazers.get(entity) {lazer.distance * 0.95} else {SCREEN_AREA};
+            let follow_area = if let Some(multy_lazer) = multy_lazers.get(entity) {
+                multy_lazer.first_distance() * 0.95
+            } else {SCREEN_AREA};
             for ai_type in ai.kinds.iter() {
                 match ai_type {
                     AIType::Shoot => {
@@ -2466,23 +2506,13 @@ impl<'a> System<'a> for AISystem {
                             }
                         }
                         if diff.norm() > follow_area {
-                            if let Some(lazer) = lazers.get_mut(entity) {
-                                lazer.active = false;
-                            }
                             if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
-                                for lazer in multy_lazer.lazers.iter_mut() {
-                                    lazer.active = false;
-                                }
+                                multy_lazer.set_all(false);
                             }
                         } else {
-                            if let Some(lazer) = lazers.get_mut(entity) {
-                                lazer.active = true;
+                            if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
+                                multy_lazer.set_all(true);
                             }
-                                if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
-                                    for lazer in multy_lazer.lazers.iter_mut() {
-                                        lazer.active = true;
-                                    }
-                                }
                         }
 
                     }

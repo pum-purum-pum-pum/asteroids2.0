@@ -37,6 +37,13 @@ impl TimeSpans {
 	}
 
 	pub fn end(&mut self, name: String) {
-		self.spans.get_mut(&name).expect(&format!("you forgot begin {}", name)).end = Some(Instant::now());
+		self.spans
+			.get_mut(&name)
+			.expect(&format!("you forgot begin {}", name)).end 
+			= Some(Instant::now());
+	}
+
+	pub fn iter(&self) -> impl Iterator<Item=(&String, &Span)> + '_ {
+		self.spans.iter()
 	}
 }

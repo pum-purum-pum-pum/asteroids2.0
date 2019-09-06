@@ -203,9 +203,9 @@ pub fn load_texture(gl: &red::GL, name: &str) -> red::shader::Texture {
     image
 }
 
-pub fn create_shader_program(gl: &red::GL, name: &str, glsl_version: &str) -> Result<red::Program, String> {
-    let vertex = format!("gles/v_{}.glsl", name);
-    let fragment = format!("gles/f_{}.glsl", name);
+pub fn create_shader_program(gl: &red::GL, pref: &str, name: &str, glsl_version: &str) -> Result<red::Program, String> {
+    let vertex = format!("{}gles/v_{}.glsl", pref, name);
+    let fragment = format!("{}gles/f_{}.glsl", pref, name);
     let (vertex_shader, fragment_shader) = (
         format!("{}\n{}", glsl_version, read_file(&vertex).unwrap()),
         format!("{}\n{}", glsl_version, read_file(&fragment).unwrap())
@@ -285,13 +285,13 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(gl: &red::GL, glsl_version: &str) -> Result<Self, String> {
-        let program = create_shader_program(gl, "", glsl_version)?;
-        let program_primitive = create_shader_program(gl, "primitive", glsl_version)?;
-        let program_primitive_texture = create_shader_program(gl, "primitive_texture", glsl_version)?;
-        let program_light = create_shader_program(gl, "light", glsl_version)?;
-        let program_instancing = create_shader_program(gl, "instancing", glsl_version)?;
-        let program_glyph = create_shader_program(gl, "text", &glsl_version)?;
+    pub fn new(gl: &red::GL, pref: &str, glsl_version: &str) -> Result<Self, String> {
+        let program = create_shader_program(gl, pref, "", glsl_version)?;
+        let program_primitive = create_shader_program(gl, pref, "primitive", glsl_version)?;
+        let program_primitive_texture = create_shader_program(gl, pref, "primitive_texture", glsl_version)?;
+        let program_light = create_shader_program(gl, pref, "light", glsl_version)?;
+        let program_instancing = create_shader_program(gl, pref, "instancing", glsl_version)?;
+        let program_glyph = create_shader_program(gl, pref, "text", &glsl_version)?;
         let z_far = Z_FAR;
         Ok(Canvas {
             program: program,
@@ -311,6 +311,44 @@ impl Canvas {
         })
     }
 
+    pub fn draw_line(
+        &self,
+        a: Point2,
+        b: Point2,
+        context: &red::GL,
+        frame: &mut red::Frame,
+        viewport: &red::Viewport,
+        color: Point3,
+        line_width: f32,
+    ) {
+        let line_length = (b.coords - a.coords).norm();
+        let positions = vec![
+            Point2::new(-line_width / 2.0, 0f32),
+            Point2::new(line_width / 2.0, 0f32),
+            Point2::new(-line_width / 2.0, -line_length),
+            Point2::new(line_width / 2.0, -line_length)
+        ];
+        let up = Vector2::new(0.0, -line_length);
+        let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
+        let iso = Isometry3::new(
+            Vector3::new(a.x, a.y, 0f32), 
+            Vector3::new(0f32, 0f32, rotation.angle())
+        );
+        let indices = [0u16, 1, 2, 1, 3, 2];
+        let geometry_data = GeometryData::new(
+            &context, &positions, &indices
+        ).unwrap();
+        self.render_geometry(
+            &context,
+            &viewport,
+            frame,
+            &geometry_data,
+            &iso,
+            RenderMode::Draw,
+            color
+        );
+    }
+
     pub fn observer(&self) -> Point3 {
         // let mut rng = rand::thread_rng();
         // let noise: Vector3 = 0.1 * Vector3::new(rng.gen(), rng.gen(), 0f32).normalize();
@@ -324,6 +362,7 @@ impl Canvas {
     pub fn add_wobble(&mut self, wobble: f32) {
         self.camera_wobble += wobble;
     }
+
 
     pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32, direction: Vector2) {
         self.observer.x = pos.x;

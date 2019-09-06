@@ -1,11 +1,15 @@
 use gfx_h::{TextData, RenderMode};
+use gfx_h::effects::MenuParticles;
 use std::collections::{HashMap};
+use telemetry::{TeleGraph, TimeSpans, render_plot};
+// use flame;
 
 use super::*;
 #[cfg(any(target_os = "android"))]
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
 use crate::geometry::{shadow_geometry};
+
 
 pub struct ScoreTableRendering {
     reader: ReaderId<Primitive>,
@@ -118,6 +122,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Write<'a, IngameUI>,
         Write<'a, EventChannel<InsertEvent>>,
         WriteExpect<'a, PreloadedImages>,
+        WriteExpect<'a, ThreadPin<MenuParticles>>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
         Write<'a, MenuChosedGun>,
@@ -138,6 +143,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mut ui,
             mut insert_channel,
             preloaded_images,
+            mut menu_particles,
             mouse,
             mut app_state,
             // text_data
@@ -155,7 +161,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         // return;
 
-        let button_w = w/6f32;
+        let button_w = w/12f32;
         let button_h = button_w;
         let mut buttons = vec![];
         let buttons_names = vec!["", "", ""];
@@ -188,6 +194,35 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 chosed_gun.0 = Some(description.player_guns[i].clone());
             }
         }
+
+        // let mut ship_names = vec!["", "", ""];
+        // let mut ship_images = vec![
+        //     preloaded_images.basic_ship];
+        let mut buttons = vec![];
+        for (i, ship) in description.player_ships.iter().enumerate() {
+            let button = Button::new(
+                Point2::new(
+                    shift_init + i as f32 * (shift_between + button_w), 
+                    button_h + button_h
+                ),
+                button_w,
+                button_h,
+                Point3::new(0f32, 0f32, 0f32),
+                false,
+                Some(ship.image),
+                "".to_string()
+            );
+            buttons.push(button);
+        }
+
+        for i in 0..buttons.len() {
+            if buttons[i].place_and_check(&mut ui, &*mouse) {
+                dbg!(&format!("ship button {}", i));
+            }
+        }
+
+        let button_w = w / 6.0;
+        let button_h = button_w;
         let score_table_button = Button::new(
             Point2::new(w / 2.0, 1.5 * button_h + shift_between),
             button_w,
@@ -200,6 +235,37 @@ impl<'a> System<'a> for MenuRenderingSystem {
         if score_table_button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::ScoreTable;
         }
+        menu_particles.update(0.5);
+        canvas
+            .render_instancing(
+                &gl,
+                &viewport,
+                &mut frame,
+                &menu_particles.instancing_data,
+                &Isometry3::new(
+                    Vector3::new(0f32, 0f32, 0f32),
+                    Vector3::new(0f32, 0f32, 0f32),
+                )
+            );
+        // for (particles_data,) in (&mut particles_datas,).join() {
+        //     match **particles_data {
+        //         ParticlesData::MenuParticles(ref mut particles) => {
+        //             particles.update(0.5);
+        //             canvas
+        //                 .render_instancing(
+        //                     &gl,
+        //                     &viewport,
+        //                     &mut frame,
+        //                     &particles.instancing_data,
+        //                     &Isometry3::new(
+        //                         Vector3::new(0f32, 0f32, 0f32),
+        //                         Vector3::new(0f32, 0f32, 0f32),
+        //                     )
+        //                 );
+        //         }
+        //         _ => ()
+        //     }
+        // }
         let button_w = button_w / 2.0;
         let button_h = button_w;
         let button = Button::new(
@@ -217,7 +283,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 *app_state = AppState::Play(PlayState::Action);
                 insert_channel.single_write(InsertEvent::Character{ 
                     gun_kind: gun.clone(), 
-                    ship_stats: description.player_ships_stats[0]
+                    ship_stats: description.player_ships[0].ship_stats
                 });
                 chosed_gun.0 = None;
                 *avaliable_upgrades = get_avaliable_cards(
@@ -335,6 +401,7 @@ impl<'a> System<'a> for UpgradeGUI {
             Entities<'a>,
             ReadStorage<'a, CharacterMarker>,
             WriteStorage<'a, ShipStats>,
+            WriteStorage<'a, MultyLazer>,
             WriteStorage<'a, ShotGun>,
             ReadExpect<'a, red::Viewport>,
         ),
@@ -354,6 +421,7 @@ impl<'a> System<'a> for UpgradeGUI {
                 entities,
                 character_markers,
                 mut ships_stats,
+                mut multiple_lazers,
                 mut shotguns,
                 viewport,
             ),
@@ -479,12 +547,6 @@ impl<'a> System<'a> for UpgradeGUI {
                             None => ()
                         }
                     }
-                    UpgradeType::ShipSpeed => {
-                        ship_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
-                    }
-                    UpgradeType::ShipRotationSpeed => {
-                        ship_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
-                    }
                     UpgradeType::BulletSpeed => {
                         match shotguns.get_mut(character) {
                             Some(gun) => {
@@ -493,6 +555,27 @@ impl<'a> System<'a> for UpgradeGUI {
                             None => ()
                         }
                     }
+                    UpgradeType::BulletReflection => {
+                        if let Some(gun) = shotguns.get_mut(character) {
+                            if let Some(ref mut reflection) = gun.reflection {
+                                reflection.speed += 0.5;
+                            } else {
+                                gun.reflection = Some(Reflection{speed: 0.4})
+                            }
+                        }
+                    }
+                    UpgradeType::LazerLength => {
+                        if let Some(multy_lazer) = multiple_lazers.get_mut(character) {
+                            multy_lazer.upgrade_length(0.3);
+                        }
+                    }                    
+                    UpgradeType::ShipSpeed => {
+                        ship_stats.thrust_force += 0.1 * THRUST_FORCE_INIT;
+                    }
+                    UpgradeType::ShipRotationSpeed => {
+                        ship_stats.torque += 0.1 * SHIP_ROTATION_SPEED_INIT;
+                    }
+
                     UpgradeType::ShieldRegen => {
                         ship_stats.shield_regen += 1;
                     }
@@ -525,6 +608,7 @@ impl<'a> System<'a> for GUISystem {
             WriteStorage<'a, ShipStats>,
             ReadExpect<'a, red::Viewport>,
         ),
+        ReadExpect<'a, DevInfo>,
         Write<'a, IngameUI>,
         Read<'a, Progress>,
         Read<'a, Mouse>,
@@ -548,6 +632,7 @@ impl<'a> System<'a> for GUISystem {
                 viewport,
             ),
             // preloaded_particles,
+            dev_info,
             mut ingame_ui,
             progress,
             mouse,
@@ -660,6 +745,20 @@ impl<'a> System<'a> for GUISystem {
                 None => ()
             }
         }
+        // FPS
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w/7.0, h / 20.0), 
+                    text: format!(
+                        "FPS: {}", 
+                        dev_info.fps
+                    ).to_string()
+                }),
+                with_projection: false,
+                image: None
+            }
+        );
 
         // stats
         ingame_ui.primitives.push(
@@ -907,13 +1006,13 @@ impl<'a> System<'a> for RenderingSystem {
             WriteStorage<'a, Animation>,
             ReadStorage<'a, Size>,
             ReadStorage<'a, Polygon>,
-            ReadStorage<'a, Lazer>,
             ReadStorage<'a, Geometry>,
             ReadStorage<'a, CollectableMarker>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
             ReadStorage<'a, MultyLazer>,
             ReadStorage<'a, Chain>
         ),
+        WriteExpect<'a, TeleGraph>,
         Read<'a, Mouse>,
         ReadExpect<'a, ThreadPin<red::GL>>,
         ReadExpect<'a, red::Viewport>,
@@ -923,6 +1022,7 @@ impl<'a> System<'a> for RenderingSystem {
         Write<'a, EventChannel<Primitive>>,
         Write<'a, IngameUI>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
+        WriteExpect<'a, GlobalParams>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -939,35 +1039,53 @@ impl<'a> System<'a> for RenderingSystem {
                 stars,
                 nebulas,
                 planets,
-                big_star_markers,
+                _big_star_markers,
                 projectiles,
                 image_datas,
                 image_ids,
                 mut animations,
                 sizes,
                 polygons,
-                lazers,
                 geometries,
                 collectables,
                 mut particles_datas,
                 multy_lazers,
-                chains,
+                _chains,
             ),
+            mut telegraph,
             mouse,
             gl,
             viewport,
             mut canvas,
             preloaded_particles,
-            world,
+            _world,
             mut primitives_channel,
             mut ingame_ui,
             mut text_data,
+            mut global_params
         ) = data;
+        flame::start("clear");
+        // flame::start("rendering");
         let mut frame = red::Frame::new(&gl);
-        frame.set_clear_color(0.015, 0.004, 0.0, 1.0);
+        global_params.update();
+        frame.set_clear_color(global_params.red.min(1.0), 0.004, 0.0, 1.0);
         // frame.set_clear_color(0.15, 0.004, 0.0, 1.0);
         frame.set_clear_stencil(0);
-        frame.clear_color_and_stencil();
+        // frame.clear_color_and_stencil();
+        flame::start("color");
+        frame.clear_color();
+        flame::end("color");
+        flame::start("stencil");
+        frame.clear_stencil();
+        flame::end("stencil");
+        telegraph.update();
+
+        // if rng.gen_range(0.0, 1.0) < 0.06 {
+        //     telegraph.insert("plot a".to_string(), rng.gen_range(0.0, 1.0));
+        //     telegraph.insert("plot b".to_string(), rng.gen_range(0.0, 1.0));
+        // }
+
+
         let (_char_iso, char_pos) = {
             let mut opt_iso = None;
             for (iso, vel, _) in (&isometries, &velocities, &character_markers).join() {
@@ -983,6 +1101,8 @@ impl<'a> System<'a> for RenderingSystem {
                 opt_iso.unwrap().0.translation.vector,
             )
         };
+        flame::end("clear");
+        flame::start("shadow rendering");
         for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
             let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
             // light_poly.clip_one((*geom).clone(), pos);
@@ -1013,6 +1133,8 @@ impl<'a> System<'a> for RenderingSystem {
                     );
             }
         }
+        flame::end("shadow rendering");
+        flame::start("background rendering");
         for (_entity, iso, image, size, _stars) in
             (&entities, &isometries, &image_ids, &sizes, &stars).join() {
             let image_data = image_datas.get(image.0).unwrap();
@@ -1044,7 +1166,6 @@ impl<'a> System<'a> for RenderingSystem {
         //                 None
         //         );
         // };
-
         for (_entity, iso, image, size, _nebula) in
             (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
             let image_data = image_datas.get(image.0).unwrap();
@@ -1075,7 +1196,8 @@ impl<'a> System<'a> for RenderingSystem {
                         None
                 );
         };
-
+        flame::end("background rendering");
+        flame::start("particles rendering");
         for (entity, particles_data) in (&entities, &mut particles_datas).join() {
             match **particles_data {
                 ParticlesData::Explosion(ref mut particles) => {
@@ -1097,24 +1219,6 @@ impl<'a> System<'a> for RenderingSystem {
             }
                 _ => ()
             };
-        }
-
-        for (_entity, iso, image, size, _light) in
-            (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
-        {
-            let translation_vec = iso.0.translation.vector;
-            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
-            canvas
-                .render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_datas.get(image.0).unwrap(),
-                    &isometry,
-                    size.0,
-                    true,
-                    Some(red::Blend)
-                );
         }
 
         for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
@@ -1140,6 +1244,28 @@ impl<'a> System<'a> for RenderingSystem {
                 _ => panic!(),
             };
         }
+
+        flame::end("particles rendering");
+
+        flame::start("other");
+        for (_entity, iso, image, size, _light) in
+            (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
+        {
+            let translation_vec = iso.0.translation.vector;
+            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+            canvas
+                .render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_datas.get(image.0).unwrap(),
+                    &isometry,
+                    size.0,
+                    true,
+                    Some(red::Blend)
+                );
+        }
+
 
         let mut render_lazer = |
             iso: &Isometry,
@@ -1175,16 +1301,13 @@ impl<'a> System<'a> for RenderingSystem {
             }
         };
         for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
-            for (i, lazer) in multy_lazer.lazers.iter().enumerate() {
-                let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+            for (angle, lazer) in multy_lazer.iter() {
+                // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
+                let rotation = Rotation2::new(angle);
                 render_lazer(iso, lazer, false, rotation);
             }
         };
         let zero_rotation = Rotation2::new(0.0);
-        for (_entity, iso, lazer) in (&entities, &isometries, &lazers).join() {
-            // let force_rendering = chains.get(entity).is_some();
-            render_lazer(iso, lazer, false, zero_rotation);
-        };
         for (_entity, iso, image, size, _projectile) in
             (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
         {
@@ -1220,6 +1343,8 @@ impl<'a> System<'a> for RenderingSystem {
                         None
                     )
         }
+        flame::end("other");
+        flame::start("asteroids rendering");
         for (_entity, iso, _image, _size, polygon, _asteroid) in (
             &entities,
             &isometries,
@@ -1244,7 +1369,9 @@ impl<'a> System<'a> for RenderingSystem {
                     Point3::new(0.8, 0.8, 0.8)
                 )
         }
-        for (iso, size, image, _coin) in (&isometries, &sizes, &image_ids, &collectables).join() {
+        flame::end("asteroids rendering");
+        flame::start("collectables");
+        for (iso, size, image, _collectable) in (&isometries, &sizes, &image_ids, &collectables).join() {
             let image_data = image_datas.get(image.0).unwrap();
             canvas
                 .render(
@@ -1290,6 +1417,7 @@ impl<'a> System<'a> for RenderingSystem {
                 Point3::new(1f32, 1f32, 1f32)
             );
         };
+        flame::end("collectables");
         // debug grid drawing
         // for i in 0..nebula_grid.grid.size {
         //     for j in 0..nebula_grid.grid.size {
@@ -1300,6 +1428,7 @@ impl<'a> System<'a> for RenderingSystem {
         //         render_line(Point2::new(max_w, min_h), Point2::new(min_w, min_h));
         //     }
         // }
+        flame::start("animation");
         for (iso, size, animation) in (&isometries, &sizes, &mut animations).join() {
             let animation_frame = animation.next_frame();
             if let Some(animation_frame) = animation_frame {
@@ -1317,6 +1446,8 @@ impl<'a> System<'a> for RenderingSystem {
                     )
             };
         };
+        flame::end("animation");
+        flame::start("primitives rendering");
         primitives_channel.iter_write(ingame_ui.primitives.drain(..));
         render_primitives(
             &mouse,
@@ -1329,5 +1460,28 @@ impl<'a> System<'a> for RenderingSystem {
             &mut primitives_channel,
             &mut text_data,
         );
+        flame::end("primitives rendering");
+        // for (name, span) in time_spans.iter() {
+        //     telegraph.insert(name.to_string(), span.evaluate().as_millis() as f32 / 1000.0 * 60.0); // TODO "xFPS" actually
+        // }
+        // flame::end("rendering");
+        // let spans = flame::spans();
+        // for span in spans.iter() {
+        //     telegraph.insert(span.name.to_string(), span.delta as f32 / 1E9 * 60.0);
+        // }
+        // for name in telegraph.iter_names() {
+        //     if let Some(plot) = telegraph.iter(name.to_string()) {
+        //         render_plot(
+        //             plot.0,
+        //             plot.1,
+        //             8.0, 
+        //             7.0,
+        //             &gl,
+        //             &viewport,
+        //             &canvas,
+        //             &mut frame,
+        //         );
+        //     }
+        // }
     }
 }

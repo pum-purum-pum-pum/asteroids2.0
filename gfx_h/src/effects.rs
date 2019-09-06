@@ -4,6 +4,7 @@ use std::time::{Instant, Duration};
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
     Explosion(Explosion),
+    MenuParticles(MenuParticles),
 }
 
 pub struct Explosion {
@@ -150,6 +151,77 @@ impl MovementParticles {
                 cut_hight(particle.world_position.1, self.y_min, self.y_max),
                 self.y_min,
                 self.y_max,
+            );
+        }
+    }
+}
+
+
+pub struct MenuParticles {
+    pub instancing_data: InstancingData,
+    pub z_min: f32,
+    pub z_max: f32,
+}
+
+impl MenuParticles {
+    pub fn new_quad(
+        gl: &red::GL,
+        x_min: f32,
+        y_min: f32,
+        x_max: f32,
+        y_max: f32,
+        z_min: f32, 
+        z_max: f32,
+        num: usize,
+    ) -> Self {
+        let scale = 0.03f32;
+        let positions = vec![
+            [-scale, -scale],
+            [-scale, scale],
+            [scale, scale],
+            [scale, -scale],
+        ];
+        let shape: Vec<GeometryVertex> = positions
+            .into_iter()
+            .map(|pos| GeometryVertex { position: red::data::f32_f32::new(pos[0], pos[1]) })
+            .collect();
+        let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
+        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
+        let mut rng = thread_rng();
+        let mut quad_positions = vec![];
+        for _ in 0..num {
+            let x = rng.gen_range(x_min, x_max);
+            let y = rng.gen_range(y_min, y_max);
+            let z = rng.gen_range(z_min, z_max);
+            quad_positions.push(WorldVertex {
+                world_position: red::data::f32_f32_f32::new(x, y, z),
+            });
+        }
+        let world_vertex_buffer = WorldVertexBuffer::new(gl, &quad_positions).unwrap();
+        Self {
+            instancing_data: InstancingData {
+                vertex_buffer: vertex_buffer,
+                indices: index_buffer,
+                per_instance: world_vertex_buffer,
+            },
+            z_min,
+            z_max
+        }
+    }
+
+    pub fn update(&mut self, z_vel: f32) {
+        let instanced = self.instancing_data.per_instance.map_array().unwrap();
+        for particle in instanced.slice.iter_mut() {
+            particle.world_position.2 += z_vel;
+            // particle.world_position.0 += vel.x;
+            // particle.world_position.1 += vel.y;
+
+            let cut_low = |x, min, max| if x < min { max - min + x } else { x };
+            let cut_hight = |x, min, max| if x > max { min + x - max } else { x };
+            particle.world_position.2 = cut_low(
+                cut_hight(particle.world_position.2, self.z_min, self.z_max),
+                self.z_min,
+                self.z_max
             );
         }
     }

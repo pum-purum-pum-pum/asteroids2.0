@@ -14,6 +14,14 @@
         assigned: [ToGun(ShotGun)]
     ),
     (
+        upgrade_type: BulletReflection,
+        image: "bullet_reflection",
+        name: "Bullet reflection",
+        description: "Adds reflection, or increase speed of reflected bullet",
+        assigned: [ToGun(ShotGun)]
+    ),
+
+    (
         upgrade_type: ShipSpeed,
         image: "ship_speed",
         name: "Ship speed",
@@ -48,4 +56,11 @@
         description: "More health",
         assigned: [General]
     ),
+    (
+        upgrade_type: LazerLength,
+        image: "bullet_damage",
+        name: "Lazer length",
+        description: "Increase lazer length by x%",
+        assigned: [ToGun(MultyLazer)]
+    )
 ]

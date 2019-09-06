@@ -15,9 +15,17 @@ android_log = "*"
 log = "*"
 
 [workspace]
-members = ["gfx_h", "common"]
+members = ["gfx_h", "common", "voronois", "telemetry"]
 
 [dependencies]
+log = "0.4.8"
+slog = "2.5.2"
+slog-term = "2.4.1"
+slog-async = "2.3.0"
+slog-scope = "4.1.2"
+slog-stdlog = "4.0.0"
+flame = "0.2.2"
+telemetry = {path = "telemetry"}
 common = {path = "common"}
 gfx_h = {path = "gfx_h"}
 cfg-if = "*"

@@ -1,13 +1,55 @@
+CURRENT:
+ * one struct for lazer and multylazer \/
+* * side lazers(the same upgrade as side bullets) \/
+
+ACTIVE ABILITIES feature:
+* * ring ability
+
+* explosion size for asteroids \/
+* Menu
+* * particles towards player \/
+* ship selection \sort of/
+* * show stats
+
+* Upgrades
+* * lazer length upgrade \/
+* * bullet reflections  \/
+
+ENEMIES:
+* add big bullet with reflection enemy \/
+* * draw image for it
+* two ships with lazer between them from Andrey's game
+* * follow rotational
+
+* damage ship from asteroids
+* red screen when damaged \sort of, fix lazers/
+
+* add harder placeholder waves at the end (mb just loop with improved stats..?)
+* scores saving
+* spawn ability: spawned from enemies to increase damage to asteroids for mining
+
+
+Limit max side bullets upgrade
+
+GRAPHICS:
+* ship trace
+* bullet trace
+* better weapon icons in menu
+* reflection upgrade image
+
+
  HUGE REFACTORING:
  <!-- * warnings \/ -->
  <!-- * undersigns \/ -->
  <!-- * fix timers \/ -->
  <!-- * one struct for blaster and shotgun \/ -->
  <!-- * damage processing simplify \/ -->
- * on struct for lazer and multylazer
+ * InsertSystem
  * comments
  * move high level gfx into different crate?
  * gui simplify
+ * * Image primitive
+ * * text layout
  * go through TODO tags
  * rendering simplify
  * debug stuff rendering separately
@@ -15,6 +57,8 @@
  * fix progress file
  * fix done button
  * rename enemies
+
+* SystemData for gunkind to insert guns kile a clever guy
 
 VIDEO
 
@@ -40,9 +84,7 @@ TODO
 * bullet contact sound
 <!-- menu music -->
 * loot abilities 
-* * ring ability
 <!-- * * double exp \/ -->
-* * side lazers(the same upgrade as side bullets) 
 <!-- * * rendering \/ -->
 <!-- * * double coins \/ -->
 <!-- * * side bullets \/ -->
@@ -55,10 +97,6 @@ TODO
 <!-- * * snake \/ -->
 <!-- * * missiles ship \/ -->
 
-* Menu
-* * particles towards player
-* * better weapon icons
-* * ship selection
 
 <!-- * ?new abilities(like side bullets/lazers or reflections) mining from asteroids then upgrading? \/ -->
 * add taran upgrade
@@ -71,7 +109,6 @@ TODO
 * fix bug lazers dead
 <!-- * fix bug asteroid spawn -->
 * make better animations
-* add harder placeholder waves at the end (mb just loop with improved stats..?)
 * ship buying on coins
 
 <!-- * fixed number of the same sounds at a time and gap. \/ -->
@@ -86,9 +123,7 @@ TODO
 * save money and scores
 * unify damage processing/killing code
 
-* ship trace
-* bullet trace
-* add rotation behaviour
+<!-- * add rotation behaviour -->
 <!-- * add rockets \/ -->
 <!-- * image borders fix \sort of. Nearest filter average white colors around/ -->
 * bullet sound in gun desc
@@ -98,6 +133,7 @@ FUN IDEAS TO TRY(TO SWITCH FROM WORK FOR FUN)
 * PORT TO WEB
 * MORE PROC GEN?
 
+
 * gui feedback and states
 * spawn group of enemies simultaniously
 
@@ -106,7 +142,6 @@ FUN IDEAS TO TRY(TO SWITCH FROM WORK FOR FUN)
 <!-- * add planet \/ -->
 <!-- * image loading for bullets \/ -->
 
-* damage ship from asteroids
 
 * enemies
 <!-- * * constantly trhows slow bullets in spiral(while rotating) \/ -->
@@ -131,12 +166,10 @@ FUN IDEAS TO TRY(TO SWITCH FROM WORK FOR FUN)
 <!-- * * granades \/ -->
 * * * animations
 * * * custom image
-ws bullets around
-* * constantly trhows slow bullets in spiral(while rotating)
+<!-- ws bullets around -->
+<!-- * * constantly trhows slow bullets in spiral(while rotating) -->
 
 * * rarely throws super fast bullets
-
-* add collectable which will throw away a lot bullets (like ultimate in galaxy wars)
 
 GRAPHICS:
 * Ship sield size draw dynamicly
