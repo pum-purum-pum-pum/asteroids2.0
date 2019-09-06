@@ -100,6 +100,13 @@ fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
     )
 }
 
+fn iso3_iso2(iso3: &Isometry3) -> Isometry2 {
+    Isometry2::new(
+        Vector2::new(iso3.translation.vector.x, iso3.translation.vector.y),
+        iso3.rotation.euler_angles().2
+    )
+}
+
 /// Calculate the shortest distance between two angles expressed in radians.
 ///
 /// Based on https://gist.github.com/shaunlebron/8832585
@@ -482,7 +489,8 @@ impl<'a> System<'a> for KinematicSystem {
             match  isometries.get(*attach) {
                 Some(isometry) => {
                     let iso = isometry;
-                    isometries.get_mut(*entity).unwrap().0 = iso.0;
+                    isometries.get_mut(*entity).unwrap().0.translation.vector 
+                        = iso.0.translation.vector;
                 }
                 None => {
                     entities.delete(*entity).unwrap();
@@ -571,6 +579,7 @@ impl<'a> System<'a> for ControlSystem {
             ReadStorage<'a, CharacterMarker>,
             ReadStorage<'a, AsteroidMarker>,
             WriteStorage<'a, ShipStats>,
+            WriteStorage<'a, Rift>,
         ),
         Read<'a, EventChannel<Keycode>>,
         Read<'a, Mouse>,
@@ -600,6 +609,7 @@ impl<'a> System<'a> for ControlSystem {
                 character_markers,
                 asteroid_markers,
                 mut ships_stats,
+                mut rifts,
             ),
             keys_channel,
             mouse_state,
@@ -653,17 +663,18 @@ impl<'a> System<'a> for ControlSystem {
                 }
             }
             let mut process_lazer = |
-                physics_component: &PhysicsComponent,
+                isometry: &Isometry3,
                 lazer: &mut Lazer,
                 world: &mut Write<World<f32>>,
                 bodies_map: & Write<BodiesMap>,
                 is_character: bool,
                 rotation,
             | {
-                let body = world
-                    .rigid_body(physics_component.body_handle)
-                    .unwrap();
-                let isometry = body.position();
+                // let body = world
+                //     .rigid_body(physics_component.body_handle)
+                //     .unwrap();
+                // let isometry = body.position();
+                let isometry = iso3_iso2(isometry);
                 let position = isometry.translation.vector;
                 let pos = Point2::new(position.x, position.y);
                 let dir = isometry * (rotation * Vector2::new(0f32, -1f32));
@@ -737,8 +748,43 @@ impl<'a> System<'a> for ControlSystem {
                     lazer.current_distance = lazer.distance
                 }
             };
+            let mut upgdate_rifts = vec![];
+            let zero_rotation = Rotation2::new(0.0);
+            for (e1, _r1) in (&entities, &rifts).join() {
+                for (e2, _r2) in (&entities, &rifts).join() {
+                    // if e1 == e2 {break};
+                    let pos1 = isometries.get(e1).unwrap().0.translation.vector;
+                    let pos2 = isometries.get(e2).unwrap().0.translation.vector;
+                    let up = Vector2::new(0.0, -1.0);
+                    let dir = pos2 - pos1;
+                    let mut lazer = Lazer {damage: 5, active: true, distance: dir.norm(), current_distance: dir.norm()};
+                    let dir = Vector2::new(dir.x, dir.y);
+                    let rotation = Rotation2::rotation_between(&up, &dir);
+                    let isometry = Isometry3::new(
+                        Vector3::new(pos1.x, pos1.y, pos1.z), Vector3::new(0f32, 0f32, rotation.angle())
+                    );
 
-            for (entity, physics_component, multiple_lazers) in (&entities, &physics, &mut multiple_lazers).join() {
+                    process_lazer(
+                        &isometry,
+                        &mut lazer,
+                        &mut world,
+                        &bodies_map,
+                        character_markers.get(e1).is_some(),
+                        zero_rotation
+                    );
+                    upgdate_rifts.push((e1, lazer.clone(), dir.normalize()));
+                    // render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
+                }
+            }
+            for rift in (&mut rifts).join() {
+                rift.lazers = vec![];
+            }
+            for (e, lazer, dir) in upgdate_rifts.into_iter() {
+                let rift = rifts.get_mut(e).unwrap();
+                rift.lazers.push((lazer, (dir.x, dir.y)));
+            }
+
+            for (entity, isometry, multiple_lazers) in (&entities, &isometries, &mut multiple_lazers).join() {
                 for (angle, lazer) in multiple_lazers.iter_mut() {
                     // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
                     let rotation = Rotation2::new(angle);
@@ -746,7 +792,7 @@ impl<'a> System<'a> for ControlSystem {
                         continue
                     }
                     process_lazer(
-                        physics_component,
+                        &isometry.0,
                         lazer,
                         &mut world,
                         &bodies_map,
@@ -1040,7 +1086,8 @@ impl<'a> System<'a> for InsertSystem {
                     ship_stats,
                     size,
                     image,
-                    snake
+                    snake,
+                    rift,
                 } => {
                     let num = if let Some(chains) = snake {*chains} else {1};
                     let mut last_entity = None;
@@ -1115,7 +1162,13 @@ impl<'a> System<'a> for InsertSystem {
                         );
                         // snake thing
                         if let Some(last_entity) = last_entity {
-                            lazy_update.insert(enemy, Chain{follow: last_entity})
+                            if snake.is_some() {
+                                lazy_update.insert(enemy, Chain{follow: last_entity})
+                            }
+                        }
+                        if let Some(rift) = rift {
+                            lazy_update.insert(enemy, rift.clone());
+                            // lazy_update.insert(enemy, Aim(last_entity))
                         }
                         last_entity = Some(enemy);
                         // with light
@@ -1726,6 +1779,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 size: enemy.size,
                 image: enemy.image,
                 snake: enemy.snake,
+                rift: enemy.rift,
             }
         };
         for _ in 0..add_cnt {

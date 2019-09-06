@@ -1010,7 +1010,8 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, CollectableMarker>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
             ReadStorage<'a, MultyLazer>,
-            ReadStorage<'a, Chain>
+            ReadStorage<'a, Chain>,
+            ReadStorage<'a, Rift>
         ),
         WriteExpect<'a, TeleGraph>,
         Read<'a, Mouse>,
@@ -1051,6 +1052,7 @@ impl<'a> System<'a> for RenderingSystem {
                 mut particles_datas,
                 multy_lazers,
                 _chains,
+                rifts,
             ),
             mut telegraph,
             mouse,
@@ -1300,6 +1302,35 @@ impl<'a> System<'a> for RenderingSystem {
                 );
             }
         };
+        let zero_rotation = Rotation2::new(0.0);
+        for (rift, isometry) in (&rifts, &isometries).join() {
+            for (lazer, dir) in rift.lazers.iter() {
+                let pos = isometry.0.translation.vector;
+                let up = Vector2::new(0.0, -1.0);
+                let dir = Vector2::new(dir.0, dir.1);
+                let rotation = Rotation2::rotation_between(&up, &Vector2::new(dir.x, dir.y));
+                let isometry = Isometry3::new(
+                    Vector3::new(pos.x, pos.y, pos.z), Vector3::new(0f32, 0f32, rotation.angle())
+                );
+                render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
+            }
+        }
+        // for (e1, _r1) in (&entities, &rifts).join() {
+        //     for (e2, _r2) in (&entities, &rifts).join() {
+        //         // if e1 == e2 {break};
+        //         let pos1 = isometries.get(e1).unwrap().0.translation.vector;
+        //         let pos2 = isometries.get(e2).unwrap().0.translation.vector;
+        //         let up = Vector2::new(0.0, -1.0);
+        //         let dir = pos2 - pos1;
+        //         let lazer = Lazer {damage: 5, active: true, distance: dir.norm(), current_distance: dir.norm()};
+        //         let rotation = Rotation2::rotation_between(&up, &Vector2::new(dir.x, dir.y));
+        //         let isometry = Isometry3::new(
+        //             Vector3::new(pos1.x, pos1.y, pos1.z), Vector3::new(0f32, 0f32, rotation.angle())
+        //         );
+        //         render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
+        //     }
+        // }
+
         for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
             for (angle, lazer) in multy_lazer.iter() {
                 // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
@@ -1307,7 +1338,6 @@ impl<'a> System<'a> for RenderingSystem {
                 render_lazer(iso, lazer, false, rotation);
             }
         };
-        let zero_rotation = Rotation2::new(0.0);
         for (_entity, iso, image, size, _projectile) in
             (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
         {

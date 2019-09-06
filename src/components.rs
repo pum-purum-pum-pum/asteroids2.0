@@ -14,7 +14,7 @@ use crate::common::*;
 
 use specs::prelude::*;
 use serde::{Serialize, Deserialize};
-use specs_derive::Component;
+use specs_derive::{Component};
 use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
@@ -154,7 +154,8 @@ pub struct EnemyKind {
     pub ship_stats: ShipStats,
     pub size: f32,
     pub image: Image,
-    pub snake: Option<usize>
+    pub snake: Option<usize>,
+    pub rift: Option<Rift>,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -184,7 +185,8 @@ pub enum InsertEvent {
         ship_stats: ShipStats,
         image: Image,
         size: f32,
-        snake: Option<usize>
+        snake: Option<usize>,
+        rift: Option<Rift>
     },
     Bullet {
         kind: EntityType,
@@ -387,6 +389,14 @@ pub enum Geometry {
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Chain {
     pub follow: specs::Entity,
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct LazerConnect(pub specs::Entity);
+
+#[derive(Component, Debug, Clone, Serialize, Deserialize)]
+pub struct Rift {
+    pub lazers: Vec<(Lazer, (f32, f32))>
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -783,6 +793,10 @@ pub fn get_avaliable_cards(
 /// attach entity positions to some other entity position
 #[derive(Component, Debug, Clone)]
 pub struct AttachPosition(pub specs::Entity);
+
+#[derive(Component, Debug, Clone)]
+pub struct AttachAim(pub specs::Entity);
+
 
 #[derive(Debug, Clone)]
 pub enum GunKind {

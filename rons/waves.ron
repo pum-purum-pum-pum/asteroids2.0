@@ -5,7 +5,7 @@
 			],
 			ships_number: 15,
 			const_distribution : [
-				("player", 1)
+				("rift", 3)
 			],
 			iterations: 1
 		),

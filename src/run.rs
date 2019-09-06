@@ -206,7 +206,9 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Animation>();
     specs_world.register::<Charge>();
     specs_world.register::<Chain>();
+    specs_world.register::<LazerConnect>();
     specs_world.register::<SoundPlacement>();
+    specs_world.register::<Rift>();
     // TODO: load all this imagea automagicly (assets pack?)
     let images = [
         "back",
@@ -245,6 +247,7 @@ pub fn run() -> Result<(), String> {
         "shotgun",
         "coin",
         "side_bullets_ability",
+        "rift",
         "double_coin",
         "double_exp",
         "health",
@@ -380,7 +383,8 @@ pub fn run() -> Result<(), String> {
                 ship_stats: enemy_save.ship_stats,
                 size: enemy_save.size,
                 image: Image(name_to_image[&enemy_save.image_name]),
-                snake: enemy_save.snake
+                snake: enemy_save.snake,
+                rift: enemy_save.rift.clone(),
             }
         }
         #[derive(Debug, Serialize, Deserialize)]
@@ -390,7 +394,9 @@ pub fn run() -> Result<(), String> {
             pub ship_stats: ShipStats,
             pub size: f32,
             pub image_name: String,
-            pub snake: Option<usize>
+            pub snake: Option<usize>,
+            #[serde(default)] 
+            pub rift: Option<Rift>,
         };
         // let file = File::open("desc.ron").unwrap();
         let file = include_str!("../rons/desc.ron");

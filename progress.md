@@ -1,3 +1,12 @@
+RIFTS:
+* spawn rifts enemy \/
+* draw rift lazer\/
+* * without distance \/
+* * with distance \/
+* process rift lazers
+* rotational behavior
+* make them faster?
+
 CURRENT:
  * one struct for lazer and multylazer \/
 * * side lazers(the same upgrade as side bullets) \/
@@ -36,6 +45,8 @@ GRAPHICS:
 * bullet trace
 * better weapon icons in menu
 * reflection upgrade image
+* ligth shooting
+* red light when lazer
 
 
  HUGE REFACTORING:
