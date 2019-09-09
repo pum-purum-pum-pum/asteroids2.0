@@ -3,7 +3,7 @@ RIFTS:
 * draw rift lazer\/
 * * without distance \/
 * * with distance \/
-* process rift lazers
+* process rift lazers \/
 * rotational behavior
 * make them faster?
 
@@ -26,8 +26,8 @@ ACTIVE ABILITIES feature:
 
 ENEMIES:
 * add big bullet with reflection enemy \/
-* * draw image for it
-* two ships with lazer between them from Andrey's game
+* * draw image for it \/
+* two ships with lazer between them from Andrey's game \/
 * * follow rotational
 
 * damage ship from asteroids

@@ -5,7 +5,8 @@
 			],
 			ships_number: 15,
 			const_distribution : [
-				("rift", 3)
+				("rift", 10),
+				// ("reflect_bullet_enemy", 1)
 			],
 			iterations: 1
 		),

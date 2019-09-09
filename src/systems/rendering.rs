@@ -1,7 +1,8 @@
 use gfx_h::{TextData, RenderMode};
 use gfx_h::effects::MenuParticles;
 use std::collections::{HashMap};
-use telemetry::{TeleGraph, TimeSpans, render_plot};
+use telemetry::{TeleGraph};
+pub use crate::gui::{Button, Rectangle, Picture};
 // use flame;
 
 use super::*;
@@ -67,7 +68,6 @@ impl<'a> System<'a> for ScoreTableRendering {
                         text: format!("{}", score).to_string(), 
                     }),
                     with_projection: false,
-                    image: None
                 }
             );            
         }
@@ -76,7 +76,7 @@ impl<'a> System<'a> for ScoreTableRendering {
             Point2::new(w / 2.0, 1.5 * button_h),
             button_w,
             button_h,
-            Point3::new(0f32, 0f32, 0f32),
+            Some(Point3::new(0f32, 0f32, 0f32)),
             false,
             None,
             "Back to Menu".to_string()
@@ -182,7 +182,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 ),
                 button_w,
                 button_h,
-                Point3::new(0f32, 0f32, 0f32),
+                Some(Point3::new(0f32, 0f32, 0f32)),
                 false,
                 Some(Image(button_images[i])),
                 buttons_names[i].to_string()
@@ -207,7 +207,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 ),
                 button_w,
                 button_h,
-                Point3::new(0f32, 0f32, 0f32),
+                Some(Point3::new(0f32, 0f32, 0f32)),
                 false,
                 Some(ship.image),
                 "".to_string()
@@ -227,7 +227,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Point2::new(w / 2.0, 1.5 * button_h + shift_between),
             button_w,
             button_h / 5.0,
-            Point3::new(0f32, 0f32, 0f32),
+            Some(Point3::new(0f32, 0f32, 0f32)),
             false,
             Some(Image(preloaded_images.upg_bar)),
             "Score Table".to_string()
@@ -273,7 +273,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             // Point2::new(0f32, 0f32),
             button_w, 
             button_h, 
-            Point3::new(0.1f32, 0.4f32, 1f32), 
+            None,
             false, 
             Some(Image(preloaded_images.play)),
             "".to_string()
@@ -325,49 +325,44 @@ pub fn render_primitives<'a>(
     for primitive in primitives_channel.read(reader) {
         match primitive {
             Primitive {
+                kind: PrimitiveKind::Picture(picture),
+                with_projection,
+            } => {
+                let (model, _points, _indicies) = picture.get_gfx();
+                canvas
+                    .render_primitive_texture(
+                        &gl, 
+                        &viewport,
+                        frame, 
+                        image_datas.get(picture.image.0).unwrap(),
+                        &model, 
+                        *with_projection, 
+                        (picture.width, picture.height)
+                        );
+            },
+            Primitive {
                 kind: PrimitiveKind::Rectangle(rectangle),
                 with_projection,
-                image
             } => {
-                let (model, points, indicies) = rectangle.get_geometry();
+                let (model, points, indicies) = rectangle.get_gfx();
                 let geom_data =
                     GeometryData::new(&gl, &points, &indicies).unwrap();
-                match image {
-                    Some(image) => {
-                        canvas
-                            .render_primitive_texture(
-                                &gl, 
-                                &viewport,
-                                frame, 
-                                image_datas.get(image.0).unwrap(),
-                                &model, 
-                                *with_projection, 
-                                (rectangle.width, rectangle.height)
-                            );
-                    }
-                    None => {
-                        let fill_color = rectangle.color;
-                        canvas.render_primitive(
-                            &gl,
-                            &viewport,
-                            frame,
-                            &geom_data,
-                            &model,
-                            (fill_color.x, fill_color.y, fill_color.z),
-                            *with_projection,
-                            RenderMode::Draw
-                        );
-                        // canvas
-                        //     .render_primitive(&display, &mut target, &geom_data, &model, rectangle.color, *with_projection)
-                        //     .unwrap();
-
-                    }
+                if let Some(fill_color) = rectangle.color {
+                    canvas.render_primitive(
+                        &gl,
+                        &viewport,
+                        frame,
+                        &geom_data,
+                        &model,
+                        (fill_color.x, fill_color.y, fill_color.z),
+                        *with_projection,
+                        RenderMode::Draw
+                    );
                 }
             }
             Primitive {
                 kind: PrimitiveKind::Text(text),
                 with_projection: _,
-                image: _
             } => {
                 use glyph_brush::{Layout, HorizontalAlign, VerticalAlign};
                 text_data.glyph_brush.queue(Section {
@@ -467,7 +462,7 @@ impl<'a> System<'a> for UpgradeGUI {
                         let upgrade_button = Button::new(
                             current_point - Vector2::new(w_add / 2.0, h_add / 2.0),
                             upgrade_button_w + w_add, upgrade_button_h + h_add, 
-                            pallete.white_color.clone(), 
+                            Some(pallete.white_color.clone()),
                             false,
                             Some(upg.image),
                             "".to_string()
@@ -479,7 +474,6 @@ impl<'a> System<'a> for UpgradeGUI {
                                     text: upg.name.clone()
                                 }),
                                 with_projection: false,
-                                image: None
                             }
                         );
                         // upg.name.clone()
@@ -494,7 +488,7 @@ impl<'a> System<'a> for UpgradeGUI {
                 let select_upgrade = Button::new(
                     Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
                     choose_button_w, choose_button_h, 
-                    pallete.grey_color.clone(), 
+                    Some(pallete.grey_color.clone()),
                     false,
                     Some(Image(preloaded_images.upg_bar)),
                     "Upgrade!".to_string()
@@ -509,7 +503,6 @@ impl<'a> System<'a> for UpgradeGUI {
                                     text: avaliable_upgrades[upgrade].description.clone()
                                 }),
                                 with_projection: false,
-                                image: None
                             }
                         );
                         if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
@@ -522,7 +515,7 @@ impl<'a> System<'a> for UpgradeGUI {
                 let done_button = Button::new(
                     Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
                     choose_button_w, choose_button_h, 
-                    pallete.grey_color.clone(), 
+                    Some(pallete.grey_color.clone()),
                     false,
                     Some(Image(preloaded_images.upg_bar)),
                     "Done".to_string()
@@ -756,7 +749,6 @@ impl<'a> System<'a> for GUISystem {
                     ).to_string()
                 }),
                 with_projection: false,
-                image: None
             }
         );
 
@@ -771,7 +763,6 @@ impl<'a> System<'a> for GUISystem {
                     ).to_string()
                 }),
                 with_projection: false,
-                image: None
             }
         );
 
@@ -785,7 +776,6 @@ impl<'a> System<'a> for GUISystem {
                     ).to_string()
                 }),
                 with_projection: false,
-                image: None
             }
         );
 
@@ -828,7 +818,7 @@ impl<'a> System<'a> for GUISystem {
                 Point2::new(x_pos, y_pos),
                 icon_size,
                 icon_size,
-                Point3::new(0f32, 0f32, 0f32),
+                Some(Point3::new(0f32, 0f32, 0f32)),
                 false,
                 Some(ability.icon),
                 "".to_string()
@@ -841,7 +831,6 @@ impl<'a> System<'a> for GUISystem {
                         text: ability.text.clone()
                     }),
                     with_projection: false,
-                    image: None
                 }
             );            
         }
@@ -856,47 +845,38 @@ impl<'a> System<'a> for GUISystem {
             position: experience_position,
             width: (progress.experience as f32 / progress.current_max_experience() as f32) * experiencebar_w,
             height: experiencebar_h,
-            color: pallete.experience_color.clone()
+            color: Some(pallete.experience_color.clone())
         };
 
         let border = d / 200f32;
-        let back_bar = Button::new(
-            experience_position + Vector2::new(-border/2.0, -border/2.0),
-            experiencebar_w + border,
-            experiencebar_h + border,
-            Point3::new(0f32, 0f32, 0f32),
-            false,
-            Some(Image(preloaded_images.bar)),
-            "".to_string()
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Picture(Picture {
+                    position: experience_position + Vector2::new(-border/2.0, -border/2.0),
+                    width: experiencebar_w + border,
+                    height: experiencebar_h + border,
+                    image: Image(preloaded_images.bar)
+                }),
+                with_projection: false,
+            }
         );
-        back_bar.place_and_check(&mut ingame_ui, &*mouse);
-
-        // let experience_bar_back = Rectangle {
-        //     position: experience_position,
-        //     width: experiencebar_w,
-        //     height: experiencebar_h,
-        //     color: pallete.white_color.clone()
-        // };
-        // ingame_ui.primitives.push(
-        //     Primitive {
-        //         kind: PrimitiveKind::Rectangle(experience_bar_back),
-        //         with_projection: false,
-        //         image: None
-        //     }
-        // );
+        ingame_ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Picture(Picture {
+                    position: experience_position + Vector2::new(-border/2.0, -border/2.0),
+                    width: (progress.experience as f32 / progress.current_max_experience() as f32) * experiencebar_w,
+                    height: experiencebar_h,
+                    image: Image(preloaded_images.bar)
+                }),
+                with_projection: false,
+            }
+        );
         ingame_ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Rectangle(experience_bar),
                 with_projection: false,
-                image: None
             }
         );
-        // let ship_lifes_bar = Rectangle {
-        //     position: Point2::new(position.x, position.y),
-        //     width: (life.0 as f32/ MAX_SHIELDS as f32) * 1.5,
-        //     height: 0.1,
-        //     color: white_color
-        // };
         if spawned_upgrades.len() > 0 {
         // {
             let (upgrade_bar_w, upgrade_bar_h) = (w / 3f32, h / 10.0);
@@ -904,7 +884,7 @@ impl<'a> System<'a> for GUISystem {
                 Point2::new(w / 2.0 - upgrade_bar_w / 2.0, h - h / 20.0 - upgrade_bar_h),
                 upgrade_bar_w,
                 upgrade_bar_h,
-                Point3::new(0f32, 0f32, 0f32),
+                None,
                 false,
                 Some(Image(preloaded_images.upg_bar)),
                 "Upgrade avaliable!".to_string()
@@ -922,7 +902,7 @@ impl<'a> System<'a> for GUISystem {
                     Point2::new(w/2.0 - health_back_w / 2.0, health_y - border / 2.0),
                     health_back_w,
                     health_back_h,
-                    Point3::new(0f32, 0f32, 0f32),
+                    None,
                     false,
                     Some(Image(preloaded_images.bar)),
                     "".to_string()
@@ -934,7 +914,7 @@ impl<'a> System<'a> for GUISystem {
                     Point2::new(w/2.0 - health_back_w / 2.0, shields_y - border / 2.0),
                     health_back_w,
                     health_back_h,
-                    Point3::new(0f32, 0f32, 0f32),
+                    None,
                     false,
                     Some(Image(preloaded_images.bar)),
                     "".to_string()
@@ -947,26 +927,24 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, health_y),
                 width: (life.0 as f32 / ship_stats.max_health as f32) * lifebar_w,
                 height: lifebar_h,
-                color: pallete.life_color.clone()
+                color: Some(pallete.life_color.clone())
             };
             let shields_bar = Rectangle {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, shields_y),
                 width: (shield.0 as f32 / ship_stats.max_shield as f32) * lifebar_w,
                 height: lifebar_h,
-                color: pallete.shield_color
+                color: Some(pallete.shield_color)
             };
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(shields_bar),
                     with_projection: false,
-                    image: None
                 }
             );
             ingame_ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(lifes_bar),
                     with_projection: false,
-                    image: None
                 }
             );
         }

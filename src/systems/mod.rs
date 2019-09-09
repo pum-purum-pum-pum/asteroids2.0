@@ -361,7 +361,13 @@ impl<'a> System<'a> for SoundSystem {
                         .duration_since(placement.last_upd) >= placement.gap {
                     placement.last_upd = Instant::now();
                     current_channel.play(sound, 0).unwrap();
-                    let fade = (1.0 + 1.0 / (1.0 * position.coords.norm() * position.coords.norm_squared() + 1.0)) / 2.0;
+                    let n = position.coords.norm();
+                    // let smooth = 1.0; // more value less depend on l
+                    let l = 1.0 + n;
+                    let mut fade = 1.0 / (l.ln());
+                    if n < 10f32 {
+                        fade = 1.0;
+                    }
                     current_channel.set_volume(
                         (EFFECT_MAX_VOLUME as f32 * fade) as i32
                     );
@@ -750,11 +756,12 @@ impl<'a> System<'a> for ControlSystem {
             };
             let mut upgdate_rifts = vec![];
             let zero_rotation = Rotation2::new(0.0);
-            for (e1, _r1) in (&entities, &rifts).join() {
+            for (e1, r1) in (&entities, &rifts).join() {
                 for (e2, _r2) in (&entities, &rifts).join() {
                     // if e1 == e2 {break};
                     let pos1 = isometries.get(e1).unwrap().0.translation.vector;
                     let pos2 = isometries.get(e2).unwrap().0.translation.vector;
+                    if (pos1 - pos2).norm() > r1.distance {continue};
                     let up = Vector2::new(0.0, -1.0);
                     let dir = pos2 - pos1;
                     let mut lazer = Lazer {damage: 5, active: true, distance: dir.norm(), current_distance: dir.norm()};

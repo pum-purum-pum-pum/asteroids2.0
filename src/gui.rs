@@ -121,7 +121,7 @@ pub struct Button {
     position: Point2, // screen position
     width: f32,
     height: f32,
-    color: Point3,
+    color: Option<Point3>,
     with_projection: bool,
     pub image: Option<Image>,
     text: String
@@ -130,14 +130,38 @@ pub struct Button {
 #[derive(Clone)]
 pub enum PrimitiveKind {
     Rectangle(Rectangle),
-    Text(Text)
+    Text(Text),
+    Picture(Picture)
+}
+
+#[derive(Clone)]
+pub struct Picture {
+    pub position: Point2,
+    pub width: f32,
+    pub height: f32,
+    pub image: Image
+}
+
+impl Picture {
+    pub fn get_gfx(&self) -> (Isometry3, Vec<Point2>, Vec<u16>) {
+        let model = Isometry3::new(Vector3::new(self.position.x, self.position.y, 0f32), Vector3::new(0f32, 0f32 ,0f32));
+        (
+            model,
+            vec![
+                Point2::new(0.0, 0.0),
+                Point2::new(0.0, self.height),
+                Point2::new(self.width, self.height), 
+                Point2::new(self.width, 0.0)
+            ],
+            vec![0u16, 1, 2, 2, 3, 0]
+        )
+    }
 }
 
 #[derive(Clone)]
 pub struct Primitive {
     pub kind: PrimitiveKind,
     pub with_projection: bool,
-    pub image: Option<Image>,
 }
 
 impl Button {
@@ -145,7 +169,7 @@ impl Button {
         position: Point2, 
         width: f32, 
         height: f32, 
-        color: Point3, 
+        color: Option<Point3>, 
         with_projection: bool, 
         image: Option<Image>, 
         text: String
@@ -168,8 +192,9 @@ impl Button {
         check_in(mouse_position.y, self.position.y, self.position.y + self.height)
     }
 
-    pub fn get_geometry(&self) -> Primitive {
-        Primitive {
+    pub fn get_geometry(&self) -> Vec<Primitive> {
+        let mut res = vec![];
+        let rectangle = Primitive {
             kind: PrimitiveKind::Rectangle(Rectangle{
                 position: self.position, 
                 width: self.width, 
@@ -177,8 +202,21 @@ impl Button {
                 color: self.color
             }),
             with_projection: self.with_projection,
-            image: self.image
+        };
+        res.push(rectangle);
+        if let Some(image) = self.image {
+            let picture = Primitive {
+                kind: PrimitiveKind::Picture(Picture{
+                    position: self.position, 
+                    width: self.width, 
+                    height: self.height,
+                    image: image
+                }),
+                with_projection: self.with_projection
+            };
+            res.push(picture);
         }
+        res
     }
 
     pub fn get_text_box(&self) -> Primitive {
@@ -192,7 +230,6 @@ impl Button {
                 },
             ),
             with_projection: self.with_projection,
-            image: None
         }
     }
 
@@ -201,7 +238,7 @@ impl Button {
         ingame_ui: &mut IngameUI,
         mouse: &Mouse, 
     ) -> bool {
-        ingame_ui.primitives.push(self.get_geometry());
+        ingame_ui.primitives.extend(self.get_geometry().into_iter());
         ingame_ui.primitives.push(self.get_text_box());
         self.check(mouse)
     }
@@ -218,11 +255,11 @@ pub struct Rectangle {
     pub position: Point2, // screen position
     pub width: f32,
     pub height: f32,
-    pub color: Point3,
+    pub color: Option<Point3>,
 }
 
 impl Rectangle {
-    pub fn get_geometry(&self) -> (Isometry3, Vec<Point2>, Vec<u16>) {
+    pub fn get_gfx(&self) -> (Isometry3, Vec<Point2>, Vec<u16>) {
         let model = Isometry3::new(Vector3::new(self.position.x, self.position.y, 0f32), Vector3::new(0f32, 0f32 ,0f32));
         (
             model,

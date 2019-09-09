@@ -64,7 +64,7 @@
     enemies: [
 
         (
-            ai_kind: AI(kinds:[Kamikadze, Aim]),
+            ai_kind: AI(kinds:[Follow, Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: (secs: 0, nanos: 300_000_000),
@@ -77,17 +77,17 @@
                 bullet_image: "enemy_projectile"
             )),
             ship_stats: (
-                thrust_force: 0.003,
+                thrust_force: 0.005,
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 0,
-                max_health: 10,
+                max_health: 100,
                 max_shield: 0,
-                damage: 100
+                damage: 1
             ),
             size: 0.4,
             image_name: "rift",
-            rift: Some((lazers: []))
+            rift: Some((distance: 8, lazers: []))
         ),
 
 
@@ -103,7 +103,7 @@
                 bullet_size: 0.7,
                 reflection: Some((speed: 0.2)),
                 bullet_lifetime: (secs: 5, nanos: 200_000_000),
-                bullet_image: "enemy_projectile_old"
+                bullet_image: "reflect_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.003,
@@ -115,7 +115,7 @@
                 damage: 10
             ),
             size: 0.8,
-            image_name: "player",
+            image_name: "reflect_bullet_enemy",
         ),
 
 

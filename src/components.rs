@@ -8,7 +8,6 @@ pub use gfx_h::{Image, ImageData};
 pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub use crate::sound::{SoundData, SoundPlacement};
-pub use crate::gui::{Button, Rectangle};
 use crate::common::*;
 
 
@@ -396,6 +395,7 @@ pub struct LazerConnect(pub specs::Entity);
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct Rift {
+    pub distance: f32,
     pub lazers: Vec<(Lazer, (f32, f32))>
 }
 
