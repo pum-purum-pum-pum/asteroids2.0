@@ -1,8 +1,11 @@
 use gfx_h::{TextData, RenderMode};
 use gfx_h::effects::MenuParticles;
 use std::collections::{HashMap};
-use telemetry::{TeleGraph};
-pub use crate::gui::{Button, Rectangle, Picture};
+use telemetry::{TeleGraph, render_plot};
+use num_enum::TryFromPrimitive;
+use std::convert::TryFrom;
+pub use crate::gui::{Button, Rectangle, Picture, Selector};
+
 // use flame;
 
 use super::*;
@@ -11,6 +14,28 @@ use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
 use crate::geometry::{shadow_geometry};
 
+const BUTTON_SCALE: f32 = 1.2;
+
+#[derive(Clone, Copy, Debug, TryFromPrimitive)]
+#[repr(usize)]
+enum Widgets {
+    BackMenu,
+    LazerGun, 
+    BlasterGun, 
+    ShotGun,
+    BasicShip,
+    HeavyShip,
+    LockedBasicShip,
+    LockedHeavyShip,
+    ScoreTable,
+    Play,
+    Upgrade1,
+    Upgrade2,
+    Upgrade,
+    Done,
+    WeaponSelector,
+    ShipsSelector,
+}
 
 pub struct ScoreTableRendering {
     reader: ReaderId<Primitive>,
@@ -31,11 +56,11 @@ impl<'a> System<'a> for ScoreTableRendering {
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, red::Viewport>,
         Write<'a, EventChannel<Primitive>>,
-        Write<'a, IngameUI>,
+        Write<'a, UI>,
         Read<'a, Mouse>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
         Write<'a, AppState>,
-        ReadExpect<'a, ScoreTable>
+        ReadExpect<'a, MacroGame>
     );
     fn run(&mut self, data: Self::SystemData) {
         let (
@@ -48,7 +73,7 @@ impl<'a> System<'a> for ScoreTableRendering {
             mouse,
             mut text_data,
             mut app_state,
-            score_table,
+            macro_game,
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
@@ -59,7 +84,7 @@ impl<'a> System<'a> for ScoreTableRendering {
 
         let mut current_h = h / 20.0;
         let text_gap_h = h / 20.0; // TODO somehow measure it
-        for score in score_table.0.iter() {
+        for score in macro_game.score_table.iter() {
             current_h += text_gap_h;
             ui.primitives.push(
                 Primitive {
@@ -72,14 +97,16 @@ impl<'a> System<'a> for ScoreTableRendering {
             );            
         }
 
-        let back_to_menu = Button::new(
+
+        let mut back_to_menu = Button::new(
             Point2::new(w / 2.0, 1.5 * button_h),
             button_w,
             button_h,
             Some(Point3::new(0f32, 0f32, 0f32)),
             false,
             None,
-            "Back to Menu".to_string()
+            "Back to Menu".to_string(),
+            Widgets::BackMenu as usize
         );
         if back_to_menu.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::Menu;
@@ -119,18 +146,19 @@ impl<'a> System<'a> for MenuRenderingSystem {
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, red::Viewport>,
         Write<'a, EventChannel<Primitive>>,
-        Write<'a, IngameUI>,
+        Write<'a, UI>,
+        Write<'a, UIState>,
         Write<'a, EventChannel<InsertEvent>>,
         WriteExpect<'a, PreloadedImages>,
         WriteExpect<'a, ThreadPin<MenuParticles>>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
-        Write<'a, MenuChosedGun>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
         ReadExpect<'a, Description>,
         Read<'a, Vec<UpgradeCardRaw>>,
         Write<'a, Vec<UpgradeCard>>,
-        Read<'a, HashMap<String, specs::Entity>>
+        Read<'a, HashMap<String, specs::Entity>>,
+        WriteExpect<'a, MacroGame>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -141,18 +169,19 @@ impl<'a> System<'a> for MenuRenderingSystem {
             viewport,
             mut primitives_channel,
             mut ui,
+            mut ui_state,
             mut insert_channel,
             preloaded_images,
             mut menu_particles,
             mouse,
             mut app_state,
             // text_data
-            mut chosed_gun,
             mut text_data,
             description,
             upgrade_cards_raw,
             mut avaliable_upgrades,
             name_to_image,
+            mut macro_game
         ) = data;
         let mut frame = red::Frame::new(&gl);
         frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
@@ -161,10 +190,24 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         // return;
 
+        ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w - w/7.0, h / 20.0), 
+                    text: format!(
+                        "$ {}", 
+                        macro_game.coins
+                    ).to_string()
+                }),
+                with_projection: false,
+            }
+        );
+
         let button_w = w/12f32;
         let button_h = button_w;
         let mut buttons = vec![];
         let buttons_names = vec!["", "", ""];
+        let guns = vec![Widgets::LazerGun, Widgets::BlasterGun, Widgets::ShotGun];
         let buttons_num = buttons_names.len();
         let button_images = vec![
             preloaded_images.lazer, 
@@ -185,41 +228,101 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 Some(Point3::new(0f32, 0f32, 0f32)),
                 false,
                 Some(Image(button_images[i])),
-                buttons_names[i].to_string()
+                buttons_names[i].to_string(),
+                guns[i] as usize
             );
             buttons.push(button);
         }
-        for i in 0..buttons_num {
-            if buttons[i].place_and_check(&mut ui, &*mouse) {
-                chosed_gun.0 = Some(description.player_guns[i].clone());
+        let weapon_selector = Selector {
+            buttons: buttons,
+            id: Widgets::WeaponSelector as usize,
+            mask: None
+        };
+        if let Some(selected_id) = weapon_selector.place_and_check(
+            &mut ui,
+            &*mouse
+        ) {
+            match Widgets::try_from(selected_id).expect("unknown widget id") {
+                Widgets::LazerGun => {
+                    ui_state.chosed_gun = Some(description.player_guns[0].clone());
+                }
+                Widgets::BlasterGun => {
+                    ui_state.chosed_gun = Some(description.player_guns[1].clone());
+                }
+                Widgets::ShotGun => {
+                    ui_state.chosed_gun = Some(description.player_guns[2].clone());
+                }
+                _ => ()
             }
         }
-
-        // let mut ship_names = vec!["", "", ""];
-        // let mut ship_images = vec![
-        //     preloaded_images.basic_ship];
         let mut buttons = vec![];
+        let ships_ids = vec![Widgets::BasicShip, Widgets::HeavyShip];
+        let locked_ships_ids = vec![Widgets::LockedBasicShip, Widgets::LockedHeavyShip];
         for (i, ship) in description.player_ships.iter().enumerate() {
-            let button = Button::new(
+            let unlocked = macro_game.ships_unlocked[i];
+            let button_position = 
                 Point2::new(
                     shift_init + i as f32 * (shift_between + button_w), 
                     button_h + button_h
-                ),
-                button_w,
-                button_h,
-                Some(Point3::new(0f32, 0f32, 0f32)),
-                false,
-                Some(ship.image),
-                "".to_string()
-            );
-            buttons.push(button);
-        }
-
-        for i in 0..buttons.len() {
-            if buttons[i].place_and_check(&mut ui, &*mouse) {
-                dbg!(&format!("ship button {}", i));
+                );
+            if unlocked {
+                let button = Button::new(
+                    button_position,
+                    button_w,
+                    button_h,
+                    Some(Point3::new(0f32, 0f32, 0f32)),
+                    false,
+                    Some(ship.image),
+                    "".to_string(),
+                    ships_ids[i] as usize,
+                );
+                buttons.push(button);
+            } else {
+                let button = Button::new(
+                    button_position,
+                    button_w,
+                    button_h,
+                    Some(Point3::new(0f32, 0f32, 0f32)),
+                    false,
+                    Some(ship.image),
+                    format!("{} $", description.ship_costs[i]),
+                    locked_ships_ids[i] as usize,
+                );
+                buttons.push(button);
             }
         }
+
+        let ships_selector = Selector {
+            buttons: buttons,
+            id: Widgets::ShipsSelector as usize,
+            mask: Some(macro_game.ships_unlocked.clone())
+        };
+        if let Some(selected_id) = ships_selector.place_and_check(
+            &mut ui,
+            &* mouse
+        ) {
+            // ui_state.chosed_ship = Some(selected_id);
+            match Widgets::try_from(selected_id).expect("unknown widget id") {
+                Widgets::BasicShip => {
+                    ui_state.chosed_ship = Some(0);
+                }
+                Widgets::HeavyShip => {
+                    ui_state.chosed_ship = Some(1);
+                }
+                Widgets::LockedHeavyShip => {
+                    if macro_game.coins >= description.ship_costs[1] {
+                        macro_game.ships_unlocked[1] = true;
+                        macro_game.coins -= description.ship_costs[1];
+                    }
+                }
+                _ => ()
+            }
+        }
+        // for i in 0..buttons.len() {
+        //     if buttons[i].place_and_check(&mut ui, &*mouse) {
+        //         dbg!(&format!("ship button {}", i));
+        //     }
+        // }
 
         let button_w = w / 6.0;
         let button_h = button_w;
@@ -230,7 +333,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Some(Point3::new(0f32, 0f32, 0f32)),
             false,
             Some(Image(preloaded_images.upg_bar)),
-            "Score Table".to_string()
+            "Score Table".to_string(),
+            Widgets::ScoreTable as usize
         );
         if score_table_button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::ScoreTable;
@@ -247,25 +351,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     Vector3::new(0f32, 0f32, 0f32),
                 )
             );
-        // for (particles_data,) in (&mut particles_datas,).join() {
-        //     match **particles_data {
-        //         ParticlesData::MenuParticles(ref mut particles) => {
-        //             particles.update(0.5);
-        //             canvas
-        //                 .render_instancing(
-        //                     &gl,
-        //                     &viewport,
-        //                     &mut frame,
-        //                     &particles.instancing_data,
-        //                     &Isometry3::new(
-        //                         Vector3::new(0f32, 0f32, 0f32),
-        //                         Vector3::new(0f32, 0f32, 0f32),
-        //                     )
-        //                 );
-        //         }
-        //         _ => ()
-        //     }
-        // }
         let button_w = button_w / 2.0;
         let button_h = button_w;
         let button = Button::new(
@@ -276,16 +361,17 @@ impl<'a> System<'a> for MenuRenderingSystem {
             None,
             false, 
             Some(Image(preloaded_images.play)),
-            "".to_string()
+            "".to_string(),
+            Widgets::Play as usize
         );
-        if let Some(gun) = chosed_gun.0.clone() {
+        if let (Some(ship), Some(gun)) = (ui_state.chosed_ship.clone(), ui_state.chosed_gun.clone()) {
             if button.place_and_check(&mut ui, &*mouse) {
                 *app_state = AppState::Play(PlayState::Action);
                 insert_channel.single_write(InsertEvent::Character{ 
                     gun_kind: gun.clone(), 
-                    ship_stats: description.player_ships[0].ship_stats
+                    ship_stats: description.player_ships[ship].ship_stats
                 });
-                chosed_gun.0 = None;
+                ui_state.chosed_gun = None;
                 *avaliable_upgrades = get_avaliable_cards(
                     &upgrade_cards_raw,
                     &gun.clone(),
@@ -347,18 +433,17 @@ pub fn render_primitives<'a>(
                 let (model, points, indicies) = rectangle.get_gfx();
                 let geom_data =
                     GeometryData::new(&gl, &points, &indicies).unwrap();
-                if let Some(fill_color) = rectangle.color {
-                    canvas.render_primitive(
-                        &gl,
-                        &viewport,
-                        frame,
-                        &geom_data,
-                        &model,
-                        (fill_color.x, fill_color.y, fill_color.z),
-                        *with_projection,
-                        RenderMode::Draw
-                    );
-                }
+                let fill_color = rectangle.color;
+                canvas.render_primitive(
+                    &gl,
+                    &viewport,
+                    frame,
+                    &geom_data,
+                    &model,
+                    (fill_color.x, fill_color.y, fill_color.z),
+                    *with_projection,
+                    RenderMode::Draw
+                );
             }
             Primitive {
                 kind: PrimitiveKind::Text(text),
@@ -400,13 +485,13 @@ impl<'a> System<'a> for UpgradeGUI {
             WriteStorage<'a, ShotGun>,
             ReadExpect<'a, red::Viewport>,
         ),
-        Write<'a, IngameUI>,
+        Write<'a, UI>,
         Write<'a, AppState>,
         Read<'a, Mouse>,
         WriteExpect<'a, PreloadedImages>,
         Read<'a, AvaliableUpgrades>,
         Write<'a, SpawnedUpgrades>,
-        WriteExpect<'a, ChoosedUpgrade>,
+        WriteExpect<'a, UIState>,
         ReadExpect<'a, Pallete>,
     );
 
@@ -421,14 +506,14 @@ impl<'a> System<'a> for UpgradeGUI {
                 viewport,
             ),
             // preloaded_particles,
-            mut ingame_ui,
+            mut ui,
             mut app_state,
             mouse,
             preloaded_images,
             avaliable_upgrades,
             mut spawned_upgrades,
-            mut choosed_upgrade,
-            pallete
+            mut ui_state,
+            _pallete
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -439,10 +524,13 @@ impl<'a> System<'a> for UpgradeGUI {
         let upgrade_button_h = upgrade_button_w;
         let (choose_button_w, choose_button_h) = (w/6f32, h/10f32);
         let shift = upgrade_button_h / 10f32;
+
         match *app_state {
             AppState::Play(PlayState::Upgrade) => {
+                let mut buttons = vec![];
                 let upgrades = spawned_upgrades.last();
                 if let Some(upgrades) = upgrades {
+                    let widget_ids = [Widgets::Upgrade1, Widgets::Upgrade2];
                     for (i, upg_id) in upgrades.iter().enumerate() {
                         let upg = &avaliable_upgrades[*upg_id];
                         let current_point = 
@@ -451,23 +539,16 @@ impl<'a> System<'a> for UpgradeGUI {
                                 + i as f32 * (upgrade_button_w + shift), 
                                 shift
                             );
-                        let mut w_add = 0f32;
-                        let mut h_add = 0f32;
-                        if let Some(id) = choosed_upgrade.0 {
-                            if id == *upg_id {
-                                w_add = upgrade_button_w * 0.1;
-                                h_add = upgrade_button_h * 0.1;
-                            }
-                        }
                         let upgrade_button = Button::new(
-                            current_point - Vector2::new(w_add / 2.0, h_add / 2.0),
-                            upgrade_button_w + w_add, upgrade_button_h + h_add, 
-                            Some(pallete.white_color.clone()),
+                            current_point,
+                            upgrade_button_w, upgrade_button_h, 
+                            None,
                             false,
                             Some(upg.image),
-                            "".to_string()
+                            "".to_string(),
+                            widget_ids[i] as usize
                         );
-                        ingame_ui.primitives.push(
+                        ui.primitives.push(
                             Primitive {
                                 kind: PrimitiveKind::Text(Text {
                                     position: Point2::new(current_point.x + upgrade_button_h / 2.0, upgrade_button_h + 2.0 * shift),
@@ -476,27 +557,41 @@ impl<'a> System<'a> for UpgradeGUI {
                                 with_projection: false,
                             }
                         );
-                        // upg.name.clone()
-                        if upgrade_button.place_and_check(&mut ingame_ui, &*mouse) {
-                            // choosed_upgrade = Some(upg.upgrade_type);
-                            choosed_upgrade.0 = Some(*upg_id);
-                            // *app_state = AppState::Play(PlayState::Action);
-                            // with multytouch things it's not cheatable
+                        buttons.push(upgrade_button);
+                    }
+                }
+               let upgrade_selector = Selector {
+                    buttons: buttons,
+                    id: Widgets::WeaponSelector as usize,
+                    mask: None,
+                };
+                if let Some(selected_id) = upgrade_selector.place_and_check(
+                    &mut ui,
+                    &*mouse
+                ) {
+                    match Widgets::try_from(selected_id).expect("unknown widget id") {
+                        Widgets::Upgrade1 => {
+                            ui_state.choosed_upgrade = Some(0);
                         }
+                        Widgets::Upgrade2 => {
+                            ui_state.choosed_upgrade = Some(1);
+                        }
+                        _ => ()
                     }
                 }
                 let select_upgrade = Button::new(
                     Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
                     choose_button_w, choose_button_h, 
-                    Some(pallete.grey_color.clone()),
+                    None,
                     false,
                     Some(Image(preloaded_images.upg_bar)),
-                    "Upgrade!".to_string()
+                    "Upgrade!".to_string(),
+                    Widgets::Upgrade as usize
                 );
 
                 if spawned_upgrades.len() > 0 {
-                    if let Some(upgrade) = choosed_upgrade.0 {
-                        ingame_ui.primitives.push(
+                    if let Some(upgrade) = ui_state.choosed_upgrade {
+                        ui.primitives.push(
                             Primitive {
                                 kind: PrimitiveKind::Text(Text {
                                     position: Point2::new(w / 2.0, upgrade_button_h + 4.0 * shift),
@@ -505,9 +600,9 @@ impl<'a> System<'a> for UpgradeGUI {
                                 with_projection: false,
                             }
                         );
-                        if select_upgrade.place_and_check(&mut ingame_ui, &*mouse) {
+                        if select_upgrade.place_and_check(&mut ui, &*mouse) {
                             current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
-                            choosed_upgrade.0 = None;
+                            ui_state.choosed_upgrade = None;
                             spawned_upgrades.pop();
                         }
                     }
@@ -515,12 +610,13 @@ impl<'a> System<'a> for UpgradeGUI {
                 let done_button = Button::new(
                     Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
                     choose_button_w, choose_button_h, 
-                    Some(pallete.grey_color.clone()),
+                    None,
                     false,
                     Some(Image(preloaded_images.upg_bar)),
-                    "Done".to_string()
+                    "Done".to_string(),
+                    Widgets::Done as usize
                 );
-                if done_button.place_and_check(&mut ingame_ui, &*mouse) {
+                if done_button.place_and_check(&mut ui, &*mouse) {
                     *app_state = AppState::Play(PlayState::Action);
                 }
             }
@@ -602,13 +698,14 @@ impl<'a> System<'a> for GUISystem {
             ReadExpect<'a, red::Viewport>,
         ),
         ReadExpect<'a, DevInfo>,
-        Write<'a, IngameUI>,
+        Write<'a, UI>,
         Read<'a, Progress>,
         Read<'a, Mouse>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, SpawnedUpgrades>,
         Read<'a, CurrentWave>,
         ReadExpect<'a, Pallete>,
+        ReadExpect<'a, MacroGame>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -626,13 +723,14 @@ impl<'a> System<'a> for GUISystem {
             ),
             // preloaded_particles,
             dev_info,
-            mut ingame_ui,
+            mut ui,
             progress,
             mouse,
             preloaded_images,
             spawned_upgrades,
             current_wave,
-            pallete
+            pallete,
+            macro_game,
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -656,13 +754,17 @@ impl<'a> System<'a> for GUISystem {
             stick_size,
             Image(preloaded_images.circle)
         );        
-        let (_character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers).join().next().unwrap();
+        let (_character, ship_stats, _) = if let Some(value) = (&entities, &mut ships_stats, &character_markers).join().next() {
+            value
+        } else {
+            return
+        };
         // move controller
         #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
         {  
             match move_controller.set(
                 0,
-                &mut ingame_ui,
+                &mut ui,
                 &touches
             ) {
                 Some(dir) => {
@@ -705,7 +807,7 @@ impl<'a> System<'a> for GUISystem {
 
             match attack_controller.set(
                 1,
-                &mut ingame_ui,
+                &mut ui,
                 &touches
             ) {
                 Some(dir) => {
@@ -739,7 +841,7 @@ impl<'a> System<'a> for GUISystem {
             }
         }
         // FPS
-        ingame_ui.primitives.push(
+        ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
                     position: Point2::new(w/7.0, h / 20.0), 
@@ -753,7 +855,7 @@ impl<'a> System<'a> for GUISystem {
         );
 
         // stats
-        ingame_ui.primitives.push(
+        ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
                     position: Point2::new(w - w/7.0, h / 20.0), 
@@ -766,7 +868,20 @@ impl<'a> System<'a> for GUISystem {
             }
         );
 
-        ingame_ui.primitives.push(
+        ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w - w/7.0, h / 20.0), 
+                    text: format!(
+                        "$ {}", 
+                        macro_game.coins
+                    ).to_string()
+                }),
+                with_projection: false,
+            }
+        );
+
+        ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
                     position: Point2::new(w - w/7.0, h / 7.0 + h / 20.0), 
@@ -814,17 +929,18 @@ impl<'a> System<'a> for GUISystem {
         for (i, ability) in abilities.iter().enumerate() {
             let x_pos = w - w/7.0;
             let y_pos = (i as f32 + 1.0) * h / 7.0 + h / 20.0;
-            let side_bullet_icon = Button::new(
-                Point2::new(x_pos, y_pos),
-                icon_size,
-                icon_size,
-                Some(Point3::new(0f32, 0f32, 0f32)),
-                false,
-                Some(ability.icon),
-                "".to_string()
+            ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Picture(Picture {
+                        position: Point2::new(x_pos, y_pos),
+                        width: icon_size,
+                        height: icon_size,
+                        image: ability.icon
+                    }),
+                    with_projection: false,
+                }
             );
-            side_bullet_icon.place_and_check(&mut ingame_ui, &*mouse);
-            ingame_ui.primitives.push(
+            ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Text(Text {
                         position: Point2::new(x_pos + 2.0 * icon_size, y_pos + icon_size / 2.0), 
@@ -845,11 +961,11 @@ impl<'a> System<'a> for GUISystem {
             position: experience_position,
             width: (progress.experience as f32 / progress.current_max_experience() as f32) * experiencebar_w,
             height: experiencebar_h,
-            color: Some(pallete.experience_color.clone())
+            color: pallete.experience_color.clone()
         };
 
         let border = d / 200f32;
-        ingame_ui.primitives.push(
+        ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Picture(Picture {
                     position: experience_position + Vector2::new(-border/2.0, -border/2.0),
@@ -860,7 +976,7 @@ impl<'a> System<'a> for GUISystem {
                 with_projection: false,
             }
         );
-        ingame_ui.primitives.push(
+        ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Picture(Picture {
                     position: experience_position + Vector2::new(-border/2.0, -border/2.0),
@@ -871,7 +987,7 @@ impl<'a> System<'a> for GUISystem {
                 with_projection: false,
             }
         );
-        ingame_ui.primitives.push(
+        ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Rectangle(experience_bar),
                 with_projection: false,
@@ -880,16 +996,17 @@ impl<'a> System<'a> for GUISystem {
         if spawned_upgrades.len() > 0 {
         // {
             let (upgrade_bar_w, upgrade_bar_h) = (w / 3f32, h / 10.0);
-            let upgrade_bar = Button::new(
-                Point2::new(w / 2.0 - upgrade_bar_w / 2.0, h - h / 20.0 - upgrade_bar_h),
-                upgrade_bar_w,
-                upgrade_bar_h,
-                None,
-                false,
-                Some(Image(preloaded_images.upg_bar)),
-                "Upgrade avaliable!".to_string()
+            ui.primitives.push(
+                Primitive {
+                    kind: PrimitiveKind::Picture(Picture {
+                        position: Point2::new(w / 2.0 - upgrade_bar_w / 2.0, h - h / 20.0 - upgrade_bar_h),
+                        width: upgrade_bar_w,
+                        height: upgrade_bar_h,
+                        image: Image(preloaded_images.upg_bar)
+                    }),
+                    with_projection: false,
+                }
             );
-            upgrade_bar.place_and_check(&mut ingame_ui, &*mouse);
         }
         let (lifebar_w, lifebar_h) = (w/4f32, h/50.0);
         let health_y = h / 40.0;
@@ -898,28 +1015,30 @@ impl<'a> System<'a> for GUISystem {
             {   // upgrade bar
                 let border = d / 200f32;
                 let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
-                let back_bar = Button::new(
-                    Point2::new(w/2.0 - health_back_w / 2.0, health_y - border / 2.0),
-                    health_back_w,
-                    health_back_h,
-                    None,
-                    false,
-                    Some(Image(preloaded_images.bar)),
-                    "".to_string()
+                ui.primitives.push(
+                    Primitive {
+                        kind: PrimitiveKind::Picture(Picture {
+                            position: Point2::new(w/2.0 - health_back_w / 2.0, health_y - border / 2.0),
+                            width: health_back_w,
+                            height: health_back_h,
+                            image: Image(preloaded_images.bar)
+                        }),
+                        with_projection: false,
+                    }
                 );
-                back_bar.place_and_check(&mut ingame_ui, &*mouse);
 
                 let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
-                let back_bar = Button::new(
-                    Point2::new(w/2.0 - health_back_w / 2.0, shields_y - border / 2.0),
-                    health_back_w,
-                    health_back_h,
-                    None,
-                    false,
-                    Some(Image(preloaded_images.bar)),
-                    "".to_string()
+                ui.primitives.push(
+                    Primitive {
+                        kind: PrimitiveKind::Picture(Picture {
+                            position: Point2::new(w/2.0 - health_back_w / 2.0, shields_y - border / 2.0),
+                            width: health_back_w,
+                            height: health_back_h,
+                            image: Image(preloaded_images.bar)
+                        }),
+                        with_projection: false,
+                    }
                 );
-                back_bar.place_and_check(&mut ingame_ui, &*mouse);
             }
 
 
@@ -927,21 +1046,21 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, health_y),
                 width: (life.0 as f32 / ship_stats.max_health as f32) * lifebar_w,
                 height: lifebar_h,
-                color: Some(pallete.life_color.clone())
+                color: pallete.life_color.clone()
             };
             let shields_bar = Rectangle {
                 position: Point2::new(w/2.0 - lifebar_w / 2.0, shields_y),
                 width: (shield.0 as f32 / ship_stats.max_shield as f32) * lifebar_w,
                 height: lifebar_h,
-                color: Some(pallete.shield_color)
+                color: pallete.shield_color
             };
-            ingame_ui.primitives.push(
+            ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(shields_bar),
                     with_projection: false,
                 }
             );
-            ingame_ui.primitives.push(
+            ui.primitives.push(
                 Primitive {
                     kind: PrimitiveKind::Rectangle(lifes_bar),
                     with_projection: false,
@@ -999,9 +1118,10 @@ impl<'a> System<'a> for RenderingSystem {
         ReadExpect<'a, PreloadedParticles>,
         Read<'a, World<f32>>,
         Write<'a, EventChannel<Primitive>>,
-        Write<'a, IngameUI>,
+        Write<'a, UI>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
         WriteExpect<'a, GlobalParams>,
+        ReadExpect<'a, DevInfo>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -1040,12 +1160,23 @@ impl<'a> System<'a> for RenderingSystem {
             preloaded_particles,
             _world,
             mut primitives_channel,
-            mut ingame_ui,
+            mut ui,
             mut text_data,
-            mut global_params
+            mut global_params,
+            dev_info
         ) = data;
+        let char_pos = if let Some((iso, vel, _)) = (&isometries, &velocities, &character_markers).join().next() {
+            canvas.update_observer(
+                Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                vel.0.norm() / VELOCITY_MAX,
+                Vector2::new(mouse.x01, mouse.y01).normalize()
+            );
+            iso.0.translation.vector
+        } else {
+            return
+        };
+        flame::start("rendering");
         flame::start("clear");
-        // flame::start("rendering");
         let mut frame = red::Frame::new(&gl);
         global_params.update();
         frame.set_clear_color(global_params.red.min(1.0), 0.004, 0.0, 1.0);
@@ -1059,28 +1190,6 @@ impl<'a> System<'a> for RenderingSystem {
         frame.clear_stencil();
         flame::end("stencil");
         telegraph.update();
-
-        // if rng.gen_range(0.0, 1.0) < 0.06 {
-        //     telegraph.insert("plot a".to_string(), rng.gen_range(0.0, 1.0));
-        //     telegraph.insert("plot b".to_string(), rng.gen_range(0.0, 1.0));
-        // }
-
-
-        let (_char_iso, char_pos) = {
-            let mut opt_iso = None;
-            for (iso, vel, _) in (&isometries, &velocities, &character_markers).join() {
-                canvas.update_observer(
-                    Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
-                    vel.0.norm() / VELOCITY_MAX,
-                    Vector2::new(mouse.x01, mouse.y01).normalize()
-                );
-                opt_iso = Some(iso);
-            }
-            (
-                opt_iso.unwrap().0,
-                opt_iso.unwrap().0.translation.vector,
-            )
-        };
         flame::end("clear");
         flame::start("shadow rendering");
         for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
@@ -1293,22 +1402,6 @@ impl<'a> System<'a> for RenderingSystem {
                 render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
             }
         }
-        // for (e1, _r1) in (&entities, &rifts).join() {
-        //     for (e2, _r2) in (&entities, &rifts).join() {
-        //         // if e1 == e2 {break};
-        //         let pos1 = isometries.get(e1).unwrap().0.translation.vector;
-        //         let pos2 = isometries.get(e2).unwrap().0.translation.vector;
-        //         let up = Vector2::new(0.0, -1.0);
-        //         let dir = pos2 - pos1;
-        //         let lazer = Lazer {damage: 5, active: true, distance: dir.norm(), current_distance: dir.norm()};
-        //         let rotation = Rotation2::rotation_between(&up, &Vector2::new(dir.x, dir.y));
-        //         let isometry = Isometry3::new(
-        //             Vector3::new(pos1.x, pos1.y, pos1.z), Vector3::new(0f32, 0f32, rotation.angle())
-        //         );
-        //         render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
-        //     }
-        // }
-
         for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
             for (angle, lazer) in multy_lazer.iter() {
                 // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
@@ -1456,7 +1549,7 @@ impl<'a> System<'a> for RenderingSystem {
         };
         flame::end("animation");
         flame::start("primitives rendering");
-        primitives_channel.iter_write(ingame_ui.primitives.drain(..));
+        primitives_channel.iter_write(ui.primitives.drain(..));
         render_primitives(
             &mouse,
             &mut self.reader,
@@ -1472,24 +1565,37 @@ impl<'a> System<'a> for RenderingSystem {
         // for (name, span) in time_spans.iter() {
         //     telegraph.insert(name.to_string(), span.evaluate().as_millis() as f32 / 1000.0 * 60.0); // TODO "xFPS" actually
         // }
-        // flame::end("rendering");
-        // let spans = flame::spans();
-        // for span in spans.iter() {
-        //     telegraph.insert(span.name.to_string(), span.delta as f32 / 1E9 * 60.0);
-        // }
-        // for name in telegraph.iter_names() {
-        //     if let Some(plot) = telegraph.iter(name.to_string()) {
-        //         render_plot(
-        //             plot.0,
-        //             plot.1,
-        //             8.0, 
-        //             7.0,
-        //             &gl,
-        //             &viewport,
-        //             &canvas,
-        //             &mut frame,
-        //         );
-        //     }
-        // }
+        flame::end("rendering");
+        let spans = flame::spans();
+        telegraph.insert("fps".to_string(), dev_info.fps as f32/ 60.0);
+        for span in spans.iter() {
+            if [
+                "rendering".to_string(), 
+                "dispatch".to_string(), 
+                "insert".to_string(),
+                "asteroids".to_string()
+            ].contains(&span.name.to_string()) {
+                telegraph.insert(span.name.to_string(), span.delta as f32 / 1E9 * 60.0);
+            }
+            if span.name == "dispatch" {
+                for subspan in span.children.iter() {
+                    telegraph.insert(subspan.name.to_string(), subspan.delta as f32 / 1E9 * 60.0);
+                }
+            }
+        }
+        for name in telegraph.iter_names() {
+            if let Some(plot) = telegraph.iter(name.to_string()) {
+                render_plot(
+                    plot.0,
+                    plot.1,
+                    14.0, 
+                    10.0,
+                    &gl,
+                    &viewport,
+                    &canvas,
+                    &mut frame,
+                );
+            }
+        }
     }
 }

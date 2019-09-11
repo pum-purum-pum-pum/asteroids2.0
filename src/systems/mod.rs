@@ -20,10 +20,10 @@ use specs::Join;
 
 use crate::components::*;
 use crate::geometry::{generate_convex_polygon, Polygon, TriangulateFromCenter, EPS};
-use gfx_h::{GeometryData, ParticlesData, Explosion};
+use gfx_h::{GeometryData, ParticlesData, Explosion, iso3_iso2};
 use crate::physics::CollisionId;
 use crate::sound::{PreloadedSounds, SoundData, MusicData, EFFECT_MAX_VOLUME};
-use crate::gui::{Primitive, PrimitiveKind, Button, IngameUI, Text};
+use crate::gui::{Primitive, PrimitiveKind, Button, UI, Text};
 
 mod rendering;
 pub use rendering::*;
@@ -97,13 +97,6 @@ fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
     Isometry3::new(
         Vector3::new(iso2.translation.vector.x, iso2.translation.vector.y, 0f32),
         Vector3::new(0f32, 0f32, iso2.rotation.angle()),
-    )
-}
-
-fn iso3_iso2(iso3: &Isometry3) -> Isometry2 {
-    Isometry2::new(
-        Vector2::new(iso3.translation.vector.x, iso3.translation.vector.y),
-        iso3.rotation.euler_angles().2
     )
 }
 
@@ -199,17 +192,20 @@ impl<'a> System<'a> for PhysicsSystem {
             mut planet_grid,
             app_state
         ) = data;
-        flame::start("physics");
         let (character_position, character_prev_position) = {
-            let (character, isometry, _) = (&entities, &isometries, &character_markers).join().next().unwrap();
-            let body = world
-                .rigid_body(
-                    physics
-                        .get(character).unwrap()
-                        .body_handle
-                ).unwrap();
-            (*body.position(), *isometry)
+            if let Some((character, isometry, _)) = (&entities, &isometries, &character_markers).join().next() {
+                let body = world
+                    .rigid_body(
+                        physics
+                            .get(character).unwrap()
+                            .body_handle
+                    ).unwrap();
+                (*body.position(), *isometry)
+            } else {
+                return
+            }
         };
+        flame::start("physics");
         let char_vec = character_position.translation.vector;
         { // rockets movements logic
             for (_entity, iso, vel, spin, phys, rocket) in (&entities, &isometries, &velocities, &mut spins, &physics, &rockets).join() {
@@ -513,6 +509,7 @@ pub fn spawn_asteroids<'a>(
     insert_channel: &mut Write<'a, EventChannel<InsertEvent>>,
     bullet_position: Option<Point2>,
 ) {
+    flame::start("asteroids");
     let position = isometry.translation.vector;
     let new_polygons = if let Some(bullet_position) = bullet_position {
         polygon.deconstruct(bullet_position - Vector2::new(position.x, position.y))
@@ -534,14 +531,14 @@ pub fn spawn_asteroids<'a>(
     } else {
         // spawn coins and stuff
         let spawn_position = Point2::new(position.x, position.y);
-        if rng.gen_range(0.0, 1.0) < 0.41 {
+        if rng.gen_range(0.0, 1.0) < 0.1 {
             insert_channel.single_write(InsertEvent::Health{
                 value: 100,
                 position: spawn_position
             })
         }
 
-        if rng.gen_range(0.0, 1.0) < 0.02 {
+        if rng.gen_range(0.0, 1.0) < 0.1 {
             insert_channel.single_write(InsertEvent::Coin{
                 value: 1,
                 position: spawn_position
@@ -557,6 +554,7 @@ pub fn spawn_asteroids<'a>(
             insert_channel.single_write(InsertEvent::DoubleExpCollectable{position: spawn_position});
         }
     }
+    flame::end("asteroids");
 }
 
 pub struct ControlSystem {
@@ -597,6 +595,8 @@ impl<'a> System<'a> for ControlSystem {
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, AppState>,
         WriteExpect<'a, Canvas>,
+        Write<'a, Progress>,
+        WriteExpect<'a, MacroGame>
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -627,8 +627,14 @@ impl<'a> System<'a> for ControlSystem {
             mut insert_channel,
             mut app_state,
             mut canvas,
+            mut progress,
+            mut macro_game
         ) = data;
-        let (ship_stats, _) = (&mut ships_stats, &character_markers).join().next().unwrap();
+        let (ship_stats, _) = if let Some(value) = (&mut ships_stats, &character_markers).join().next() {
+            value
+        } else {
+            return
+        };
         #[cfg(not(target_os = "android"))]
         {
             let mut character = None;
@@ -738,6 +744,9 @@ impl<'a> System<'a> for ControlSystem {
                                 }
                                 explosion_size = 20;
                                 insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
+                                if character_markers.get(*target_entity).is_some() {
+                                    to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
+                                }
                                 entities.delete(*target_entity).unwrap();
                             }
                             let effect_position = position + dir * min_d;
@@ -1512,7 +1521,6 @@ impl<'a> System<'a> for GamePlaySystem {
             ReadStorage<'a, CollectableMarker>,
         ),
         ReadStorage<'a, Projectile>,
-        WriteExpect<'a, MacroGame>,
         ReadExpect<'a, PreloadedImages>,
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, Progress>,
@@ -1528,7 +1536,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteExpect<'a, StarsGrid>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
-        WriteExpect<'a, ScoreTable>,
+        WriteExpect<'a, MacroGame>,
         WriteExpect<'a, GlobalParams>
     );
 
@@ -1563,7 +1571,6 @@ impl<'a> System<'a> for GamePlaySystem {
                 collectables,
             ),
             projectiles,
-            mut macro_game,
             preloaded_images,
             mut insert_channel,
             mut progress,
@@ -1579,13 +1586,15 @@ impl<'a> System<'a> for GamePlaySystem {
             mut stars_grid,
             mut nebula_grid,
             mut planet_grid,
-            mut score_table,
+            mut macro_game,
             mut global_params
         ) = data;
-        for (shield, life, ship_stats, _character) in (&mut shields, &mut lifes, &ships_stats, &character_markers).join() {
+        if let Some((shield, life, ship_stats, _character)) = (&mut shields, &mut lifes, &ships_stats, &character_markers).join().next() {
             shield.0 = (shield.0 + ship_stats.shield_regen).min(ship_stats.max_shield);
             life.0 = (life.0 + ship_stats.health_regen).min(ship_stats.max_health);
-        }
+        } else {
+            return
+        };
         if progress.experience >= progress.current_max_experience() {
             progress.level_up();
             let mut rng = thread_rng();
@@ -1660,7 +1669,7 @@ impl<'a> System<'a> for GamePlaySystem {
                                 }
                                 if is_character {
                                     // *app_state = AppState::Menu;
-                                    to_menu(&mut app_state, &mut progress, &mut score_table);
+                                    to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
                                 }
                                 // delete character
                                 entities.delete(entity).unwrap();
@@ -1974,6 +1983,7 @@ fn process_damage(life: &mut Lifes, mut shield: Option<&mut Shield>, mut project
     if life.0 > projectile_damage {
         life.0 -= projectile_damage
     } else {
+        life.0 = 0;
         return true;
     }
     false
@@ -2087,12 +2097,12 @@ fn blast_explode(
 pub fn to_menu(
     app_state: &mut Write<AppState>,
     progress: &mut Write<Progress>,
-    score_table: &mut WriteExpect<ScoreTable>
+    score_table: &mut Vec<usize>
 ) {
     **app_state = AppState::Menu;
     // score_table.0 = score_table.0.sort()
-    score_table.0.push(progress.score);
-    score_table.0.sort_by(|a, b| b.cmp(a));
+    score_table.push(progress.score);
+    score_table.sort_by(|a, b| b.cmp(a));
     progress.score = 0;
 }
 
@@ -2152,7 +2162,7 @@ impl<'a> System<'a> for CollisionSystem {
         ReadExpect<'a, PreloadedImages>,
         Write<'a, Progress>,
         Write<'a, AppState>,
-        WriteExpect<'a, ScoreTable>,
+        WriteExpect<'a, MacroGame>,
         WriteExpect<'a, GlobalParams>
     );
 
@@ -2178,7 +2188,7 @@ impl<'a> System<'a> for CollisionSystem {
             preloaded_images,
             mut progress,
             mut app_state,
-            mut score_table,
+            mut macro_game,
             mut global_params,
         ) = data;
         self.colliding_start_events.clear();
@@ -2312,7 +2322,7 @@ impl<'a> System<'a> for CollisionSystem {
                         to_menu(
                             &mut app_state, 
                             &mut progress,
-                            &mut score_table
+                            &mut macro_game.score_table
                         );
                         // delete character
                         entities.delete(ship).unwrap();
@@ -2394,7 +2404,7 @@ impl<'a> System<'a> for CollisionSystem {
                         shields.get_mut(character_ship),
                         damages.get(other_ship).unwrap().0
                     ) {
-                        to_menu(&mut app_state, &mut progress, &mut score_table);
+                        to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
                         // delete character
                         entities.delete(character_ship).unwrap();
                     }
@@ -2443,6 +2453,7 @@ impl<'a> System<'a> for AISystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, AI>,
         ReadStorage<'a, Chain>,
+        ReadStorage<'a, ShipStats>,
         Write<'a, World<f32>>,
         Write<'a, EventChannel<InsertEvent>>,
         Write<'a, BodiesMap>,
@@ -2466,14 +2477,19 @@ impl<'a> System<'a> for AISystem {
             character_markers,
             ais,
             chains,
+            ship_stats,
             mut world,
             mut insert_channel,
             bodies_map,
             mut sounds_channel,
             preloaded_sounds,
         ) = data;
-        let (character_entity, character_position, _) = (&entities, &isometries, &character_markers)
-            .join().next().unwrap();
+        let (character_entity, character_position, _) = 
+            if let Some(value ) = (&entities, &isometries, &character_markers).join().next() {
+                value
+            } else {
+                return
+            };
         let character_position = character_position.0.translation.vector;
         for (entity, iso, vel, physics_component, spin, _enemy, ai) in (
             &entities,
@@ -2578,7 +2594,7 @@ impl<'a> System<'a> for AISystem {
 
                     }
                     AIType::Follow => {
-                        let speed = 0.1f32;
+                        let speed = ship_stats.get(entity).unwrap().thrust_force;
                         let mut is_chain = false;
                         if let Some(chain) = chains.get(entity) {
                             if let Some(iso) = isometries.get(chain.follow) {
@@ -2613,6 +2629,44 @@ impl<'a> System<'a> for AISystem {
                             body.set_velocity(velocity);
                         }
 
+                    }
+                    AIType::FollowRotate => {
+                        let speed = ship_stats.get(entity).unwrap().thrust_force;
+                        let mut is_chain = false;
+                        // if let Some(chain) = chains.get(entity) {
+                        //     if let Some(iso) = isometries.get(chain.follow) {
+                        //         is_chain = true;
+                        //         let follow_vector = iso.0.translation.vector;
+                        //         let follow_pos = Point2::new(follow_vector.x, follow_vector.y);
+                        //         let diff = follow_pos - pos;
+                        //         // if diff.norm() > 1.5f32 { // for not overlap
+                        //             let dir = diff.normalize();
+                        //             let ai_vel = speed * dir;
+                        //             *vel = Velocity::new(ai_vel.x, ai_vel.y);
+                        //             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                        //             let mut velocity = *body.velocity();
+                        //             *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                        //             body.set_velocity(velocity);
+                        //         // }
+                        //     }
+                        // };
+                        if !is_chain {
+                            if diff.norm() > follow_area {
+                                if character_noticed {
+                                    let ai_vel = speed * dir;
+                                    *vel = Velocity::new(ai_vel.x, ai_vel.y);
+                                }
+                            } else {
+                                // let vel_vec = DAMPING_FACTOR * vel.0;
+                                let ai_vel = speed * dir;
+                                let spiral = 0.5;
+                                *vel = Velocity::new(-ai_vel.y + ai_vel.x * spiral, ai_vel.x + ai_vel.y * spiral);
+                            }
+                            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                            let mut velocity = *body.velocity();
+                            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                            body.set_velocity(velocity);
+                        }
                     }
                     AIType::Aim => {
                         let ship_torque = DT

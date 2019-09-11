@@ -114,14 +114,12 @@ pub fn render_plot<T>(
 	canvas: &Canvas,
 	frame: &mut red::Frame,
 ) where T: Iterator<Item = (f32, f32)> {
-    let render_line = move |
-        a: Point2,
-        b: Point2,
+    let render_lines = move |
+    	lines: &[(Point2, Point2)],
         frame: &mut red::Frame,
 	| {
-	        canvas.draw_line(
-	        	a,
-	        	b,
+	        canvas.draw_lines(
+	        	&lines,
 	        	&context,
 	        	frame,
 	        	&viewport,
@@ -130,13 +128,16 @@ pub fn render_plot<T>(
         );	
 	};
 	let mut prev = None;
+	let mut lines_to_draw = vec![];
 	for (x_fract, value) in iter_plot {
 		let x =  w - w * x_fract - w / 2.0;
 		let y = h - h * value - h / 2.0;
 		let current = Point2::new(x, y);
 		if let Some(prev) = prev {
-    		render_line(prev, current, frame);
+			lines_to_draw.push((prev, current));
+    		// render_line(prev, current, frame);
 		}
 		prev = Some(current);
 	}	
+	render_lines(&lines_to_draw, frame);
 }

@@ -1,3 +1,4 @@
+use std::io::{Read};
 use nphysics2d::world::World;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
@@ -19,7 +20,6 @@ use serde::{Serialize, Deserialize};
 use slog::o;
 use log::info;
 
-
 use std::path::Path;
 use std::fs::File;
 use telemetry::{TeleGraph, TimeSpans};
@@ -38,7 +38,7 @@ use crate::systems::{
     GUISystem, ScoreTableRendering, UpgradeGUI
 };
 use glyph_brush::{*};
-use crate::gui::{IngameUI, Primitive};
+use crate::gui::{UI, Primitive};
 
 
 const NEBULAS_NUM: usize = 3usize;
@@ -69,9 +69,12 @@ pub fn run() -> Result<(), String> {
         slog_stdlog::init().unwrap();
     info!("asteroids: logging crazyness");
     let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
-    let mut telegraph = TeleGraph::new(Duration::from_secs(5));
+    let mut telegraph = TeleGraph::new(Duration::from_secs(10));
     telegraph.set_color("rendering".to_string(), Point3::new(1.0, 0.0, 0.0));
-    telegraph.set_color("physics".to_string(), Point3::new(0.0, 1.0, 0.0));
+    telegraph.set_color("dispatch".to_string(), Point3::new(0.0, 1.0, 0.0));
+    telegraph.set_color("insert".to_string(), Point3::new(0.0, 0.0, 1.0));
+    telegraph.set_color("asteroids".to_string(), Point3::new(1.0, 0.0, 1.0));
+    telegraph.set_color("fps".to_string(), Point3::new(1.0, 1.0, 0.0));
 
     let time_spans = TimeSpans::new();
     let glyph_brush: GlyphBrush<GlyphVertex, _> = GlyphBrushBuilder::using_font_bytes(dejavu).build();
@@ -145,7 +148,7 @@ pub fn run() -> Result<(), String> {
     let spawned_upgrades: SpawnedUpgrades = vec![];
     specs_world.add_resource(DevInfo::new());
     specs_world.add_resource(Pallete::new());
-    specs_world.add_resource(ChoosedUpgrade(None));
+    specs_world.add_resource(UIState::default());
     specs_world.add_resource(text_data);
     // specs_world.add_resource(glyph_brush);
     specs_world.add_resource(glyph_texture);
@@ -354,6 +357,7 @@ pub fn run() -> Result<(), String> {
     {   // load .ron files with tweaks
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
+            ship_costs: Vec<usize>,
             player_ships: Vec<ShipKindSave>,
             player_guns: Vec<GunKindSave>,
             enemies: Vec<EnemyKindSave>
@@ -364,6 +368,7 @@ pub fn run() -> Result<(), String> {
             name_to_image: &HashMap<String, specs::Entity>
         ) -> Description {
             Description {
+                ship_costs: description_save.ship_costs,
                 player_ships: description_save.player_ships.iter().map(|x| x.clone().load(name_to_image)).collect(),
                 player_guns: description_save.player_guns
                     .iter()
@@ -548,12 +553,12 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
     specs_world.add_resource(StarsGrid::new(3, 40f32, 40f32, 4f32, 4f32));
     specs_world.add_resource(BigStarGrid::new(1, 150f32, 150f32, 30f32, 30f32));
-    specs_world.add_resource(MacroGame{coins: 0, score: 0});
+
+    // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
     specs_world.add_resource(LoopSound::default());
-    specs_world.add_resource(MenuChosedGun::default());
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
@@ -564,16 +569,27 @@ pub fn run() -> Result<(), String> {
     );
     specs_world.add_resource(GlobalParams::default());
     {
-        let file = include_str!("../assets/scores.ron");
-        let score_table: ScoreTable = match from_str(file) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to load config: {}", e);
+        let file = "rons/macro_game.ron";
+        let macro_game = if let Ok(mut rw) = RWops::from_file(Path::new(&file), "r") {
+            let mut macro_game_str = String::new();
+            let macro_game = if let Ok(_) = rw.read_to_string(&mut macro_game_str) {
+                let macro_game: MacroGame = match from_str(&macro_game_str) {
+                    Ok(x) => x,
+                    Err(e) => {
+                        println!("Failed to load config: {}", e);
 
-                std::process::exit(1);
-            }
+                        std::process::exit(1);
+                    }
+                };
+                macro_game
+            } else {
+                MacroGame::default()
+            };
+            macro_game
+        } else {
+            MacroGame::default()
         };
-        specs_world.add_resource(score_table);
+        specs_world.add_resource(macro_game);
     }
     let mut sound_dispatcher = DispatcherBuilder::new()
         .with_thread_local(sound_system)
@@ -622,7 +638,7 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(ThreadPin::new(canvas));
     specs_world.add_resource(preloaded_images);
     specs_world.add_resource(AppState::Menu);
-    specs_world.add_resource(IngameUI::default());
+    specs_world.add_resource(UI::default());
     specs_world.add_resource(primitives_channel);
     specs_world.add_resource(Progress::default());
     specs_world.add_resource(telegraph);
@@ -737,9 +753,7 @@ pub fn run() -> Result<(), String> {
                 }
                 // specs_world.write_resource::<TimeSpans>().begin("rendering".to_string());
                 info!("asteroids: rendering dispatcher");
-                flame::start("rendering");
                 rendering_dispatcher.dispatch(&specs_world.res);
-                flame::end("rendering");
                 // specs_world.write_resource::<TimeSpans>().end("rendering".to_string())
             }
             AppState::ScoreTable => {
@@ -769,6 +783,20 @@ pub fn run() -> Result<(), String> {
                     ..
                 } => {
                     *running = false;
+                    use ron::ser::{to_string_pretty, PrettyConfig};
+                    use std::io::Write;
+                    // use serde::Serialize;
+                    let pretty = PrettyConfig {
+                        depth_limit: 2,
+                        separate_tuple_members: true,
+                        enumerate_arrays: true,
+                        ..PrettyConfig::default()
+                    };
+                    let s = to_string_pretty(&*specs_world.write_resource::<MacroGame>(), pretty).expect("Serialization failed");
+                    let file = "rons/macro_game.ron";
+                    let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
+                    eprintln!("{}", s);
+                    rw.write(s.as_bytes()).expect("failed to write macro game");
                     flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
                 },
                 sdl2::event::Event::Window {
@@ -792,10 +820,5 @@ pub fn run() -> Result<(), String> {
         }
     });
         
-        
-    // 'running: loop {
-    //     for event in event_pump.poll_iter() {
-    //     }
-    // }
     Ok(())
 }

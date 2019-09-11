@@ -15,6 +15,7 @@ extern crate slog_term;
 extern crate slog_async;
 extern crate slog_scope;
 extern crate slog_stdlog;
+pub use num_enum;
 pub use common;
 pub use gfx_h;
 pub use specs_derive;

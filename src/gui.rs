@@ -1,6 +1,7 @@
 use crate::common::*;
 use crate::components::{*};
 use cfg_if::cfg_if;
+use std::collections::HashMap;
 
 cfg_if! {
     if #[cfg(any(target_os = "android"))] {
@@ -36,12 +37,12 @@ cfg_if! {
             }
 
             /// returns radius vector with lenght from 0 to 1 if updated
-            pub fn set(&self, id: usize, ingame_ui: &mut IngameUI,  touches: &Touches) -> Option<Vector2> {
-                ingame_ui.primitives.push(self.controller_geometry.clone());
+            pub fn set(&self, id: usize, ui: &mut UI,  touches: &Touches) -> Option<Vector2> {
+                ui.primitives.push(self.controller_geometry.clone());
                 for (touch_id, touch) in touches.iter().enumerate() {
                     let previously_attached = 
-                        ingame_ui.widget_finger[touch_id].is_some() && 
-                        ingame_ui.widget_finger[touch_id].unwrap() == id;
+                        ui.widget_finger[touch_id].is_some() && 
+                        ui.widget_finger[touch_id].unwrap() == id;
                     match touch {
                         Some(touch) => {
                             if self.is_in(touch) || previously_attached {
@@ -52,8 +53,8 @@ cfg_if! {
                                 }
                                 new_pos = self.position + dir;
                                 // let new_pos = Point2::new(raw.x, raw.y);
-                                ingame_ui.widget_finger[touch_id] = Some(id);
-                                ingame_ui.primitives.push(
+                                ui.widget_finger[touch_id] = Some(id);
+                                ui.primitives.push(
                                     self.stick_geometry(new_pos)
                                 );
                                 return Some(self.get_rad(new_pos))
@@ -61,12 +62,12 @@ cfg_if! {
                         }
                         None => {
                             if previously_attached {
-                                ingame_ui.widget_finger[touch_id] = None;
+                                ui.widget_finger[touch_id] = None;
                             }
                         }
                     }
                 }
-                ingame_ui.primitives.push(
+                ui.primitives.push(
                     self.stick_geometry(self.position)
                 );
                 None
@@ -106,16 +107,46 @@ fn check_in(x:f32, a: f32, b: f32) -> bool {
 }
 
 #[derive(Default)]
-pub struct IngameUI {
+pub struct UI {
     // mouse controls
-    _hover_id: Option<usize>,
-    _pressed_id: Option<usize>,
+    hover: Option<usize>,
+    selectors: HashMap<usize, Option<usize>>,
     // touch controls
     // for each finger we have id of pressed widget
     #[cfg(any(target_os = "android"))]
     widget_finger: [Option<usize>; FINGER_NUMBER],
     pub primitives: Vec<Primitive>,
 }
+
+pub struct Selector {
+    pub buttons: Vec<Button>,
+    pub id: usize,
+    pub mask: Option<Vec<bool>>
+}
+
+impl  Selector {
+    pub fn place_and_check(
+        &self, 
+        ui: &mut UI,
+        mouse: &Mouse, 
+    ) -> Option<usize> {
+        for (i, button) in self.buttons.iter().enumerate() {
+            if button.place_and_check(ui, mouse) {
+                let mask = if let Some(mask) = &self.mask {
+                    mask[i]
+                } else {
+                    true
+                };
+                if mask {
+                    ui.selectors.insert(self.id, Some(button.id));
+                }
+                return Some(button.id);
+            }
+        }
+        None
+    }
+}
+
 
 pub struct Button {
     position: Point2, // screen position
@@ -124,7 +155,8 @@ pub struct Button {
     color: Option<Point3>,
     with_projection: bool,
     pub image: Option<Image>,
-    text: String
+    text: String,
+    id: usize 
 }
 
 #[derive(Clone)]
@@ -172,7 +204,8 @@ impl Button {
         color: Option<Point3>, 
         with_projection: bool, 
         image: Option<Image>, 
-        text: String
+        text: String,
+        id: usize,
     ) -> Button {
         Button {
             position: position,
@@ -181,35 +214,59 @@ impl Button {
             color: color,
             with_projection: with_projection,
             image: image,
-            text: text
+            text: text,
+            id: id
         }
     }
 
-    pub fn check(&self, mouse: &Mouse) -> bool {
+    pub fn check(&self, mouse: &Mouse, ui: &mut UI) -> bool {
         let mouse_position = Point2::new(mouse.o_x, mouse.o_y);
-        mouse.left_released &&
-        check_in(mouse_position.x, self.position.x, self.position.x + self.width) &&
-        check_in(mouse_position.y, self.position.y, self.position.y + self.height)
+        let hover = check_in(mouse_position.x, self.position.x, self.position.x + self.width) &&
+        check_in(mouse_position.y, self.position.y, self.position.y + self.height);
+        if hover {
+            ui.hover = Some(self.id);
+        }
+        mouse.left_released && hover
     }
 
-    pub fn get_geometry(&self) -> Vec<Primitive> {
+    pub fn get_geometry(&self, ui: &UI) -> Vec<Primitive> {
         let mut res = vec![];
-        let rectangle = Primitive {
-            kind: PrimitiveKind::Rectangle(Rectangle{
-                position: self.position, 
-                width: self.width, 
-                height: self.height,
-                color: self.color
-            }),
-            with_projection: self.with_projection,
-        };
-        res.push(rectangle);
+        let mut add_w = 0f32;
+        let mut add_h = 0f32;
+        let selected_ids: Vec<usize> = 
+            ui.selectors
+                .iter()
+                .filter_map(|(_, i)| *i)
+                .collect();
+        if selected_ids.contains(&self.id)  {
+                add_w += self.width * 0.2;
+                add_h += self.height * 0.2;
+        } else {
+            if let Some(hover) = ui.hover {
+                if hover == self.id {
+                    add_w += self.width * 0.1;
+                    add_h += self.height * 0.1;
+                }
+            }
+        }
+        if let Some(color) = self.color {
+            let rectangle = Primitive {
+                kind: PrimitiveKind::Rectangle(Rectangle{
+                    position: self.position - Vector2::new(add_w / 2.0, add_h / 2.0), 
+                    width: self.width, 
+                    height: self.height,
+                    color: color
+                }),
+                with_projection: self.with_projection,
+            };
+            res.push(rectangle);
+        }
         if let Some(image) = self.image {
             let picture = Primitive {
                 kind: PrimitiveKind::Picture(Picture{
-                    position: self.position, 
-                    width: self.width, 
-                    height: self.height,
+                    position: self.position - Vector2::new(add_w / 2.0, add_h / 2.0),
+                    width: self.width + add_w, 
+                    height: self.height + add_h,
                     image: image
                 }),
                 with_projection: self.with_projection
@@ -235,12 +292,13 @@ impl Button {
 
     pub fn place_and_check(
         &self, 
-        ingame_ui: &mut IngameUI,
+        ui: &mut UI,
         mouse: &Mouse, 
     ) -> bool {
-        ingame_ui.primitives.extend(self.get_geometry().into_iter());
-        ingame_ui.primitives.push(self.get_text_box());
-        self.check(mouse)
+        let check = self.check(mouse, ui);
+        ui.primitives.extend(self.get_geometry(ui).into_iter());
+        ui.primitives.push(self.get_text_box());
+        check
     }
 }
 
@@ -255,7 +313,7 @@ pub struct Rectangle {
     pub position: Point2, // screen position
     pub width: f32,
     pub height: f32,
-    pub color: Option<Point3>,
+    pub color: Point3,
 }
 
 impl Rectangle {

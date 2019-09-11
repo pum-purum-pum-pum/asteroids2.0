@@ -131,7 +131,18 @@ pub struct Music {
     pub menu_play: bool,
 }
 
-pub struct ChoosedUpgrade(pub Option<usize>);
+// it's convinitent for my game to store everything in one big struct
+
+/// Global UI State for all GUIs in the game
+#[derive(Default)]
+pub struct UIState {
+    // upgrade menu
+    pub choosed_upgrade: Option<usize>,
+    pub choosed_weapon: Option<usize>,
+    pub choosed_ship: Option<usize>,
+    pub chosed_gun: Option<GunKind>,
+    pub chosed_ship: Option<usize>,
+}
 
 #[derive(Debug, Default)]
 pub struct LoopSound {
@@ -141,9 +152,10 @@ pub struct LoopSound {
 
 #[derive(Debug)]
 pub struct Description {
-    pub player_ships: Vec<ShipKind>,
+    pub ship_costs: Vec<usize>,
+    pub player_ships: Vec<(ShipKind)>,
     pub player_guns: Vec<GunKind>,
-    pub enemies: Vec<EnemyKind>            
+    pub enemies: Vec<EnemyKind>
 }
 
 #[derive(Debug, Clone)]
@@ -264,8 +276,8 @@ pub enum InsertEvent {
     }
 }
 
-#[derive(Default, Clone)]
-pub struct MenuChosedGun(pub Option<GunKind>);
+// #[derive(Default, Clone)]
+// pub struct MenuChosedGun();
 
 #[derive(Debug, Clone)]
 pub struct UpgradeCard {
@@ -307,7 +319,8 @@ pub enum AIType {
     Aim,
     Rotate(f32),
     Kamikadze,
-    Charging(Duration)
+    Charging(Duration),
+    FollowRotate,
 }
 
 #[derive(Debug, Clone, Copy, Component, Serialize, Deserialize)]
@@ -356,9 +369,6 @@ pub enum PlayState {
     Action,
     Upgrade
 }
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ScoreTable(pub Vec<usize>);
 
 #[derive(Debug, Clone, Copy)]
 pub enum AppState {
@@ -461,10 +471,21 @@ pub struct Shield(pub usize);
 #[derive(Component, Clone, Copy)]
 pub struct Damage(pub usize);
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct MacroGame {
+    pub score_table: Vec<usize>,
     pub coins: usize,
-    pub score: usize,
+    pub ships_unlocked: Vec<bool>
+}
+
+impl Default for MacroGame {
+    fn default() -> Self {
+        MacroGame {
+            score_table: vec![],
+            coins: 0,
+            ships_unlocked: vec![true, false]
+        }
+    }
 }
 
 // #[derive(Default)]

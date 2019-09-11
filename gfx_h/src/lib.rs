@@ -14,7 +14,6 @@ use red;
 use red::VertexAttribPointers;
 use red::glow::Context;
 use red::glow;
-
 use image;
 
 use sdl2::rwops::RWops;
@@ -37,6 +36,14 @@ const Z_FAR: f32 = 15f32;
 const MAX_ADD_SPEED_Z: f32 = 10f32;
 const SPEED_EMA: f32 = 0.04f32; // new value will be taken with with that coef
 pub const _BACKGROUND_SIZE: f32 = 20f32;
+
+pub fn iso3_iso2(iso3: &Isometry3) -> Isometry2 {
+    Isometry2::new(
+        Vector2::new(iso3.translation.vector.x, iso3.translation.vector.y),
+        iso3.rotation.euler_angles().2
+    )
+}
+
 
 pub fn get_view(observer: Point3) -> Isometry3 {
     let mut target = observer.clone();
@@ -309,6 +316,53 @@ impl Canvas {
             direction_offset: Vector2::new(0f32, 0f32),
             z_far: z_far
         })
+    }
+
+
+    /// draw lines with only one draw call
+    pub fn draw_lines(
+        &self,
+        lines: &[(Point2, Point2)],
+        context: &red::GL,
+        frame: &mut red::Frame,
+        viewport: &red::Viewport,
+        color: Point3,
+        line_width: f32,
+    ) {
+        let mut positions = vec![];
+        let mut indices = vec![];
+        let mut cur_id = 0u16;
+        for (a, b) in lines.iter() {
+            let line_length = (b.coords - a.coords).norm();
+            let current_positions = vec![
+                Point2::new(-line_width / 2.0, 0f32),
+                Point2::new(line_width / 2.0, 0f32),
+                Point2::new(-line_width / 2.0, -line_length),
+                Point2::new(line_width / 2.0, -line_length)
+            ];
+            let up = Vector2::new(0.0, -line_length);
+            let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
+            let iso = Isometry3::new(
+                Vector3::new(a.x, a.y, 0f32), 
+                Vector3::new(0f32, 0f32, rotation.angle())
+            );
+            let current_indices = [0u16, 1, 2, 1, 3, 2];
+            positions.extend(current_positions.iter().map(|x| iso3_iso2(&iso) * x));
+            indices.extend(current_indices.iter().map(|x| cur_id + x));
+            cur_id += current_indices.len() as u16;
+        }
+        let geometry_data = GeometryData::new(
+            &context, &positions, &indices
+        ).unwrap();
+        self.render_geometry(
+            &context,
+            &viewport,
+            frame,
+            &geometry_data,
+            &Isometry3::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0f32, 0f32, 0f32)),
+            RenderMode::Draw,
+            color
+        );
     }
 
     pub fn draw_line(
