@@ -64,7 +64,7 @@
     ],
     enemies: [
         (
-            ai_kind: AI(kinds:[FollowRotate, Aim]),
+            ai_kind: AI(kinds:[FollowRotate(spin: None), Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: (secs: 0, nanos: 300_000_000),

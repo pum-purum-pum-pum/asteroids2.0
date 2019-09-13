@@ -9,6 +9,7 @@ pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
 pub use crate::sound::{SoundData, SoundPlacement};
 use crate::common::*;
+use log::info;
 
 
 use specs::prelude::*;
@@ -18,7 +19,7 @@ use crate::run::FINGER_NUMBER;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
 
-pub const ASTEROID_MAX_LIFES: usize = 100usize;
+pub const ASTEROID_MAX_LIFES: usize = 300usize;
 
 
 pub const BULLET_SPEED_INIT: f32 = 0.5;
@@ -34,6 +35,7 @@ pub struct DevInfo {
     pub fps: usize,
     current_count: usize,
     last_timestamp: Instant,
+    pub draw_telemetry: bool,
 }
 
 impl DevInfo {
@@ -42,6 +44,7 @@ impl DevInfo {
             fps: 0,
             current_count: 0,
             last_timestamp: Instant::now(),
+            draw_telemetry: false,
         }
     }
 
@@ -320,7 +323,11 @@ pub enum AIType {
     Rotate(f32),
     Kamikadze,
     Charging(Duration),
-    FollowRotate,
+    FollowRotate {
+        // if spin is None, then it will be sampled by random
+        // sign means direction
+        spin: Option<f32>,
+    },
 }
 
 #[derive(Debug, Clone, Copy, Component, Serialize, Deserialize)]
@@ -406,7 +413,7 @@ pub struct LazerConnect(pub specs::Entity);
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct Rift {
     pub distance: f32,
-    pub lazers: Vec<(Lazer, (f32, f32))>
+    pub lazers: Vec<(Lazer, (f32, f32))>,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -1080,8 +1087,11 @@ impl Gun for ShotGun {
                 reflection: self.reflection,
             });
         }
+        info!("asteroids: side projectile number {:?}", self.side_projectiles_number);
         for i in 1..=self.side_projectiles_number {
+            info!("asteroids: outer loop");
             for j in 0i32..=1 {
+                info!("asteroids: add projectile...");
                 let sign = j * 2 - 1;
                 let shift = self.angle_shift * i as f32 * sign as f32;
                 let rotation = Rotation3::new(Vector3::new(0f32, 0f32, shift));

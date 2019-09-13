@@ -28,14 +28,14 @@ use crate::components::*;
 use gfx_h::{
     Canvas, GlyphVertex, TextVertexBuffer, 
     TextData, ParticlesData, MovementParticles,
-    effects::MenuParticles
+    effects::MenuParticles, GeometryData
 };
 use crate::physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
 use crate::sound::{init_sound, };
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
-    GUISystem, ScoreTableRendering, UpgradeGUI
+    ScoreTableRendering, UpgradeGUI, GUISystem
 };
 use glyph_brush::{*};
 use crate::gui::{UI, Primitive};
@@ -168,6 +168,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Reflection>();
     specs_world.register::<Blast>();
     specs_world.register::<ThreadPin<ImageData>>();
+    specs_world.register::<ThreadPin<GeometryData>>();
     specs_world.register::<Spin>();
     specs_world.register::<AttachPosition>();
     specs_world.register::<ShotGun>();
@@ -745,6 +746,7 @@ pub fn run() -> Result<(), String> {
                     info!("asteroids: main dispatcher");
                     dispatcher.dispatch_seq(&specs_world.res);
                     dispatcher.dispatch_thread_local(&specs_world.res);
+                    info!("asteroids: gui dispatcher");
                     gui_dispatcher.dispatch(&specs_world.res);
                     flame::end("dispatch");
                 } else {

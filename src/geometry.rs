@@ -358,7 +358,7 @@ impl Polygon {
         self.mass_center = Point2::new(0f32, 0f32);
     }
 
-    pub fn deconstruct(&self, bullet: Point2) -> Vec<Polygon> {
+    pub fn deconstruct(&self, bullet: Point2, sites: usize) -> Vec<Polygon> {
         if self.min_r < 0.8 {
             return vec![]
         }
@@ -375,7 +375,7 @@ impl Polygon {
         bullet.x /= w_div;
         bullet.y /= h_div;
         let bullet = Point2::from(5.0 * bullet.coords);
-        let (polys, _, _) = destruction(&transofrmed_points, bullet, 10);
+        let (polys, _, _) = destruction(&transofrmed_points, bullet, sites);
         let mut res = vec![];
         for poly in polys.iter() {
             let mut poly = poly.clone();
