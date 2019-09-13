@@ -1,0 +1,333 @@
+use super::*;
+use log::info;
+
+
+#[derive(Default)]
+pub struct CollisionSystem {
+    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
+}
+
+fn damage_ship(
+    is_character: bool,
+    ship: specs::Entity,
+    lifes: &mut WriteStorage<Lifes>,
+    shields: &mut WriteStorage<Shield>,
+    entities: &Entities,
+    app_state: &mut Write<AppState>,
+    progress: &mut Write<Progress>,
+    macro_game: &mut WriteExpect<MacroGame>,
+    insert_channel: &mut Write<EventChannel<InsertEvent>>,
+    sounds_channel: &mut Write<EventChannel<Sound>>,
+    preloaded_sounds: &ReadExpect<PreloadedSounds>,
+    preloaded_images: &ReadExpect<PreloadedImages>,
+    global_params: &mut WriteExpect<GlobalParams>,
+    contact_pos: Point2,
+    ship_pos: Point2,
+    damage: usize,
+    bullet: bool
+) {
+    if is_character {
+        if bullet {
+            global_params.damaged(DAMAGED_RED);
+            insert_channel.single_write(InsertEvent::Wobble(0.1f32));
+        }
+    }
+    if bullet {
+        bullet_contact(
+            contact_pos,
+            insert_channel,
+            sounds_channel,
+            preloaded_sounds,
+            preloaded_images,
+        );
+    }
+    if process_damage(
+        lifes.get_mut(ship).unwrap(),
+        shields.get_mut(ship),
+        damage
+    ) {
+        // ship is done... Explode it
+        ship_explode(
+            ship_pos,
+            insert_channel,
+            sounds_channel,
+            preloaded_sounds,
+        );
+        if is_character {
+            to_menu(
+                app_state, 
+                progress,
+                &mut macro_game.score_table
+            );
+        }
+        entities.delete(ship).unwrap();
+    }
+}
+
+impl<'a> System<'a> for CollisionSystem {
+    type SystemData = (
+        Entities<'a>,
+        WriteStorage<'a, Isometry>,
+        ReadStorage<'a, PhysicsComponent>,
+        ReadStorage<'a, AsteroidMarker>,
+        ReadStorage<'a, CharacterMarker>,
+        ReadStorage<'a, ShipMarker>,
+        ReadStorage<'a, Projectile>,
+        ReadStorage<'a, Reflection>,
+        WriteStorage<'a, Lifes>,
+        WriteStorage<'a, Shield>,
+        ReadStorage<'a, Damage>,
+        WriteStorage<'a, Polygon>,
+        Write<'a, World<f32>>,
+        Read<'a, BodiesMap>,
+        Write<'a, EventChannel<InsertEvent>>,
+        Write<'a, EventChannel<Sound>>,
+        ReadExpect<'a, PreloadedSounds>,
+        ReadExpect<'a, PreloadedImages>,
+        Write<'a, Progress>,
+        Write<'a, AppState>,
+        WriteExpect<'a, MacroGame>,
+        WriteExpect<'a, GlobalParams>
+    );
+
+    fn run(&mut self, data: Self::SystemData) {
+        info!("asteroids: collision started");
+        let (
+            entities,
+            isometries,
+            physics_components,
+            asteroids,
+            character_markers,
+            ships,
+            projectiles,
+            reflections,
+            mut lifes,
+            mut shields,
+            damages,
+            polygons,
+            mut world,
+            bodies_map,
+            mut insert_channel,
+            mut sounds_channel,
+            preloaded_sounds,
+            preloaded_images,
+            mut progress,
+            mut app_state,
+            mut macro_game,
+            mut global_params,
+        ) = data;
+        self.colliding_start_events.clear();
+        for (collider1, collider2, _, manifold) in world.collider_world_mut().contact_pairs(false) {
+            if let Some(tracked_contact) = manifold.deepest_contact() {
+                let contact_normal = tracked_contact.contact.normal;
+                self.colliding_start_events.push((collider1.handle(), collider2.handle(), *contact_normal));
+            }
+        }
+        // for event in world.contact_events() {
+        //     match event {
+        //         &ncollide2d::events::ContactEvent::Started(
+        //             collision_handle1,
+        //             collision_handle2,
+        //         ) => self
+        //             .colliding_start_events
+        //             .push((collision_handle1, collision_handle2)),
+        //         _ => ()
+        //     }
+        // }
+        for (handle1, handle2, normal) in self.colliding_start_events.iter() {
+            let (body_handle1, body_handle2) = {
+                // get body handles
+                let collider_world = world.collider_world_mut();
+                (
+                    collider_world.collider_mut(*handle1).unwrap().body(),
+                    collider_world.collider_mut(*handle2).unwrap().body(),
+                )
+            };
+            let mut entity1 = bodies_map[&body_handle1];
+            let mut entity2 = bodies_map[&body_handle2];
+            if asteroids.get(entity2).is_some() {
+                swap(&mut entity1, &mut entity2);
+            }
+            if asteroids.get(entity1).is_some() {
+                let asteroid = entity1;
+                let mut asteroid_explosion = false;
+                let mut bullet_position = None;
+                if projectiles.get(entity2).is_some() {
+                    let proj_pos = isometries.get(entity2).unwrap().0.translation.vector;
+                    let proj_pos2d = Point2::new(proj_pos.x, proj_pos.y);
+                    bullet_position = Some(proj_pos2d);
+                    bullet_contact(
+                        proj_pos2d,
+                        &mut insert_channel,
+                        &mut sounds_channel,
+                        &preloaded_sounds,
+                        &preloaded_images,
+                    );
+                    let projectile = entity2;
+                    let projectile_damage = damages.get(projectile).unwrap().0;
+                    if projectile_damage != 0 {
+                        if let Some(reflection) = reflections.get(projectile) {
+                            reflect_bullet(projectile, &physics_components, &mut world, &reflection, *normal);
+                        } else {
+                            entities.delete(projectile).unwrap();
+                        }
+                    }
+                    let lifes = lifes.get_mut(asteroid).unwrap();
+                    if lifes.0 > projectile_damage {
+                        lifes.0 -= projectile_damage
+                    } else {
+                        if lifes.0 > 0 {
+                            lifes.0 = 0;
+                            asteroid_explosion = true
+                        }
+                    }
+                };
+                if ships.get(entity2).is_some() {
+                    let ship = entity2;
+                    let isometry = isometries.get(ship).unwrap().0;
+                    let position = isometry.translation.vector;
+                    // asteroid_explosion = true;
+                    let effect = InsertEvent::Explosion {
+                        position: Point2::new(position.x, position.y),
+                        num: 3usize,
+                        lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
+                        with_animation: None
+                    };
+                    insert_channel.single_write(effect);
+                    if character_markers.get(ship).is_some() {
+                        sounds_channel.single_write(
+                            Sound(
+                                preloaded_sounds.collision,
+                                Point2::new(position.x, position.y)
+                            )
+                        );
+                    }
+                    let is_character = character_markers.get(ship).is_some();
+                    if is_character {
+                        damage_ship(
+                            is_character,
+                            ship,
+                            &mut lifes,
+                            &mut shields,
+                            &entities,
+                            &mut app_state,
+                            &mut progress,
+                            &mut macro_game,
+                            &mut insert_channel,
+                            &mut sounds_channel,
+                            &preloaded_sounds,
+                            &preloaded_images,
+                            &mut global_params,
+                            Point2::new(position.x, position.y),
+                            Point2::new(position.x, position.y),
+                            3usize,
+                            false
+                        );
+                    }
+                }
+                if asteroid_explosion {
+                    insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
+                    let isometry = isometries.get(asteroid).unwrap().0;
+                    let position = isometry.translation.vector;
+                    let polygon = polygons.get(asteroid).unwrap();
+                    asteroid_explode(
+                        Point2::new(position.x, position.y),
+                        &mut insert_channel,
+                        &mut sounds_channel,
+                        &preloaded_sounds,
+                        &preloaded_images,
+                        polygon.max_r
+                    );
+                    spawn_asteroids(
+                        isometries.get(asteroid).unwrap().0, 
+                        polygons.get(asteroid).unwrap(), 
+                        &mut insert_channel,
+                        bullet_position
+                    );
+                    entities.delete(asteroid).unwrap();
+                }
+            }
+            if ships.get(entity2).is_some() {
+                swap(&mut entity1, &mut entity2);
+            }
+            if ships.get(entity1).is_some() && projectiles.get(entity2).is_some() {
+                let ship = entity1;
+                let projectile = entity2;
+                let projectile_damage = damages.get(projectile).unwrap().0;
+                let isometry = isometries.get(ship).unwrap().0;
+                let projectile_pos = isometries.get(projectile).unwrap().0.translation.vector;
+                let projectile_pos = Point2::new(projectile_pos.x, projectile_pos.y);
+                let position = isometry.translation.vector;
+                damage_ship(
+                    character_markers.get(ship).is_some(),
+                    ship,
+                    &mut lifes,
+                    &mut shields,
+                    &entities,
+                    &mut app_state,
+                    &mut progress,
+                    &mut macro_game,
+                    &mut insert_channel,
+                    &mut sounds_channel,
+                    &preloaded_sounds,
+                    &preloaded_images,
+                    &mut global_params,
+                    projectile_pos,
+                    Point2::new(position.x, position.y),
+                    projectile_damage,
+                    true
+                );
+                // Kludge
+                if projectile_damage != 0 {
+                    if let Some(reflection) = reflections.get(projectile) {
+                        reflect_bullet(projectile, &physics_components, &mut world, &reflection, *normal);
+                    } else {
+                        entities.delete(projectile).unwrap();
+                    }
+                }
+            }
+            if ships.get(entity1).is_some() && ships.get(entity2).is_some() {
+                let mut ship1 = entity1;
+                let mut ship2 = entity2;
+                let isometry = isometries.get(ship1).unwrap().0;
+                let position = isometry.translation.vector;
+                if character_markers.get(ship2).is_some() {
+                    swap(&mut ship1, &mut ship2)
+                }
+                if character_markers.get(ship1).is_some() {
+                    let character_ship = ship1;
+                    let other_ship = ship2;
+                    // entities.delete(other_ship).unwrap();
+                    sounds_channel.single_write(Sound(
+                        preloaded_sounds.collision, 
+                        Point2::new(0f32, 0f32))
+                    );
+                    if process_damage(
+                        lifes.get_mut(other_ship).unwrap(),
+                        shields.get_mut(other_ship),
+                        damages.get(character_ship).unwrap().0
+                    ) {
+                        ship_explode(
+                            Point2::new(position.x, position.y),
+                            &mut insert_channel,
+                            &mut sounds_channel,
+                            &preloaded_sounds,
+                        );
+                        entities.delete(other_ship).unwrap();
+                    }
+                    global_params.damaged(DAMAGED_RED);
+                    if process_damage(
+                        lifes.get_mut(character_ship).unwrap(),
+                        shields.get_mut(character_ship),
+                        damages.get(other_ship).unwrap().0
+                    ) {
+                        to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
+                        // delete character
+                        entities.delete(character_ship).unwrap();
+                    }
+                }
+            }
+        }
+        info!("asteroids: collision ended");
+    }
+}
