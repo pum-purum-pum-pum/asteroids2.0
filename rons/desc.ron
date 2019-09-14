@@ -64,6 +64,33 @@
     ],
     enemies: [
         (
+            ai_kind: AI(kinds:[Follow, Aim]),
+            gun_kind: ShotGun((
+                recharge_state: 0,
+                recharge_time: (secs: 0, nanos: 400_000_000),
+                bullets_damage: 100,
+                side_projectiles_number: 0,
+                angle_shift: 0.25,
+                bullet_speed: 0.2,
+                bullet_size: 0.2,
+                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_image: "enemy_projectile"
+            )),
+            ship_stats: (
+                thrust_force: 0.1,
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 0,
+                max_health: 50,
+                max_shield: 0,
+                damage: 100
+            ),
+            size: 0.3,
+            image_name: "chain_standart_rift",
+            snake: Some(10),
+            //rift: Some((distance: 8, lazers: []))
+        ),
+        (
             ai_kind: AI(kinds:[FollowRotate(spin: None), Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
@@ -117,9 +144,6 @@
             size: 0.8,
             image_name: "reflect_bullet_enemy",
         ),
-
-
-
         (
             ai_kind: AI(kinds:[Kamikadze, Aim]),
             gun_kind: ShotGun((

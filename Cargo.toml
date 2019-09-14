@@ -68,6 +68,18 @@ features = ["image", "mixer"]
 opt-level = 0
 debug = true
 
+[profile.dev.overrides.gfx_h]
+opt-level = 3
+
+[profile.dev.overrides.common]
+opt-level = 3
+
+[profile.dev.overrides.voronoi]
+opt-level = 3
+
+[profile.dev.overrides.telemetry]
+opt-level = 3
+
 [profile.dev.overrides."*"]
 opt-level = 3
 

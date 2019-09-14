@@ -19,7 +19,7 @@ impl<'a> System<'a> for GamePlaySystem {
             ReadStorage<'a, ShipMarker>,
             WriteStorage<'a, Polygon>,
             WriteStorage<'a, StarsMarker>,
-            WriteStorage<'a, BigStarMarker>,
+            WriteStorage<'a, FogMarker>,
             WriteStorage<'a, NebulaMarker>,
             WriteStorage<'a, PlanetMarker>,
             WriteStorage<'a, Shield>,
@@ -47,7 +47,7 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, AppState>,
-        WriteExpect<'a, BigStarGrid>,
+        WriteExpect<'a, FogGrid>,
         WriteExpect<'a, StarsGrid>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
@@ -130,7 +130,11 @@ impl<'a> System<'a> for GamePlaySystem {
             if lifetime.delete() {
                 if side_bullet_ability.get(entity).is_some() {
                     if let Some(gun) = shotguns.get_mut(char_entity) {
-                        gun.side_projectiles_number -= 1;
+                        // it's hack to avoid overflow
+                        // posibble if we forgot to delete upgrade from previous game
+                        if gun.side_projectiles_number > 0 {
+                            gun.side_projectiles_number -= 1;
+                        }
                     }
                     if let Some(multy_lazer) = multiple_lazers.get_mut(char_entity) {
                         multy_lazer.minus_side_lazers();
@@ -353,7 +357,7 @@ impl<'a> System<'a> for GamePlaySystem {
                     let spawn_pos = spawn_in_rectangle(min_w, max_w, min_h, max_h);
                     let mut rng = thread_rng();
                     let angle = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
-                    insert_channel.single_write(InsertEvent::BigStar {
+                    insert_channel.single_write(InsertEvent::Fog {
                         iso: Point3::new(spawn_pos.x, spawn_pos.y, angle)
                     })
                 }

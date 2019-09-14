@@ -5,49 +5,7 @@
 			],
 			ships_number: 15,
 			const_distribution : [
-				("rift", 10),
-				// ("reflect_bullet_enemy", 1)
-			],
-			iterations: 1
-		),
-		(
-			distribution: [
-			],
-			ships_number: 15,
-			const_distribution : [
-				("kamikadze", 1),
-				("charging", 1),
-				("bomber", 1),
-				("bomberman", 1),
-				("enemy1", 1),
-				("lazer", 1),
-				("enemy3", 1),
-				("lazer_boss", 1),
-				("rotship", 1),
-				("random_ship", 1),
-				("fish", 1),
-				("chain_standart", 1),
 				("chain_lazer", 1),
-			],
-			iterations: 1
-		),
-		(
-			distribution: [
-			],
-			ships_number: 15,
-			const_distribution : [
-				("lazer_boss", 1)
-			],
-			iterations: 1
-		),
-		(
-			distribution: [
-			],
-			ships_number: 15,
-			const_distribution : [
-				("kamikadze", 1),
-
-				("chain_standart", 1),
 			],
 			iterations: 1
 		),
@@ -125,6 +83,89 @@
 				("lazer_boss", 1)
 			],
 			iterations: 1
+		),
+		(
+			distribution: [
+				("kamikadze", 0.1),
+				("charging", 0.1),
+				("bomber", 0.1),
+				("bomberman", 0.1),
+			],
+			ships_number: 6,
+			const_distribution : [
+				("rift", 5),
+				("chain_standart", 1),
+				// ("reflect_bullet_enemy", 1)
+			],
+			iterations: 1
+		),
+		(
+			distribution: [
+				("kamikadze", 0.1),
+				("charging", 0.1),
+				("bomber", 0.1),
+				("bomberman", 0.1),
+			],
+			ships_number: 6,
+			const_distribution : [
+				("rift", 3),
+				("chain_lazer", 2),
+				("reflect_bullet_enemy", 2)
+				// ("reflect_bullet_enemy", 1)
+			],
+			iterations: 1
+		),
+		(
+			distribution: [
+				("charging", 0.1),
+				("reflect_bullet_enemy", 0.1),
+				("enemy1", 0.1),
+				("enemy3", 0.1),
+
+			],
+			ships_number: 6,
+			const_distribution : [
+				("rift", 2),
+				("chain_lazer", 2),
+				// ("reflect_bullet_enemy", 1)
+			],
+			iterations: 1
+		),
+		(
+			distribution: [
+			],
+			ships_number: 6,
+			const_distribution : [
+				("rift", 10),
+				("chain_standart", 1),
+				("chain_lazer", 1),
+				// ("reflect_bullet_enemy", 1)
+			],
+			iterations: 1
+		),
+		(
+			distribution: [
+				("kamikadze", 0.1),
+				("charging", 0.1),
+				("bomber", 0.1),
+				("bomberman", 0.1),
+				("enemy1", 0.1),
+				("lazer", 0.1),
+				("enemy3", 0.1),
+				("lazer_boss", 0.1),
+				("rotship", 0.1),
+				("random_ship", 0.1),
+				("fish", 0.1),
+				("chain_standart", 0.1),
+				("chain_lazer", 0.1),
+				("rift", 0.1),
+			],
+			ships_number: 15,
+			const_distribution : [
+				("rift", 3),
+				("lazer_boss", 2),
+			],
+			iterations: 123
 		),
 	]
 )

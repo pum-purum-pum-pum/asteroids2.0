@@ -201,7 +201,7 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<Shield>();
     specs_world.register::<NebulaMarker>();
     specs_world.register::<StarsMarker>();
-    specs_world.register::<BigStarMarker>();
+    specs_world.register::<FogMarker>();
     specs_world.register::<PlanetMarker>();
     specs_world.register::<Damage>();
     specs_world.register::<AI>();
@@ -242,6 +242,7 @@ pub fn run() -> Result<(), String> {
         "circle",
         "circle2",
         "chain_standart",
+        "chain_standart_rift",
         "chain_lazer",
         "ship_rotation",
         "shield_regen",
@@ -266,7 +267,7 @@ pub fn run() -> Result<(), String> {
         "charging",
         "bar",
         "upg_bar",
-        "big_star",
+        "fog",
         "rocket",
         "fish",
         "player",
@@ -493,7 +494,7 @@ pub fn run() -> Result<(), String> {
         background: name_to_image["back"],
         nebulas: nebula_images,
         stars: stars_images,
-        big_star: name_to_image["big_star"],
+        fog: name_to_image["fog"],
         planets: planet_images,
         ship_speed_upgrade: name_to_image["ship_speed"],
         bullet_speed_upgrade: name_to_image["bullet_speed"],
@@ -553,7 +554,7 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
     specs_world.add_resource(StarsGrid::new(3, 40f32, 40f32, 4f32, 4f32));
-    specs_world.add_resource(BigStarGrid::new(1, 150f32, 150f32, 30f32, 30f32));
+    specs_world.add_resource(FogGrid::new(2, 50f32, 50f32, 5f32, 5f32));
 
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
     specs_world.add_resource(name_to_image);
@@ -796,9 +797,14 @@ pub fn run() -> Result<(), String> {
                     };
                     let s = to_string_pretty(&*specs_world.write_resource::<MacroGame>(), pretty).expect("Serialization failed");
                     let file = "rons/macro_game.ron";
-                    let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
+                    // let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
                     eprintln!("{}", s);
-                    rw.write(s.as_bytes()).expect("failed to write macro game");
+                    if let Ok(mut rw) = RWops::from_file(Path::new(&file), "r+") {
+                        rw.write(s.as_bytes()).expect("failed to load macro game");
+                    } else {
+                        let mut rw = RWops::from_file(Path::new(&file), "w").expect("failed to load macro game");
+                        rw.write(s.as_bytes()).expect("failed to write");
+                    }
                     flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
                 },
                 sdl2::event::Event::Window {

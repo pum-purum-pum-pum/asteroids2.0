@@ -92,29 +92,50 @@ impl<'a> System<'a> for PhysicsSystem {
             for (entity, _phys, _enemy) in (&entities, &physics, &enemies).join() {
                 enemies_entities.push(entity);
             }
+            let force_factor = 0.006;
             for e1 in enemies_entities.iter() {
                 for e2 in enemies_entities.iter() {
                     if e1 == e2 {
                         break
                     }
+                    let phys1 = physics.get(*e1).unwrap();
+                    let phys2 = physics.get(*e2).unwrap();
+                    let body1 = world.rigid_body(phys1.body_handle).unwrap();
+                    let body2 = world.rigid_body(phys2.body_handle).unwrap();
+                    let position1 = body1.position().translation.vector;
+                    let position2 = body2.position().translation.vector;
+                    let distance = (position1 - position2).norm();
+                    let center = (position1 + position2) / 2.0;
                     if chargings.get(*e1).is_some() || chargings.get(*e2).is_some() {
                         continue
                     }
-                    if chains.get(*e1).is_some() || chains.get(*e2).is_some() {
+                    let mut applyed = false;
+                    if let Some(c1) = chains.get(*e1) {
+                        applyed = true;
+                        if c1.follow == *e2 {
+                            let force1 = Force2::new(-1.0 * force_factor * (position1 - center).normalize(), 0.0);
+                            world.rigid_body_mut(phys1.body_handle).unwrap()
+                                .apply_force(0, &force1, ForceType::Force, true);
+                        }
+                    }
+                    if let Some(c2) = chains.get(*e2) {
+                        applyed = true;
+                        if c2.follow == *e1 {
+                            let force2 = Force2::new(-1.0 * force_factor * (position2 - center).normalize(), 0.0);
+                            world.rigid_body_mut(phys2.body_handle).unwrap()
+                                .apply_force(0, &force2, ForceType::Force, true);                            
+                        }
+                    }
+                    if applyed {
                         continue
                     }
-                    let phys1 = physics.get(*e1).unwrap();
-                    let phys2 = physics.get(*e2).unwrap();
+                    // if chains.get(*e1).is_some() && chains.get(*e2).is_some() {
+                    //     continue;
+                    // }
                     let (force1, force2, distance) = {
-                        let body1 = world.rigid_body(phys1.body_handle).unwrap();
-                        let body2 = world.rigid_body(phys2.body_handle).unwrap();
-                        let position1 = body1.position().translation.vector;
-                        let position2 = body2.position().translation.vector;
-                        let distance = (position1 - position2).norm();
-                        let center = (position1 + position2) / 2.0;
                         (
-                            Force2::new(0.006 * (position1 - center).normalize(), 0.0), 
-                            Force2::new(0.006 * (position2 - center).normalize(), 0.0),
+                            Force2::new(force_factor * (position1 - center).normalize(), 0.0), 
+                            Force2::new(force_factor * (position2 - center).normalize(), 0.0),
                             distance
                         )
                     };

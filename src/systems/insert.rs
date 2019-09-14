@@ -581,16 +581,16 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(stars, StarsMarker);
                     lazy_update.insert(stars, Size(30f32));
                 }
-                InsertEvent::BigStar {
+                InsertEvent::Fog {
                     iso
                 } => {
                     let mut rng = thread_rng();
-                    let z = rng.gen_range(-140f32, -120f32);
+                    let z = rng.gen_range(-40f32, -20f32);
                     let entity = entities.create();
                     lazy_update.insert(entity, Isometry::new3d(iso.x, iso.y, z, iso.z));
-                    lazy_update.insert(entity, Image(preloaded_images.big_star));
-                    lazy_update.insert(entity, BigStarMarker);
-                    lazy_update.insert(entity, Size(40f32));
+                    lazy_update.insert(entity, Image(preloaded_images.fog));
+                    lazy_update.insert(entity, FogMarker);
+                    lazy_update.insert(entity, Size(35f32));
                 }
                 InsertEvent::Planet {
                     iso

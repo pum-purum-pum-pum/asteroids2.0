@@ -2,7 +2,7 @@ use std::ops::AddAssign;
 use std::collections::{HashMap};
 use std::time::{Instant, Duration};
 
-pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, BigStarGrid};
+pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, FogGrid};
 pub use crate::physics::{BodiesMap, PhysicsComponent};
 pub use gfx_h::{Image, ImageData};
 pub use gfx_h::animation::{Animation, AnimationFrame};
@@ -264,7 +264,7 @@ pub enum InsertEvent {
     Stars {
         iso: Point3
     },
-    BigStar {
+    Fog {
         iso: Point3
     },
     Planet {
@@ -550,7 +550,7 @@ pub struct PreloadedImages {
     pub nebulas: Vec<specs::Entity>,
     pub planets: Vec<specs::Entity>,
     pub stars: Vec<specs::Entity>,
-    pub big_star: specs::Entity,
+    pub fog: specs::Entity,
     pub ship_speed_upgrade: specs::Entity,
     pub bullet_speed_upgrade: specs::Entity,
     pub attack_speed_upgrade: specs::Entity,
@@ -671,7 +671,7 @@ pub struct StarsMarker;
 
 #[derive(Default, Component, Clone, Copy)]
 #[storage(NullStorage)]
-pub struct BigStarMarker;
+pub struct FogMarker;
 
 #[derive(Default, Component, Clone, Copy)]
 #[storage(NullStorage)]

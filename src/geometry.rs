@@ -50,14 +50,14 @@ impl StarsGrid {
     }
 }
 
-pub struct BigStarGrid {
+pub struct FogGrid {
     pub grid: Grid<bool>
 }
 
-impl BigStarGrid {
+impl FogGrid {
     pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
         let grid = Grid::new(n, rw, rh, rbw, rbh);
-        BigStarGrid {
+        FogGrid {
             grid: grid
         }
     }

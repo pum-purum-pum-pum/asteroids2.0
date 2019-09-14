@@ -155,7 +155,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, StarsMarker>,
             ReadStorage<'a, NebulaMarker>,
             ReadStorage<'a, PlanetMarker>,
-            ReadStorage<'a, BigStarMarker>,
+            ReadStorage<'a, FogMarker>,
             ReadStorage<'a, Projectile>,
             ReadStorage<'a, ThreadPin<ImageData>>,
             ReadStorage<'a, Image>,
@@ -198,7 +198,7 @@ impl<'a> System<'a> for RenderingSystem {
                 stars,
                 nebulas,
                 planets,
-                _big_star_markers,
+                _fog_markers,
                 projectiles,
                 image_datas,
                 image_ids,
@@ -307,21 +307,6 @@ impl<'a> System<'a> for RenderingSystem {
             }
         };
 
-        for (_entity, iso, image, size, _stars) in
-            (&entities, &isometries, &image_ids, &sizes, &_big_star_markers).join() {
-            let image_data = image_datas.get(image.0).unwrap();
-            canvas
-                .render(
-                        &gl,
-                        &viewport,
-                        &mut frame,
-                        &image_data,
-                        &iso.0,
-                        size.0,
-                        false,
-                        None
-                );
-        };
         for (_entity, iso, image, size, _nebula) in
             (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
             if visible(&*canvas, &iso.0, dims) {
@@ -355,6 +340,22 @@ impl<'a> System<'a> for RenderingSystem {
                             None
                     );
             }
+        };
+
+        for (_entity, iso, image, size, _stars) in
+            (&entities, &isometries, &image_ids, &sizes, &_fog_markers).join() {
+            let image_data = image_datas.get(image.0).unwrap();
+            canvas
+                .render(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        false,
+                        None
+                );
         };
         flame::end("background rendering");
         // flame::start("particles rendering");

@@ -203,23 +203,23 @@ impl<'a> System<'a> for AISystem {
                     } => {
                         let speed = ship_stats.get(entity).unwrap().thrust_force;
                         let mut is_chain = false;
-                        // if let Some(chain) = chains.get(entity) {
-                        //     if let Some(iso) = isometries.get(chain.follow) {
-                        //         is_chain = true;
-                        //         let follow_vector = iso.0.translation.vector;
-                        //         let follow_pos = Point2::new(follow_vector.x, follow_vector.y);
-                        //         let diff = follow_pos - pos;
-                        //         // if diff.norm() > 1.5f32 { // for not overlap
-                        //             let dir = diff.normalize();
-                        //             let ai_vel = speed * dir;
-                        //             *vel = Velocity::new(ai_vel.x, ai_vel.y);
-                        //             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
-                        //             let mut velocity = *body.velocity();
-                        //             *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
-                        //             body.set_velocity(velocity);
-                        //         // }
-                        //     }
-                        // };
+                        if let Some(chain) = chains.get(entity) {
+                            if let Some(iso) = isometries.get(chain.follow) {
+                                is_chain = true;
+                                let follow_vector = iso.0.translation.vector;
+                                let follow_pos = Point2::new(follow_vector.x, follow_vector.y);
+                                let diff = follow_pos - pos;
+                                // if diff.norm() > 1.5f32 { // for not overlap
+                                    let dir = diff.normalize();
+                                    let ai_vel = speed * dir;
+                                    *vel = Velocity::new(ai_vel.x, ai_vel.y);
+                                    let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                                    let mut velocity = *body.velocity();
+                                    *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                                    body.set_velocity(velocity);
+                                // }
+                            }
+                        };
                         let rot_spin = rot_spin.unwrap();
                         if !is_chain {
                             if diff.norm() > rot_spin.abs() {
