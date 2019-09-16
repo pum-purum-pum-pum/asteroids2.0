@@ -203,6 +203,9 @@ impl<'a> System<'a> for UpgradeGUI {
                     UpgradeType::ShieldSize => {
                         ship_stats.max_shield += 20;
                     }
+                    UpgradeType::Maneuverability => {
+                        *ship_stats.maneuverability.as_mut().unwrap() += 1.0;
+                    }
                 }
             }
             None => ()

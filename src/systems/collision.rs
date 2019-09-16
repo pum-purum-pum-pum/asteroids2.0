@@ -1,12 +1,6 @@
 use super::*;
 use log::info;
 
-
-#[derive(Default)]
-pub struct CollisionSystem {
-    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
-}
-
 fn damage_ship(
     is_character: bool,
     ship: specs::Entity,
@@ -64,6 +58,13 @@ fn damage_ship(
     }
 }
 
+
+#[derive(Default)]
+pub struct CollisionSystem {
+    colliding_pairs: Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
+    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>
+}
+
 impl<'a> System<'a> for CollisionSystem {
     type SystemData = (
         Entities<'a>,
@@ -116,25 +117,35 @@ impl<'a> System<'a> for CollisionSystem {
             mut macro_game,
             mut global_params,
         ) = data;
+        self.colliding_pairs.clear();
         self.colliding_start_events.clear();
-        for (collider1, collider2, _, manifold) in world.collider_world_mut().contact_pairs(false) {
-            if let Some(tracked_contact) = manifold.deepest_contact() {
-                let contact_normal = tracked_contact.contact.normal;
-                self.colliding_start_events.push((collider1.handle(), collider2.handle(), *contact_normal));
+        for event in world.contact_events() {
+            match event {
+                &ncollide2d::events::ContactEvent::Started(
+                    collision_handle1,
+                    collision_handle2,
+                ) => {
+                    self.colliding_start_events.push((collision_handle1, collision_handle2));
+                }
+                _ => ()
             }
         }
-        // for event in world.contact_events() {
-        //     match event {
-        //         &ncollide2d::events::ContactEvent::Started(
-        //             collision_handle1,
-        //             collision_handle2,
-        //         ) => self
-        //             .colliding_start_events
-        //             .push((collision_handle1, collision_handle2)),
-        //         _ => ()
-        //     }
-        // }
-        for (handle1, handle2, normal) in self.colliding_start_events.iter() {
+        for (h1, h2) in self.colliding_start_events.iter() {
+            if let Some((_h1, _h2, _, manifold)) = world
+                .collider_world_mut()
+                .contact_pair(*h1, *h2, true) {
+                if let Some(tracked_contact) = manifold.deepest_contact() {
+                    let contact_normal = tracked_contact.contact.normal;
+                    self
+                        .colliding_pairs
+                        .push((*h1, *h2, *contact_normal))   
+                }
+            }        
+        }
+
+
+
+        for (handle1, handle2, normal) in self.colliding_pairs.iter() {
             let (body_handle1, body_handle2) = {
                 // get body handles
                 let collider_world = world.collider_world_mut();

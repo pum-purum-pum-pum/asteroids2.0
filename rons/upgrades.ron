@@ -14,6 +14,13 @@
         assigned: [ToGun(ShotGun)]
     ),
     (
+        upgrade_type: LazerLength,
+        image: "bullet_damage",
+        name: "Lazer length",
+        description: "Increase lazer length by x%",
+        assigned: [ToGun(MultyLazer)]
+    ),
+    (
         upgrade_type: BulletReflection,
         image: "bullet_reflection",
         name: "Bullet reflection",
@@ -57,10 +64,10 @@
         assigned: [General]
     ),
     (
-        upgrade_type: LazerLength,
-        image: "bullet_damage",
-        name: "Lazer length",
-        description: "Increase lazer length by x%",
-        assigned: [ToGun(MultyLazer)]
-    )
+        upgrade_type: Maneuverability,
+        image: "maneuverability",
+        name: "Maneuverability",
+        description: "Change direction of the ship faster",
+        assigned: [General]
+    ),
 ]

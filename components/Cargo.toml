@@ -1,0 +1,40 @@
+[package]
+name = "components"
+version = "0.1.0"
+authors = ["vlad <vladzhukovtirko@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+common = {path = "../common"}
+gfx_h = {path = "../gfx_h"}
+physics = {path = "../physics"}
+vorod = {path="../voronois"}
+geometry = {path = "../geometry"}
+sound = {path = "../sound"}
+noise = "0.5.1"
+backtrace = "0.3.32"
+libc = "*"
+image = "0.21.1"
+specs = {version="0.14.3", features=["nightly"]}
+specs-derive = "0.4.0"
+nalgebra = "0.18.0"
+nphysics2d = "0.11.1"
+gl = "0.10.0"
+shrev = "1.1.1"
+ncollide2d = "0.19.1"
+rand = "0.6.5"
+hibitset = "0.5.0"
+fnv = "1.0.6"
+derive_deref = "1.1.0"
+num_enum = "0.1.1"
+red = {path = "../red"}
+glyph_brush = "0.5.3"
+ron = "0.5.1"
+serde = "1.0.97"
+
+[dependencies.sdl2]
+version = "0.32.2"
+default-features = false
+features = ["image", "mixer"]

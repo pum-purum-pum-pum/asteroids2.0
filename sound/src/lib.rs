@@ -1,7 +1,7 @@
 use std::path::Path;
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
-use crate::common::*;
+use common::*;
 use serde::{Serialize, Deserialize};
 
 use sdl2::mixer::{InitFlag, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS, Music};
@@ -94,7 +94,7 @@ pub fn init_sound<'a>(
 
     {
         use ron::de::{from_str};
-        let file = include_str!("../rons/sounds.ron");
+        let file = include_str!("../../rons/sounds.ron");
         let sounds_save: SoundsSave = match from_str(file) {
             Ok(x) => x,
             Err(e) => {

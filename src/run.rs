@@ -24,14 +24,14 @@ use std::path::Path;
 use std::fs::File;
 use telemetry::{TeleGraph, TimeSpans};
 use common::*;
-use crate::components::*;
+use components::*;
 use gfx_h::{
     Canvas, GlyphVertex, TextVertexBuffer, 
     TextData, ParticlesData, MovementParticles,
     effects::MenuParticles, GeometryData
 };
-use crate::physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
-use crate::sound::{init_sound, };
+use physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
+use sound::{init_sound, };
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
     KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
@@ -42,7 +42,6 @@ use crate::gui::{UI, Primitive};
 
 
 const NEBULAS_NUM: usize = 3usize;
-pub const FINGER_NUMBER: usize = 20;
 
 pub fn run() -> Result<(), String> {
     // LOGGING
@@ -66,7 +65,7 @@ pub fn run() -> Result<(), String> {
         let _guard = slog_scope::set_global_logger(logger);
 
         // register slog_stdlog as the log handler with the log crate
-        slog_stdlog::init().unwrap();
+        // slog_stdlog::init().unwrap();
     info!("asteroids: logging crazyness");
     let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
     let mut telegraph = TeleGraph::new(Duration::from_secs(10));
@@ -213,7 +212,8 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<LazerConnect>();
     specs_world.register::<SoundPlacement>();
     specs_world.register::<Rift>();
-    // TODO: load all this imagea automagicly (assets pack?)
+
+    // TODO: load all this images automagicly (assets pack?)
     let images = [
         "back",
         "player_ship1",
@@ -271,7 +271,8 @@ pub fn run() -> Result<(), String> {
         "rocket",
         "fish",
         "player",
-        "enemy_projectile_old"
+        "enemy_projectile_old",
+        "maneuverability"
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations

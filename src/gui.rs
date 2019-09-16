@@ -1,5 +1,5 @@
 use crate::common::*;
-use crate::components::{*};
+use components::{*};
 use cfg_if::cfg_if;
 use std::collections::HashMap;
 

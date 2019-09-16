@@ -2,20 +2,18 @@ use std::ops::AddAssign;
 use std::collections::{HashMap};
 use std::time::{Instant, Duration};
 
-pub use crate::geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, FogGrid};
-pub use crate::physics::{BodiesMap, PhysicsComponent};
+pub use geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, FogGrid, Geometry, BlockSegment};
+pub use physics::{BodiesMap, PhysicsComponent};
 pub use gfx_h::{Image, ImageData};
 pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
-pub use crate::sound::{SoundData, SoundPlacement};
-use crate::common::*;
-use log::info;
-
+pub use sound::{SoundData, SoundPlacement};
+use common::*;
 
 use specs::prelude::*;
 use serde::{Serialize, Deserialize};
 use specs_derive::{Component};
-use crate::run::FINGER_NUMBER;
+pub const FINGER_NUMBER: usize = 20;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
 
@@ -308,6 +306,7 @@ pub enum UpgradeType {
     HealthSize,
     LazerLength,
     BulletReflection,
+    Maneuverability
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -334,6 +333,7 @@ pub enum AIType {
 pub struct ShipStats {
     pub thrust_force: f32,
     pub torque: f32,
+    pub maneuverability: Option<f32>,
     pub health_regen: usize,
     pub shield_regen: usize,
     pub max_health: usize,
@@ -388,18 +388,6 @@ impl Default for AppState {
     fn default() -> Self {
         AppState::Menu
     }
-}
-
-#[derive(Component, Debug, Clone, Copy)]
-pub struct BlockSegment {
-    pub point1: Point2, 
-    pub point2: Point2 
-}
-
-#[derive(Component, Debug, Clone)]
-pub enum Geometry {
-    Circle { radius: f32 },
-    Polygon(Polygon),
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -865,6 +853,7 @@ impl GunKindSave {
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct MultyLazer {
     pub lazers: Vec<Lazer>,
+    pub lazers_limit: Option<usize>,
     angle: f32,
 }
 
@@ -909,11 +898,23 @@ impl MultyLazer {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (f32, &Lazer)> + '_ {
-        self.angles().into_iter().zip(self.lazers.iter())
+        let slice = if let Some(limit) = self.lazers_limit {
+            &self.lazers[0..limit.min(self.lazers.len())]
+        } else {
+            &self.lazers
+        };
+        self.angles().into_iter().zip(slice.iter())
     }
 
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (f32, &mut Lazer)> + '_ {
-        self.angles().into_iter().zip(self.lazers.iter_mut())
+        let lazers_num = self.lazers.len();
+        self.angles().into_iter().zip(
+            if let Some(limit) = self.lazers_limit {
+                &mut self.lazers[0..limit.min(lazers_num)]
+            } else {
+                &mut self.lazers
+            }.iter_mut()
+        )
     }
 }
 
@@ -978,6 +979,7 @@ pub struct ShotGun {
     pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub side_projectiles_number: usize,
+    pub side_projectiles_limit: Option<usize>,
     pub angle_shift: f32,
     pub bullet_speed: f32,
     pub bullet_size: f32,
@@ -991,6 +993,7 @@ pub struct ShotGunSave {
     pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub side_projectiles_number: usize,
+    pub side_projectiles_limit: Option<usize>,
     pub angle_shift: f32,
     pub bullet_speed: f32,
     pub bullet_size: f32,
@@ -1005,6 +1008,7 @@ impl ShotGunSave {
             self.recharge_time,
             self.bullets_damage,
             self.side_projectiles_number,
+            self.side_projectiles_limit,
             self.angle_shift,
             self.bullet_speed,
             self.bullet_size,
@@ -1019,7 +1023,8 @@ impl ShotGun {
     pub fn new(
         recharge_time: Duration, 
         bullets_damage: usize, 
-        side_projectiles_number: usize, 
+        side_projectiles_number: usize,
+        side_projectiles_limit: Option<usize>,
         angle_shift: f32, 
         bullet_speed: f32,
         bullet_size: f32,
@@ -1032,6 +1037,7 @@ impl ShotGun {
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             side_projectiles_number: side_projectiles_number,
+            side_projectiles_limit: side_projectiles_limit,
             angle_shift: angle_shift,
             bullet_speed: bullet_speed,
             bullet_size: bullet_size,
@@ -1087,11 +1093,13 @@ impl Gun for ShotGun {
                 reflection: self.reflection,
             });
         }
-        info!("asteroids: side projectile number {:?}", self.side_projectiles_number);
-        for i in 1..=self.side_projectiles_number {
-            info!("asteroids: outer loop");
+        let limit = if let Some(limit) = self.side_projectiles_limit {
+            limit
+        } else {
+            42
+        };
+        for i in 1..=self.side_projectiles_number.min(limit) {
             for j in 0i32..=1 {
-                info!("asteroids: add projectile...");
                 let sign = j * 2 - 1;
                 let shift = self.angle_shift * i as f32 * sign as f32;
                 let rotation = Rotation3::new(Vector3::new(0f32, 0f32, shift));

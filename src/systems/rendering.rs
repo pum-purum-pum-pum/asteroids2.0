@@ -12,7 +12,7 @@ use super::*;
 #[cfg(any(target_os = "android"))]
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
-use crate::geometry::{shadow_geometry};
+use geometry::{shadow_geometry};
 
 const BUTTON_SCALE: f32 = 1.2;
 
@@ -358,55 +358,55 @@ impl<'a> System<'a> for RenderingSystem {
                 );
         };
         flame::end("background rendering");
-        // flame::start("particles rendering");
-        // for (entity, particles_data) in (&entities, &mut particles_datas).join() {
-        //     match **particles_data {
-        //         ParticlesData::Explosion(ref mut particles) => {
-        //             if particles.update() {
-        //                 canvas
-        //                     .render_instancing(
-        //                         &gl,
-        //                         &viewport,
-        //                         &mut frame,
-        //                         &particles.instancing_data,
-        //                         &Isometry3::new(
-        //                             Vector3::new(0f32, 0f32, 0f32),
-        //                             Vector3::new(0f32, 0f32, 0f32),
-        //                         )
-        //                     );
-        //             } else {
-        //                 entities.delete(entity).unwrap();
-        //             }
-        //     }
-        //         _ => ()
-        //     };
-        // }
+        flame::start("particles rendering");
+        for (entity, particles_data) in (&entities, &mut particles_datas).join() {
+            match **particles_data {
+                ParticlesData::Explosion(ref mut particles) => {
+                    if particles.update() {
+                        canvas
+                            .render_instancing(
+                                &gl,
+                                &viewport,
+                                &mut frame,
+                                &particles.instancing_data,
+                                &Isometry3::new(
+                                    Vector3::new(0f32, 0f32, 0f32),
+                                    Vector3::new(0f32, 0f32, 0f32),
+                                )
+                            );
+                    } else {
+                        entities.delete(entity).unwrap();
+                    }
+            }
+                _ => ()
+            };
+        }
 
-        // for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
-        //     let translation_vec = iso.0.translation.vector;
-        //     let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
-        //     let pure_isometry = isometry.clone();
-        //     isometry.translation.vector.z = canvas.get_z_shift();
-        //     match **particles_datas
-        //         .get_mut(preloaded_particles.movement)
-        //         .unwrap()
-        //     {
-        //         ParticlesData::MovementParticles(ref mut particles) => {
-        //             particles.update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
-        //              canvas
-        //                 .render_instancing(
-        //                     &gl,
-        //                     &viewport,
-        //                     &mut frame,
-        //                     &particles.instancing_data,
-        //                     &pure_isometry,
-        //                 );
-        //         }
-        //         _ => panic!(),
-        //     };
-        // }
+        for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
+            let translation_vec = iso.0.translation.vector;
+            let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+            let pure_isometry = isometry.clone();
+            isometry.translation.vector.z = canvas.get_z_shift();
+            match **particles_datas
+                .get_mut(preloaded_particles.movement)
+                .unwrap()
+            {
+                ParticlesData::MovementParticles(ref mut particles) => {
+                    particles.update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
+                     canvas
+                        .render_instancing(
+                            &gl,
+                            &viewport,
+                            &mut frame,
+                            &particles.instancing_data,
+                            &pure_isometry,
+                        );
+                }
+                _ => panic!(),
+            };
+        }
 
-        // flame::end("particles rendering");
+        flame::end("particles rendering");
 
         flame::start("other");
         for (_entity, iso, image, size, _light) in

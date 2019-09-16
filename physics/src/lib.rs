@@ -1,4 +1,4 @@
-use crate::common::*;
+use common::*;
 use derive_deref::{Deref, DerefMut};
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;

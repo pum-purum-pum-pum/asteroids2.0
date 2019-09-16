@@ -15,17 +15,25 @@ android_log = "*"
 log = "*"
 
 [workspace]
-members = ["gfx_h", "common", "voronois", "telemetry"]
-
-
-
-
-
-
-
-
+members = [
+	"gfx_h", 
+	"common", 
+	"voronois", 
+	"telemetry", 
+	"geometry", 
+	"components", 
+	"sound", 
+	"physics"
+]
 
 [dependencies]
+components = {path = "components"}
+geometry = {path = "geometry"}
+physics = {path = "physics"}
+sound = {path = "sound"}
+telemetry = {path = "telemetry"}
+common = {path = "common"}
+gfx_h = {path = "gfx_h"}
 log = "0.4.8"
 slog = "2.5.2"
 slog-term = "2.4.1"
@@ -33,9 +41,6 @@ slog-async = "2.3.0"
 slog-scope = "4.1.2"
 slog-stdlog = "4.0.0"
 flame = "0.2.2"
-telemetry = {path = "telemetry"}
-common = {path = "common"}
-gfx_h = {path = "gfx_h"}
 cfg-if = "*"
 noise = "0.5.1"
 backtrace = "0.3.32"
@@ -79,6 +84,20 @@ opt-level = 3
 
 [profile.dev.overrides.telemetry]
 opt-level = 3
+
+[profile.dev.overrides.components]
+opt-level = 3
+
+[profile.dev.overrides.geometry]
+opt-level = 3
+
+[profile.dev.overrides.sound]
+opt-level = 3
+
+[profile.dev.overrides.physics]
+opt-level = 3
+
+
 
 [profile.dev.overrides."*"]
 opt-level = 3

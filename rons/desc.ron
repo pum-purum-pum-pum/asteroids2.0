@@ -4,6 +4,7 @@
         (
             ship_stats: (
                 thrust_force: 0.003,
+                maneuverability: Some(6.0),
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 1,
@@ -16,6 +17,7 @@
         (
             ship_stats: (
                 thrust_force: 0.003,
+                maneuverability: Some(6.0),
                 torque: 0.05,
                 health_regen: 0,
                 shield_regen: 1,
@@ -29,9 +31,10 @@
     player_guns: [
         MultyLazer((
             angle: 0.25,
+            lazers_limit: Some(3),
             lazers: [
                 Lazer(
-                    damage: 7,
+                    damage: 3,
                     active: false,
                     distance: 5,
                     current_distance: 8,
@@ -41,8 +44,9 @@
         ShotGun((
             recharge_state: 0,
             recharge_time: (secs: 0, nanos: 300_000_000),
-            bullets_damage: 30,
+            bullets_damage: 12,
             side_projectiles_number: 0,
+            side_projectiles_limit: Some(1),
             angle_shift: 0.25,
             bullet_speed: 0.5,
             bullet_size: 0.4,
@@ -53,8 +57,9 @@
         ShotGun((
             recharge_state: 0,
             recharge_time: (secs: 0, nanos: 500_000_000),
-            bullets_damage: 30,
+            bullets_damage: 12,
             side_projectiles_number: 1,
+            side_projectiles_limit: Some(1),
             angle_shift: 0.25,
             bullet_speed: 0.3,
             bullet_size: 0.2,
@@ -64,7 +69,7 @@
     ],
     enemies: [
         (
-            ai_kind: AI(kinds:[Follow, Aim]),
+            ai_kind: AI(kinds:[FollowRotate(spin: None), Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: (secs: 0, nanos: 400_000_000),
@@ -223,7 +228,7 @@
         ),
 
         (
-            ai_kind: AI(kinds:[Shoot, Follow, Aim]),
+            ai_kind: AI(kinds:[Shoot, FollowRotate(spin: None), Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: (secs: 0, nanos: 400_000_000),
@@ -251,7 +256,7 @@
 
 
         (
-            ai_kind: AI(kinds:[Follow, Aim]),
+            ai_kind: AI(kinds:[FollowRotate(spin: None), Aim]),
             gun_kind: ShotGun((
                 recharge_state: 0,
                 recharge_time: (secs: 3, nanos: 0),

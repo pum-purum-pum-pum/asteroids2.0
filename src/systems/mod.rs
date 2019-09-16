@@ -18,11 +18,11 @@ use shrev::EventChannel;
 use specs::prelude::*;
 use specs::Join;
 
-use crate::components::*;
-use crate::geometry::{generate_convex_polygon, Polygon, TriangulateFromCenter, EPS};
+use components::*;
+use geometry::{generate_convex_polygon, Polygon, TriangulateFromCenter, EPS};
 use gfx_h::{GeometryData, ParticlesData, Explosion, iso3_iso2};
-use crate::physics::CollisionId;
-use crate::sound::{PreloadedSounds, SoundData, MusicData, EFFECT_MAX_VOLUME};
+use physics::CollisionId;
+use sound::{PreloadedSounds, SoundData, MusicData, EFFECT_MAX_VOLUME};
 use crate::gui::{Primitive, PrimitiveKind, UI, Text};
 
 mod rendering;

@@ -297,23 +297,24 @@ impl<'a> System<'a> for ControlSystem {
             }
             info!("asteroids: started reading keys");
             for key in keys_channel.read(&mut self.reader) {
-                match key {
+                let mut thrust = match key {
                     Keycode::W => {
-                        let thrust = ship_stats.thrust_force * Vector3::new(0.0, -1.0, 0.0);
-                        *character_velocity.as_vector_mut() += thrust;
+                        ship_stats.thrust_force * Vector3::new(0.0, -1.0, 0.0)
                     }
                     Keycode::S => {
-                        let thrust = ship_stats.thrust_force * Vector3::new(0.0, 1.0, 0.0);
-                        *character_velocity.as_vector_mut() += thrust;
+                        ship_stats.thrust_force * Vector3::new(0.0, 1.0, 0.0)
                     }
                     Keycode::A => {
-                        let thrust = ship_stats.thrust_force * Vector3::new(-1.0, 0.0, 0.0);
-                        *character_velocity.as_vector_mut() += thrust;
+                        ship_stats.thrust_force * Vector3::new(-1.0, 0.0, 0.0)
                     }
                     Keycode::D => {
-                        let thrust = ship_stats.thrust_force * Vector3::new(1.0, 0.0, 0.0);
-                        *character_velocity.as_vector_mut() += thrust;
+                        ship_stats.thrust_force * Vector3::new(1.0, 0.0, 0.0)
                     }
+                    _ => {
+                        Vector3::new(0f32, 0f32, 0f32)
+                    }
+                };
+                match key {
                     Keycode::Space => {
                         *app_state = AppState::Play(PlayState::Upgrade)
                     }
@@ -327,9 +328,16 @@ impl<'a> System<'a> for ControlSystem {
                         dev_info.draw_telemetry = !dev_info.draw_telemetry;
                     }
                     _ => ()
-                    
+                };
+                let maneuverability = ship_stats.maneuverability.unwrap();
+                let depth = 30.0 * thrust.norm();
+                let scalar = thrust.normalize().dot(&*character_velocity.as_vector());
+                if scalar < depth {
+                    let x = scalar - depth;
+                    thrust *= maneuverability * (1.0 + x.abs() * x.abs().sqrt());
                 }
-            }
+                *character_velocity.as_vector_mut() += thrust;
+            };
             info!("asteroids: ended reading keys");
             if mouse_state.right {
                 let rotation = isometries.get(character).unwrap().0.rotation;
