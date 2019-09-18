@@ -14,22 +14,12 @@ crate-type = ["cdylib"]
 android_log = "*"
 log = "*"
 
-[workspace]
-members = [
-	"gfx_h", 
-	"common", 
-	"voronois", 
-	"telemetry", 
-	"geometry", 
-	"components", 
-	"sound", 
-	"physics"
-]
 
 [dependencies]
 components = {path = "components"}
 geometry = {path = "geometry"}
 physics = {path = "physics"}
+physics_system = {path = "physics_system"}
 sound = {path = "sound"}
 telemetry = {path = "telemetry"}
 common = {path = "common"}
@@ -73,6 +63,19 @@ features = ["image", "mixer"]
 opt-level = 0
 debug = true
 
+[workspace]
+exclude = ["physics_system"]
+members = [
+	"gfx_h", 
+	"common", 
+	"voronois", 
+	"telemetry", 
+	"geometry", 
+	"components", 
+	"sound", 
+	"physics",
+]
+
 [profile.dev.overrides.gfx_h]
 opt-level = 3
 
@@ -97,11 +100,18 @@ opt-level = 3
 [profile.dev.overrides.physics]
 opt-level = 3
 
+[profile.dev.overrides.physics_system]
+opt-level = 3
 
+[profile.dev.build-override]
+opt-level = 3
 
 [profile.dev.overrides."*"]
 opt-level = 3
 
+[profile.dev.overrides.nphysics2d]
+opt-level = 3
+codegen-units = 60
 
 # [profile.release]
 # lto = true

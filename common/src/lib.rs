@@ -32,6 +32,13 @@ pub use ncollide2d::query::ray_internal::ray::RayCast;
 unsafe impl<T> Send for ThreadPin<T> {}
 unsafe impl<T> Sync for ThreadPin<T> {}
 
+pub fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
+    Isometry3::new(
+        Vector3::new(iso2.translation.vector.x, iso2.translation.vector.y, 0f32),
+        Vector3::new(0f32, 0f32, iso2.rotation.angle()),
+    )
+}
+
 /// Allows safely implement Sync and Send for type T
 /// panics if called from another thread
 #[derive(Component)]

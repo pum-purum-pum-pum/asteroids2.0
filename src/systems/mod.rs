@@ -9,11 +9,10 @@ use std::time::{Instant, Duration};
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
 use ncollide2d::world::CollisionObjectHandle;
-use ncollide2d::query::{Ray, ContactManifold};
+use ncollide2d::query::{Ray};
 use nphysics2d::object::{Body, BodyStatus, BodyHandle};
 use nphysics2d::world::World;
-use nphysics2d::algebra::ForceType;
-use nphysics2d::algebra::Force2;
+
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::Join;
@@ -27,7 +26,6 @@ use crate::gui::{Primitive, PrimitiveKind, UI, Text};
 
 mod rendering;
 mod collision;
-mod physics_system;
 mod insert;
 mod ai;
 mod gameplay;
@@ -38,6 +36,7 @@ mod menu_rendering_system;
 mod score_table;
 mod upgrade_ui;
 mod kinematic;
+mod deadscreen;
 
 pub use collision::*;
 pub use rendering::*;
@@ -52,11 +51,10 @@ pub use menu_rendering_system::*;
 pub use score_table::*;
 pub use upgrade_ui::*;
 pub use kinematic::*;
+pub use deadscreen::*;
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const VELOCITY_MAX: f32 = 1f32;
-const MAX_TORQUE: f32 = 10f32;
-
 const SCREEN_AREA: f32 = 10f32;
 // it's a kludge -- TODO redo with camera and screen sizes
 
@@ -64,7 +62,7 @@ const SCREEN_AREA: f32 = 10f32;
 const PLAYER_AREA: f32 = 20f32;
 const ACTIVE_AREA: f32 = 40f32;
 // the same for NEBULAS
-const ASTEROIDS_MIN_NUMBER: usize = 100;
+const ASTEROIDS_MIN_NUMBER: usize = 50;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
@@ -74,7 +72,6 @@ const DAMAGED_RED: f32 = 0.2;
 
 const MAGNETO_RADIUS: f32 = 4f32;
 const COLLECT_RADIUS: f32 = 0.2;
-pub const DT: f32 =  1f32 / 60f32;
 const COIN_LIFETIME_SECS: u64 = 5;
 const EXPLOSION_LIFETIME_SECS: u64 = 1;
 const BLAST_LIFETIME_SECS: u64 = 1;
@@ -117,38 +114,6 @@ pub fn spawn_in_rectangle(min_w: f32, max_w: f32, min_h: f32, max_h: f32) -> Poi
 pub fn is_active(character_position: Point2, point: Point2, active_area: f32) -> bool {
     (point.x - character_position.x).abs() < active_area
         && (point.y - character_position.y).abs() < active_area
-}
-
-fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
-    Isometry3::new(
-        Vector3::new(iso2.translation.vector.x, iso2.translation.vector.y, 0f32),
-        Vector3::new(0f32, 0f32, iso2.rotation.angle()),
-    )
-}
-
-/// Calculate the shortest distance between two angles expressed in radians.
-///
-/// Based on https://gist.github.com/shaunlebron/8832585
-pub fn angle_shortest_dist(a0: f32, a1: f32) -> f32 {
-    let max = std::f32::consts::PI * 2.0;
-    let da = (a1 - a0) % max;
-    2.0 * da % max - da
-}
-
-/// Calculate spin for rotating the player's ship towards a given direction.
-///
-/// Inspired by proportional-derivative controllers, but approximated with just the current spin
-/// instead of error derivatives. Uses arbitrary constants tuned for player control.
-pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f32) -> f32 {
-    let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
-        rotation
-    } else {
-        -(-aim.x).atan2(-aim.y)
-    };
-
-    let angle_diff = angle_shortest_dist(rotation, target_rot);
-
-    (angle_diff * 10.0 - speed * 55.0)
 }
 
 fn get_collision_groups(kind: &EntityType) -> CollisionGroups {
@@ -369,14 +334,10 @@ fn blast_explode(
 
 pub fn to_menu(
     app_state: &mut Write<AppState>,
-    progress: &mut Write<Progress>,
-    score_table: &mut Vec<usize>
+    _progress: &mut Write<Progress>,
+    _score_table: &mut Vec<usize>
 ) {
-    **app_state = AppState::Menu;
-    // score_table.0 = score_table.0.sort()
-    score_table.push(progress.score);
-    score_table.sort_by(|a, b| b.cmp(a));
-    progress.score = 0;
+    **app_state = AppState::DeadScreen;
 }
 
 fn reflect(d: Vector2, n: Vector2) -> Vector2 {

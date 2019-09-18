@@ -380,6 +380,7 @@ pub enum PlayState {
 #[derive(Debug, Clone, Copy)]
 pub enum AppState {
     Menu,
+    DeadScreen,
     Play(PlayState),
     ScoreTable,
 }

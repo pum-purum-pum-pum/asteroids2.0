@@ -139,9 +139,6 @@ impl<'a> System<'a> for PhysicsSystem {
                     if applyed {
                         continue
                     }
-                    // if chains.get(*e1).is_some() && chains.get(*e2).is_some() {
-                    //     continue;
-                    // }
                     let (force1, force2, distance) = {
                         (
                             Force2::new(force_factor * (position1 - center).normalize(), 0.0), 

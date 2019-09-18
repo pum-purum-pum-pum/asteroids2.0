@@ -227,16 +227,6 @@ impl<'a> System<'a> for RenderingSystem {
             dev_info
         ) = data;
         let dims = viewport.dimensions();
-        let char_pos = if let Some((iso, vel, _)) = (&isometries, &velocities, &character_markers).join().next() {
-            canvas.update_observer(
-                Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
-                vel.0.norm() / VELOCITY_MAX,
-                Vector2::new(mouse.x01, mouse.y01).normalize()
-            );
-            iso.0.translation.vector
-        } else {
-            return
-        };
         flame::start("rendering");
         flame::start("clear");
         let mut frame = red::Frame::new(&gl);
@@ -253,42 +243,49 @@ impl<'a> System<'a> for RenderingSystem {
         flame::end("stencil");
         telegraph.update();
         flame::end("clear");
-        flame::start("shadow rendering");
-        for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
-            if visible(&*canvas, &iso.0, dims) {
-                let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
-                // light_poly.clip_one((*geom).clone(), pos);
-                let rotation = iso.0.rotation.euler_angles().2;
-                let rotation = Rotation2::new(rotation);
-                let shadow_triangulation = shadow_geometry(
-                    Point2::new(char_pos.x, char_pos.y),
-                    (*geom).clone(),
-                    pos,
-                    rotation
-                );
-                if let Some(shadow_triangulation) = shadow_triangulation {
-                    let geometry_data =  GeometryData::new(
-                        &gl, 
-                        &shadow_triangulation.points, 
-                        &shadow_triangulation.indicies)
-                    .unwrap();
-                    let iso = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
-                    // draw shadows
-                    canvas
-                        .render_geometry(
-                            &gl, &viewport,
-                            &mut frame,
-                            &geometry_data,
-                            &iso,
-                            RenderMode::StencilWrite,
-                            Point3::new(0f32, 0f32, 0f32)
-                        );
+        flame::start("background rendering");
+        if let Some((iso, vel, _)) = (&isometries, &velocities, &character_markers).join().next() {
+            canvas.update_observer(
+                Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                vel.0.norm() / VELOCITY_MAX,
+                Vector2::new(mouse.x01, mouse.y01).normalize()
+            );
+            let char_pos = iso.0.translation.vector;
+            flame::start("shadow rendering");
+            for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
+                if visible(&*canvas, &iso.0, dims) {
+                    let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
+                    // light_poly.clip_one((*geom).clone(), pos);
+                    let rotation = iso.0.rotation.euler_angles().2;
+                    let rotation = Rotation2::new(rotation);
+                    let shadow_triangulation = shadow_geometry(
+                        Point2::new(char_pos.x, char_pos.y),
+                        (*geom).clone(),
+                        pos,
+                        rotation
+                    );
+                    if let Some(shadow_triangulation) = shadow_triangulation {
+                        let geometry_data =  GeometryData::new(
+                            &gl, 
+                            &shadow_triangulation.points, 
+                            &shadow_triangulation.indicies)
+                        .unwrap();
+                        let iso = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
+                        // draw shadows
+                        canvas
+                            .render_geometry(
+                                &gl, &viewport,
+                                &mut frame,
+                                &geometry_data,
+                                &iso,
+                                RenderMode::StencilWrite,
+                                Point3::new(0f32, 0f32, 0f32)
+                            );
+                    }
                 }
             }
-        }
-        flame::end("shadow rendering");
-
-        flame::start("background rendering");
+            flame::end("shadow rendering");
+        };
         for (_entity, iso, image, size, _stars) in
             (&entities, &isometries, &image_ids, &sizes, &stars).join() {
             if visible(&*canvas, &iso.0, dims) {

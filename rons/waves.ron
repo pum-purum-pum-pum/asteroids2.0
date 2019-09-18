@@ -5,10 +5,15 @@
 			],
 			ships_number: 6,
 			const_distribution : [
-				("rift", 10),
-				("chain_standart", 1),
+
+				//("enemy1", 4),
+				//("enemy3", 4),
+				//("rift", 3),
+				//("kamikadze", 2),
+				//("chain_standart", 1),
 				("chain_lazer", 1),
-				("lazer_boss", 1)
+				//("lazer_boss", 1),
+				//("chain_lazer", 1),
 			],
 			iterations: 1
 		),

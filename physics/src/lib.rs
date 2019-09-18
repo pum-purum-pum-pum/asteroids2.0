@@ -7,7 +7,37 @@ use nphysics2d::volumetric::volumetric::Volumetric;
 use nphysics2d::world::World;
 use specs::Component;
 
+#[cfg(debug_assertions)]
+pub const PHYSICS_SIMULATION_TIME: f32 = 1.7;
+#[cfg(not(debug_assertions))]
 pub const PHYSICS_SIMULATION_TIME: f32 = 1.0;
+pub const DT: f32 =  1f32 / 60f32;
+pub const MAX_TORQUE: f32 = 10f32;
+
+/// Calculate the shortest distance between two angles expressed in radians.
+///
+/// Based on https://gist.github.com/shaunlebron/8832585
+pub fn angle_shortest_dist(a0: f32, a1: f32) -> f32 {
+    let max = std::f32::consts::PI * 2.0;
+    let da = (a1 - a0) % max;
+    2.0 * da % max - da
+}
+
+/// Calculate spin for rotating the player's ship towards a given direction.
+///
+/// Inspired by proportional-derivative controllers, but approximated with just the current spin
+/// instead of error derivatives. Uses arbitrary constants tuned for player control.
+pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f32) -> f32 {
+    let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
+        rotation
+    } else {
+        -(-aim.x).atan2(-aim.y)
+    };
+
+    let angle_diff = angle_shortest_dist(rotation, target_rot);
+
+    (angle_diff * 10.0 - speed * 55.0)
+}
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 #[repr(usize)]

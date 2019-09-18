@@ -31,17 +31,28 @@ use gfx_h::{
     effects::MenuParticles, GeometryData
 };
 use physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
+use physics_system::{PhysicsSystem};
 use sound::{init_sound, };
 use crate::systems::{
     AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
-    KinematicSystem, PhysicsSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
-    ScoreTableRendering, UpgradeGUI, GUISystem
+    KinematicSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
+    ScoreTableRendering, UpgradeGUI, GUISystem, DeadScreen
 };
 use glyph_brush::{*};
 use crate::gui::{UI, Primitive};
 
 
 const NEBULAS_NUM: usize = 3usize;
+
+pub fn just_read(file: &str) -> Result<String, String> {
+    let mut rw = RWops::from_file(Path::new(&file), "r")?;
+    let mut desc_str = String::new();
+    if let Ok(_) = rw.read_to_string(&mut desc_str) {
+        Ok(desc_str)
+    } else {
+        Err("failed to read file".to_string())
+    }
+}
 
 pub fn run() -> Result<(), String> {
     // LOGGING
@@ -65,7 +76,7 @@ pub fn run() -> Result<(), String> {
         let _guard = slog_scope::set_global_logger(logger);
 
         // register slog_stdlog as the log handler with the log crate
-        // slog_stdlog::init().unwrap();
+        slog_stdlog::init().unwrap();
     info!("asteroids: logging crazyness");
     let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
     let mut telegraph = TeleGraph::new(Duration::from_secs(10));
@@ -108,6 +119,7 @@ pub fn run() -> Result<(), String> {
         gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
         gl_attr.set_context_version(3, 0);
     }
+
     #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
     {
         gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
@@ -277,12 +289,12 @@ pub fn run() -> Result<(), String> {
     let mut name_to_animation = HashMap::new();
     { // load animations
         let animations = [
-            "explosion",
-            "explosion2",
-            "blast2",
-            "bullet_contact",
+            ("explosion", 7),
+            ("explosion2", 7),
+            ("blast2", 7),
+            ("bullet_contact", 1),
         ];
-        for animation_name in animations.iter() {
+        for (animation_name, ticks) in animations.iter() {
             // let animation_full = &format!("assets/{}", animation_name);
             let mut frames = vec![];
             for i in 1..100 {
@@ -299,7 +311,7 @@ pub fn run() -> Result<(), String> {
                         .build();        
                     let animation_frame = AnimationFrame {
                         image: Image(image),
-                        ticks: 1
+                        ticks: *ticks
                     };
                     frames.push(animation_frame);
                 } else {break};
@@ -408,7 +420,10 @@ pub fn run() -> Result<(), String> {
             #[serde(default)] 
             pub rift: Option<Rift>,
         };
-        // let file = File::open("desc.ron").unwrap();
+        #[cfg(not(target_os = "android"))]
+        let file = just_read("rons/desc.ron").unwrap();
+        let file = &file;
+        #[cfg(target_os = "android")]
         let file = include_str!("../rons/desc.ron");
         let desc: DescriptionSave = match from_str(file) {
             Ok(x) => x,
@@ -445,8 +460,6 @@ pub fn run() -> Result<(), String> {
         ).collect();
         let avaliable_upgrades = upgrades;
         specs_world.add_resource(avaliable_upgrades);
-
-        // let file = File::open("waves.ron").unwrap();
         pub fn wave_load(wave: &WaveSave, enemy_name_to_id: &HashMap<String, usize>) -> Wave {
             let distribution: Vec<(usize, f32)> = 
                 wave.distribution
@@ -465,8 +478,10 @@ pub fn run() -> Result<(), String> {
                 iterations: wave.iterations
             }
         }
-
+        #[cfg(target_os = "android")]
         let file = include_str!("../rons/waves.ron");
+        #[cfg(not(target_os = "android"))]
+        let file = &just_read("rons/waves.ron").unwrap();
         let waves: WavesSave = match from_str(file) {
             Ok(x) => x,
             Err(e) => {
@@ -537,6 +552,10 @@ pub fn run() -> Result<(), String> {
     let insert_system = InsertSystem::new(insert_channel.register_reader());
     let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
     let menu_rendering_system = MenuRenderingSystem::new(primitives_channel.register_reader());
+    let dead_screen_system = DeadScreen::default();
+    let mut dead_screen_dispatcher = DispatcherBuilder::new()
+        .with_thread_local(dead_screen_system)
+        .build();
     let mut menu_dispatcher = DispatcherBuilder::new()
         .with_thread_local(menu_rendering_system)
         .build();
@@ -737,9 +756,9 @@ pub fn run() -> Result<(), String> {
         }
         flame::end("control crazyness");
         let app_state = *specs_world.read_resource::<AppState>();
+        dbg!(&app_state);
         match app_state {
             AppState::Menu => {
-                info!("asteroids: menu dispatcher");
                 menu_dispatcher.dispatch(&specs_world.res)
             }
             AppState::Play(play_state) => {
@@ -762,6 +781,11 @@ pub fn run() -> Result<(), String> {
             }
             AppState::ScoreTable => {
                 score_table_dispatcher.dispatch(&specs_world.res);
+            }
+            AppState::DeadScreen => {
+                info!("dead screen");
+                dead_screen_dispatcher.dispatch(&specs_world.res);
+                rendering_dispatcher.dispatch(&specs_world.res);
             }
         }
         info!("asteroids: insert dispatcher");

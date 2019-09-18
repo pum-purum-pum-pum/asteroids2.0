@@ -77,7 +77,7 @@ impl<'a> System<'a> for InsertSystem {
                     ship_stats
                 } => {
                     *progress = Progress::default();
-                    let char_size = 0.4f32;
+                    let char_size = 0.5f32;
                     let character_shape = Geometry::Circle { radius: char_size };
                     let enemy_size = 0.4f32;
                     let _enemy_shape = Geometry::Circle { radius: enemy_size };

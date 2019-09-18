@@ -184,7 +184,7 @@
                 side_projectiles_number: 0,
                 angle_shift: 0.25,
                 bullet_speed: 0.2,
-                bullet_size: 0.2,
+                bullet_size: 0.4,
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),
@@ -273,7 +273,7 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 0,
-                max_health: 50,
+                max_health: 70,
                 max_shield: 0,
                 damage: 100
             ),
@@ -291,8 +291,8 @@
                 side_projectiles_number: 4,
                 angle_shift: 0.35,
                 bullet_speed: 0.08,
-                bullet_size: 0.2,
-                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_size: 0.4,
+                bullet_lifetime: (secs: 2, nanos: 200_000_000),
                 bullet_image: "enemy_shotgun_projectile"
             )),
             ship_stats: (
@@ -366,10 +366,11 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 0,
-                max_health: 700,
+                max_health: 300,
                 max_shield: 0,
                 damage: 10
             ),
+            rift: Some((distance: 8, lazers: [])),
             size: 1.5,
             image_name: "lazer_boss",
         ),

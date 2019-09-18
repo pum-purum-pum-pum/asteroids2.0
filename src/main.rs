@@ -1,7 +1,3 @@
-mod components;
-mod geometry;
-mod physics;
-mod sound;
 mod systems;
 #[cfg(test)]
 mod test;

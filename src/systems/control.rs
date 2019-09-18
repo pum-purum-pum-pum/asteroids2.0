@@ -1,13 +1,23 @@
+use sdl2::keyboard::{Keycode, Scancode};
+use std::collections::HashSet;
+
 pub use super::*;
+use physics::*;
 use log::info;
 
 pub struct ControlSystem {
     reader: ReaderId<Keycode>,
+    prev_keys: HashSet<Keycode>,
+    new_keys: HashSet<Keycode>,
 }
 
 impl ControlSystem {
     pub fn new(reader: ReaderId<Keycode>) -> Self {
-        ControlSystem { reader: reader }
+        ControlSystem { 
+            reader: reader,
+            prev_keys: HashSet::new(),
+            new_keys: HashSet::new(),
+        }
     }
 }
 
@@ -296,7 +306,20 @@ impl<'a> System<'a> for ControlSystem {
                 }
             }
             info!("asteroids: started reading keys");
+            // for key in keys_channel.read(&mut self.reader) {
+            //     self.new_keys.insert(*key);
+            // }
+            // for key in new_pressed.iter() {
+            //     match key {
+            //         Keycode::Space => {
+
+            //         }
+            //     }
+            // }
+            self.prev_keys = self.new_keys.clone();
+            self.new_keys.clear();
             for key in keys_channel.read(&mut self.reader) {
+                self.new_keys.insert(*key);
                 let mut thrust = match key {
                     Keycode::W => {
                         ship_stats.thrust_force * Vector3::new(0.0, -1.0, 0.0)
@@ -315,17 +338,11 @@ impl<'a> System<'a> for ControlSystem {
                     }
                 };
                 match key {
-                    Keycode::Space => {
-                        *app_state = AppState::Play(PlayState::Upgrade)
-                    }
                     Keycode::LeftBracket => {
                         canvas.z_far -= 0.5;
                     }
                     Keycode::RightBracket => {
                         canvas.z_far += 0.5;
-                    }
-                    Keycode::T => {
-                        dev_info.draw_telemetry = !dev_info.draw_telemetry;
                     }
                     _ => ()
                 };
@@ -338,6 +355,18 @@ impl<'a> System<'a> for ControlSystem {
                 }
                 *character_velocity.as_vector_mut() += thrust;
             };
+            let new_pressed = &self.new_keys - &self.prev_keys;
+            for key in new_pressed.iter() {
+                match key {
+                    Keycode::Space => {
+                        *app_state = AppState::Play(PlayState::Upgrade)
+                    }
+                    Keycode::T => {
+                        dev_info.draw_telemetry = !dev_info.draw_telemetry;
+                    }
+                    _ => ()
+                }
+            }
             info!("asteroids: ended reading keys");
             if mouse_state.right {
                 let rotation = isometries.get(character).unwrap().0.rotation;

@@ -188,7 +188,6 @@ impl<'a> System<'a> for GamePlaySystem {
                                     );
                                 }
                                 if is_character {
-                                    // *app_state = AppState::Menu;
                                     to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
                                 }
                                 // delete character
