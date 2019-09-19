@@ -3,6 +3,15 @@
 		(
 			distribution: [
 			],
+			ships_number: 15,
+			const_distribution : [
+				("chain_lazer", 1),
+			],
+			iterations: 1
+		),
+		(
+			distribution: [
+			],
 			ships_number: 6,
 			const_distribution : [
 
@@ -16,15 +25,6 @@
 				//("chain_lazer", 1),
 				//("lazer_boss", 1),
 				//("chain_lazer", 1),
-			],
-			iterations: 1
-		),
-		(
-			distribution: [
-			],
-			ships_number: 15,
-			const_distribution : [
-				("chain_lazer", 1),
 			],
 			iterations: 1
 		),

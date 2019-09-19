@@ -12,6 +12,7 @@ impl<'a> System<'a> for DeadScreen {
         Write<'a, UI>,
         Write<'a, AppState>,
         Write<'a, CurrentWave>,
+        Write<'a, SpawnedUpgrades>,
         Read<'a, Mouse>,
         WriteExpect<'a, PreloadedImages>,
         ReadStorage<'a, ShipMarker>,
@@ -27,6 +28,7 @@ impl<'a> System<'a> for DeadScreen {
             mut ui,
             mut app_state,
             mut current_wave,
+            mut spawned_upgrades,
             mouse,
             preloaded_images,
             ship_markers,
@@ -61,6 +63,7 @@ impl<'a> System<'a> for DeadScreen {
             for (entity, _asteroid_marker) in (&entities, &asteroid_markers).join() {
                 entities.delete(entity).unwrap();
             }
+            *spawned_upgrades = vec![];
             *app_state = AppState::Menu;
             macro_game.score_table.push(progress.score);
             macro_game.score_table.sort_by(|a, b| b.cmp(a));

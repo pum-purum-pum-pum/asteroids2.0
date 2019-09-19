@@ -51,6 +51,7 @@
             bullet_speed: 0.5,
             bullet_size: 0.4,
             reflection: None,
+            bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 1, nanos: 200_000_000),
             bullet_image: "player_projectile"
         )),
@@ -63,6 +64,7 @@
             angle_shift: 0.25,
             bullet_speed: 0.3,
             bullet_size: 0.2,
+            bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 0, nanos: 500_000_000),
             bullet_image: "player_projectile"
         )),
@@ -78,6 +80,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.2,
                 bullet_size: 0.2,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),
@@ -105,6 +108,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.5,
                 bullet_size: 0.2,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),
@@ -133,7 +137,8 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.2,
                 bullet_size: 0.7,
-                reflection: Some((speed: 0.2)),
+                reflection: Some((speed: 0.2, lifetime: (secs:3, nanos: 000_000_000))),
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 5, nanos: 200_000_000),
                 bullet_image: "reflect_bullet"
             )),
@@ -159,6 +164,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.5,
                 bullet_size: 0.2,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),
@@ -185,6 +191,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.2,
                 bullet_size: 0.4,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),
@@ -237,6 +244,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.2,
                 bullet_size: 0.2,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),
@@ -265,6 +273,7 @@
                 angle_shift: 0.35,
                 bullet_speed: 0.08,
                 bullet_size: 0.2,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_shotgun_projectile"
             )),
@@ -273,7 +282,7 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 0,
-                max_health: 70,
+                max_health: 30,
                 max_shield: 0,
                 damage: 100
             ),
@@ -292,6 +301,7 @@
                 angle_shift: 0.35,
                 bullet_speed: 0.08,
                 bullet_size: 0.4,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 2, nanos: 200_000_000),
                 bullet_image: "enemy_shotgun_projectile"
             )),
@@ -386,6 +396,7 @@
                 bullet_speed: 0.1,
                 bullet_size: 0.2,
                 bullet_lifetime: (secs: 2, nanos: 200_000_000),
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_image: "enemy_projectile"
             )),
             ship_stats: (
@@ -434,6 +445,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.1,
                 bullet_size: 0.2,
+                bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "enemy_projectile"
             )),

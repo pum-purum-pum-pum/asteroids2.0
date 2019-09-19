@@ -249,7 +249,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     gun_kind: gun.clone(), 
                     ship_stats: description.player_ships[ship].ship_stats
                 });
-                // ui_state.chosed_gun = None;
                 *avaliable_upgrades = get_avaliable_cards(
                     &upgrade_cards_raw,
                     &gun.clone(),
@@ -258,16 +257,5 @@ impl<'a> System<'a> for MenuRenderingSystem {
             }
         }
         primitives_channel.iter_write(ui.primitives.drain(..));
-        // render_primitives(
-        //     &mouse,
-        //     &mut self.reader,
-        //     &mut frame,
-        //     &image_datas,
-        //     &gl,
-        //     &mut canvas,
-        //     &viewport,
-        //     &mut primitives_channel,
-        //     &mut text_data,
-        // );
     }
 }

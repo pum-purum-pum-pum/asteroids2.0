@@ -690,6 +690,7 @@ pub struct Projectile {
 #[derive(Component, Default, Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct Reflection {
     pub speed: f32,
+    pub lifetime: Duration,
 }
 
 #[derive(Component)]
@@ -986,6 +987,7 @@ pub struct ShotGun {
     pub bullet_size: f32,
     pub reflection: Option<Reflection>,
     pub bullet_lifetime: Duration,
+    pub bullet_reflection_lifetime: Duration,
     pub bullet_image: Image
 }
 
@@ -1000,6 +1002,7 @@ pub struct ShotGunSave {
     pub bullet_size: f32,
     pub reflection: Option<Reflection>,
     pub bullet_lifetime: Duration,
+    pub bullet_reflection_lifetime: Duration,
     pub bullet_image: String
 }
 
@@ -1014,6 +1017,7 @@ impl ShotGunSave {
             self.bullet_speed,
             self.bullet_size,
             self.reflection,
+            self.bullet_reflection_lifetime,
             self.bullet_lifetime,
             Image(name_to_image[&self.bullet_image])
         )
@@ -1030,6 +1034,7 @@ impl ShotGun {
         bullet_speed: f32,
         bullet_size: f32,
         reflection: Option<Reflection>,
+        bullet_reflection_lifetime: Duration,
         bullet_lifetime: Duration,
         bullet_image: Image,
     ) -> Self {
@@ -1043,6 +1048,7 @@ impl ShotGun {
             bullet_speed: bullet_speed,
             bullet_size: bullet_size,
             reflection: reflection,
+            bullet_reflection_lifetime: bullet_reflection_lifetime,
             bullet_lifetime: bullet_lifetime,
             bullet_image: bullet_image
         }

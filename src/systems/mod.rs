@@ -346,31 +346,6 @@ fn reflect(d: Vector2, n: Vector2) -> Vector2 {
     d - 2.0 * (d.dot(&n)) * n
 }
 
-fn reflect_bullet(
-    projectile: specs::Entity,
-    physics_components: &ReadStorage<PhysicsComponent>,
-    world: &mut Write<World<f32>>,
-    reflection: &Reflection,
-    normal: Vector2
-) {
-    let physics_component = physics_components.get(projectile).unwrap();
-    let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
-    let position = body.position();
-    let mut velocity = *body.velocity();
-    let vel = reflection.speed * reflect(velocity.linear, normal.normalize()).normalize();
-    *velocity.as_vector_mut() = Vector3::new(vel.x, vel.y, 0.0);
-    let standart = Vector2::new(0.0, -1.0);
-    let alpha = Rotation2::rotation_between(&standart, &velocity.linear).angle();
-    let position = Isometry2::new(
-        Vector2::new(position.translation.vector.x, position.translation.vector.y),
-        alpha
-    );
-    body.set_position(position);
-    body.set_velocity(velocity);
-
-}
-
-
 fn get_min_dist(
     world: &mut Write<World<f32>>, 
     ray: Ray<f32>, 

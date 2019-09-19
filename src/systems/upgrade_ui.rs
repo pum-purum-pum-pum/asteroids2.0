@@ -53,11 +53,12 @@ impl<'a> System<'a> for UpgradeGUI {
         let upgrade_button_h = upgrade_button_w;
         let (choose_button_w, choose_button_h) = (w/6f32, h/10f32);
         let shift = upgrade_button_h / 10f32;
-
+        // dbg!(avaliable_upgrades.len());
         match *app_state {
             AppState::Play(PlayState::Upgrade) => {
                 let mut buttons = vec![];
                 let upgrades = spawned_upgrades.last();
+                // dbg!(&upgrades);
                 if let Some(upgrades) = upgrades {
                     let widget_ids = [Widgets::Upgrade1, Widgets::Upgrade2];
                     for (i, upg_id) in upgrades.iter().enumerate() {
@@ -176,9 +177,10 @@ impl<'a> System<'a> for UpgradeGUI {
                     UpgradeType::BulletReflection => {
                         if let Some(gun) = shotguns.get_mut(character) {
                             if let Some(ref mut reflection) = gun.reflection {
-                                reflection.speed += 0.5;
+                                // reflection.speed += 0.5;
+                                reflection.lifetime += Duration::from_millis(200);
                             } else {
-                                gun.reflection = Some(Reflection{speed: 0.4})
+                                gun.reflection = Some(Reflection{speed: 0.4, lifetime: Duration::from_millis(1500)})
                             }
                         }
                     }
