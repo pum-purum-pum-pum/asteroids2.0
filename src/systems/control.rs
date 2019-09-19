@@ -306,16 +306,6 @@ impl<'a> System<'a> for ControlSystem {
                 }
             }
             info!("asteroids: started reading keys");
-            // for key in keys_channel.read(&mut self.reader) {
-            //     self.new_keys.insert(*key);
-            // }
-            // for key in new_pressed.iter() {
-            //     match key {
-            //         Keycode::Space => {
-
-            //         }
-            //     }
-            // }
             self.prev_keys = self.new_keys.clone();
             self.new_keys.clear();
             for key in keys_channel.read(&mut self.reader) {

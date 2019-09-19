@@ -34,7 +34,7 @@ use physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
 use physics_system::{PhysicsSystem};
 use sound::{init_sound, };
 use crate::systems::{
-    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, InsertSystem,
+    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, CommonRespawn, InsertSystem,
     KinematicSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
     ScoreTableRendering, UpgradeGUI, GUISystem, DeadScreen
 };
@@ -241,7 +241,7 @@ pub fn run() -> Result<(), String> {
         "player_projectile",
         "enemy1",
         "kamikadze",
-        "enemy3",
+        "buckshot",
         "reflect_bullet_enemy",
         "lazer",
         "play",
@@ -505,7 +505,7 @@ pub fn run() -> Result<(), String> {
         asteroid: name_to_image["asteroid"],
         enemy: name_to_image["enemy1"],
         enemy2: name_to_image["kamikadze"],
-        enemy3: name_to_image["enemy3"],
+        enemy3: name_to_image["buckshot"],
         enemy4: name_to_image["lazer"],
         background: name_to_image["back"],
         nebulas: nebula_images,
@@ -549,21 +549,28 @@ pub fn run() -> Result<(), String> {
         movement: movement_particles_entity,
     };
 
+    let physics_system = PhysicsSystem::default();
     let insert_system = InsertSystem::new(insert_channel.register_reader());
     let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
+    let rendering_system2 = RenderingSystem::new(primitives_channel.register_reader());
     let menu_rendering_system = MenuRenderingSystem::new(primitives_channel.register_reader());
     let dead_screen_system = DeadScreen::default();
+    let common_respawn = CommonRespawn::default();
     let mut dead_screen_dispatcher = DispatcherBuilder::new()
+        .with(common_respawn.clone(), "common_respawn", &[])
+        .with_thread_local(physics_system.clone())
         .with_thread_local(dead_screen_system)
         .build();
     let mut menu_dispatcher = DispatcherBuilder::new()
+        .with(common_respawn.clone(), "common_respawn", &[])
         .with_thread_local(menu_rendering_system)
+        .with_thread_local(rendering_system2)
+        .with_thread_local(physics_system.clone())
         .build();
     let score_table_system = ScoreTableRendering::new(primitives_channel.register_reader());
     let mut score_table_dispatcher = DispatcherBuilder::new()
         .with_thread_local(score_table_system)
         .build();
-    let phyiscs_system = PhysicsSystem::default();
     let sound_system = SoundSystem::new(sounds_channel.register_reader());
     let control_system = ControlSystem::new(keys_channel.register_reader());
     let gameplay_sytem = GamePlaySystem::default();
@@ -623,10 +630,11 @@ pub fn run() -> Result<(), String> {
         // .with(control_system, "control_system", &[])
         .with_thread_local(control_system)
         .with(gameplay_sytem, "gameplay_system", &[])
+        .with(common_respawn, "common_respawn", &[])
         .with(ai_system, "ai_system", &[])
         .with(collision_system, "collision_system", &["ai_system"])
         .with(
-            phyiscs_system,
+            physics_system,
             "physics_system",
             &[
                 // "kinematic_system",
@@ -751,12 +759,11 @@ pub fn run() -> Result<(), String> {
                             }
                         }
                     }
-                }
+                }   
             }
         }
         flame::end("control crazyness");
         let app_state = *specs_world.read_resource::<AppState>();
-        dbg!(&app_state);
         match app_state {
             AppState::Menu => {
                 menu_dispatcher.dispatch(&specs_world.res)

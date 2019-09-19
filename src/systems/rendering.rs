@@ -13,6 +13,7 @@ use super::*;
 use crate::gui::VecController;
 use glyph_brush::{Section, rusttype::Scale};
 use geometry::{shadow_geometry};
+use physics_system::MENU_VELOCITY;
 
 const BUTTON_SCALE: f32 = 1.2;
 
@@ -379,7 +380,12 @@ impl<'a> System<'a> for RenderingSystem {
             };
         }
 
-        for (iso, vel, _char_marker) in (&isometries, &velocities, &character_markers).join() {
+        let (iso, vel) = if let Some((iso, vel, _char_marker)) = (&isometries, &velocities, &character_markers).join().next() {
+            (*iso, *vel)
+        } else {
+            (Isometry::new(0f32, 0f32, 0f32), Velocity::new(MENU_VELOCITY.0, MENU_VELOCITY.1))
+        };
+        {
             let translation_vec = iso.0.translation.vector;
             let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             let pure_isometry = isometry.clone();

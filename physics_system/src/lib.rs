@@ -10,8 +10,9 @@ use nphysics2d::object::{Body, BodyStatus, BodyHandle};
 use nphysics2d::algebra::ForceType;
 use nphysics2d::algebra::Force2;
 use physics::*;
+pub const MENU_VELOCITY: (f32, f32) = (0.0, 0.2);
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct PhysicsSystem;
 
 impl<'a> System<'a> for PhysicsSystem {
@@ -59,7 +60,10 @@ impl<'a> System<'a> for PhysicsSystem {
                     ).unwrap();
                 (*body.position(), *isometry)
             } else {
-                return
+                (
+                	Isometry2::new(Vector2::new(MENU_VELOCITY.0 ,MENU_VELOCITY.1), 0f32),
+                	Isometry::new(0f32, 0f32, 0f32),
+                )
             }
         };
         info!("asteroids: physics started");
@@ -168,7 +172,7 @@ impl<'a> System<'a> for PhysicsSystem {
             let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
             let mut physics_isometry = *body.position();
             // MOVE THE WORLD, NOT ENTITIES
-            physics_isometry.translation.vector -= character_position.translation.vector;
+            physics_isometry.translation.vector -= char_vec;
             body.set_position(physics_isometry);
             let physics_velocity = body.velocity().as_vector();
             let physics_velocity = Vector2::new(physics_velocity.x, physics_velocity.y);

@@ -37,6 +37,7 @@ mod score_table;
 mod upgrade_ui;
 mod kinematic;
 mod deadscreen;
+mod common_respawn;
 
 pub use collision::*;
 pub use rendering::*;
@@ -52,6 +53,7 @@ pub use score_table::*;
 pub use upgrade_ui::*;
 pub use kinematic::*;
 pub use deadscreen::*;
+pub use common_respawn::*;
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const VELOCITY_MAX: f32 = 1f32;

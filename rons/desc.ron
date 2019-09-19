@@ -305,7 +305,7 @@
                 damage: 10
             ),
             size: 0.4,
-            image_name: "enemy3",
+            image_name: "buckshot",
         ),
 
         (

@@ -103,7 +103,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 ),
                 button_w,
                 button_h,
-                Some(Point3::new(0f32, 0f32, 0f32)),
+                None,
                 false,
                 Some(Image(button_images[i])),
                 buttons_names[i].to_string(),
@@ -148,7 +148,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     button_position,
                     button_w,
                     button_h,
-                    Some(Point3::new(0f32, 0f32, 0f32)),
+                    None,
                     false,
                     Some(ship.image),
                     "".to_string(),
@@ -160,7 +160,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     button_position,
                     button_w,
                     button_h,
-                    Some(Point3::new(0f32, 0f32, 0f32)),
+                    None,
                     false,
                     Some(ship.image),
                     format!("{} $", description.ship_costs[i]),
@@ -208,7 +208,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Point2::new(w / 2.0, 1.5 * button_h + shift_between),
             button_w,
             button_h / 5.0,
-            Some(Point3::new(0f32, 0f32, 0f32)),
+            None,
             false,
             Some(Image(preloaded_images.upg_bar)),
             "Score Table".to_string(),
@@ -249,7 +249,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     gun_kind: gun.clone(), 
                     ship_stats: description.player_ships[ship].ship_stats
                 });
-                ui_state.chosed_gun = None;
+                // ui_state.chosed_gun = None;
                 *avaliable_upgrades = get_avaliable_cards(
                     &upgrade_cards_raw,
                     &gun.clone(),
@@ -258,16 +258,16 @@ impl<'a> System<'a> for MenuRenderingSystem {
             }
         }
         primitives_channel.iter_write(ui.primitives.drain(..));
-        render_primitives(
-            &mouse,
-            &mut self.reader,
-            &mut frame,
-            &image_datas,
-            &gl,
-            &mut canvas,
-            &viewport,
-            &mut primitives_channel,
-            &mut text_data,
-        );
+        // render_primitives(
+        //     &mouse,
+        //     &mut self.reader,
+        //     &mut frame,
+        //     &image_datas,
+        //     &gl,
+        //     &mut canvas,
+        //     &viewport,
+        //     &mut primitives_channel,
+        //     &mut text_data,
+        // );
     }
 }
