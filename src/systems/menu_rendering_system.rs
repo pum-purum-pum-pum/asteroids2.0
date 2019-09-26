@@ -170,6 +170,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 Widgets::LockedLazerGun => {
                     if macro_game.coins >= description.gun_costs[1] {
                         macro_game.guns_unlocked[1] = true;
+                        sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
                         macro_game.coins -= description.gun_costs[1];
                         ui_state.chosed_gun = Some(description.player_guns[1].clone());
                     }
@@ -239,6 +240,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 Widgets::LockedHeavyShip => {
                     if macro_game.coins >= description.ship_costs[1] {
                         macro_game.ships_unlocked[1] = true;
+                        sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
                         macro_game.coins -= description.ship_costs[1];
                     }
                 }

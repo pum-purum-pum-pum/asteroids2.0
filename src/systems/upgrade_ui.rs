@@ -22,6 +22,7 @@ impl<'a> System<'a> for UpgradeGUI {
         Write<'a, SpawnedUpgrades>,
         WriteExpect<'a, UIState>,
         ReadExpect<'a, Pallete>,
+        ReadExpect<'a, PreloadedSounds>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -42,7 +43,8 @@ impl<'a> System<'a> for UpgradeGUI {
             avaliable_upgrades,
             mut spawned_upgrades,
             mut ui_state,
-            _pallete
+            _pallete,
+            preloaded_sounds,
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -86,8 +88,8 @@ impl<'a> System<'a> for UpgradeGUI {
                     Some(upg.image),
                     "".to_string(),
                     widget_ids[i] as usize,
-                    None,
-                    None,
+                    Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
+                    Some(Sound(preloaded_sounds.click, Point2::new(0f32, 0f32))),
                 );
                 ui.primitives.push(
                     Primitive {
@@ -128,8 +130,8 @@ impl<'a> System<'a> for UpgradeGUI {
             Some(Image(preloaded_images.upg_bar)),
             "Upgrade!".to_string(),
             Widgets::Upgrade as usize,
-            None,
-            None,
+            Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
+            Some(Sound(preloaded_sounds.click, Point2::new(0f32, 0f32))),
         );
 
         if spawned_upgrades.len() > 0 {
@@ -158,8 +160,8 @@ impl<'a> System<'a> for UpgradeGUI {
             Some(Image(preloaded_images.upg_bar)),
             "Done".to_string(),
             Widgets::Done as usize,
-            None,
-            None,
+            Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
+            Some(Sound(preloaded_sounds.click, Point2::new(0f32, 0f32))),
         );
         if done_button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::Play(PlayState::Action);

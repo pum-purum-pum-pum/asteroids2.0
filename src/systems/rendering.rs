@@ -186,7 +186,8 @@ impl<'a> System<'a> for RenderingSystem {
         Write<'a, UI>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
         WriteExpect<'a, GlobalParams>,
-        ReadExpect<'a, DevInfo>
+        ReadExpect<'a, DevInfo>,
+        Write<'a, EventChannel<Sound>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -229,7 +230,8 @@ impl<'a> System<'a> for RenderingSystem {
             mut ui,
             mut text_data,
             mut global_params,
-            dev_info
+            dev_info,
+            mut sounds_channel,
         ) = data;
         let dims = viewport.dimensions();
         flame::start("rendering");
@@ -633,6 +635,7 @@ impl<'a> System<'a> for RenderingSystem {
         flame::end("animation");
         flame::start("primitives rendering");
         primitives_channel.iter_write(ui.primitives.drain(..));
+        sounds_channel.iter_write(ui.sounds.drain(..));
         render_primitives(
             &mouse,
             &mut self.reader,

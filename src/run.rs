@@ -843,7 +843,7 @@ pub fn run() -> Result<(), String> {
                     let file = "rons/macro_game.ron";
                     // let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
                     eprintln!("{}", s);
-                    if let Ok(mut rw) = RWops::from_file(Path::new(&file), "r+") {
+                    if let Ok(mut rw) = RWops::from_file(Path::new(&file), "w+") {
                         rw.write(s.as_bytes()).expect("failed to load macro game");
                     } else {
                         let mut rw = RWops::from_file(Path::new(&file), "w").expect("failed to load macro game");

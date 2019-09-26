@@ -2,16 +2,6 @@
 	[
 		(
 			distribution: [
-			],
-			ships_number: 6,
-			const_distribution : [
-				("lazer_boss", 1),
-				("rift", 5),
-			],
-			iterations: 1
-		),
-		(
-			distribution: [
 				("kamikadze", 0.5),
 				("bomberman", 0.5),
 			],

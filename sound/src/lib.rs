@@ -63,7 +63,8 @@ pub struct PreloadedSounds {
     pub hover: specs::Entity,
     pub click: specs::Entity,
     pub play: specs::Entity,
-    pub deny: specs::Entity
+    pub deny: specs::Entity,
+    pub buy: specs::Entity,
 }
 
 pub struct MusicData<'a> {
@@ -146,6 +147,7 @@ pub fn init_sound<'a>(
         click: name_to_sound["click"],
         play: name_to_sound["play"],
         deny: name_to_sound["deny"],
+        buy: name_to_sound["buy"],
     };
     let mut name_to_music: HashMap<String, Music> = HashMap::new();
     {   // load music
