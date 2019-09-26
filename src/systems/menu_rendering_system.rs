@@ -287,7 +287,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             "Play".to_string(),
             Widgets::Play as usize,
             Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
-            Some(Sound(preloaded_sounds.click, Point2::new(0f32, 0f32))),
+            Some(Sound(preloaded_sounds.play, Point2::new(0f32, 0f32))),
         );
         if let (Some(ship), Some(gun)) = (ui_state.chosed_ship.clone(), ui_state.chosed_gun.clone()) {
             if button.place_and_check(&mut ui, &*mouse) {
