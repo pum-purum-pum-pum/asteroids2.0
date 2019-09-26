@@ -116,6 +116,7 @@ pub struct UI {
     #[cfg(any(target_os = "android"))]
     widget_finger: [Option<usize>; FINGER_NUMBER],
     pub primitives: Vec<Primitive>,
+    pub sounds: Vec<Sound>
 }
 
 pub struct Selector {
@@ -124,7 +125,7 @@ pub struct Selector {
     pub mask: Option<Vec<bool>>
 }
 
-impl  Selector {
+impl Selector {
     pub fn place_and_check(
         &self, 
         ui: &mut UI,
@@ -156,7 +157,9 @@ pub struct Button {
     with_projection: bool,
     pub image: Option<Image>,
     text: String,
-    id: usize 
+    id: usize,
+    hover_sound: Option<Sound>,
+    click_sound: Option<Sound>,
 }
 
 #[derive(Clone)]
@@ -206,6 +209,8 @@ impl Button {
         image: Option<Image>, 
         text: String,
         id: usize,
+        hover_sound: Option<Sound>,
+        click_sound: Option<Sound>,
     ) -> Button {
         Button {
             position: position,
@@ -215,7 +220,9 @@ impl Button {
             with_projection: with_projection,
             image: image,
             text: text,
-            id: id
+            id: id,
+            hover_sound: hover_sound,
+            click_sound: click_sound
         }
     }
 
@@ -224,6 +231,13 @@ impl Button {
         let hover = check_in(mouse_position.x, self.position.x, self.position.x + self.width) &&
         check_in(mouse_position.y, self.position.y, self.position.y + self.height);
         if hover {
+            if let Some(id) = ui.hover {
+                if id != self.id {
+                    if let Some(hover_sound) = self.hover_sound {
+                        ui.sounds.push(hover_sound)
+                    }
+                }
+            }
             ui.hover = Some(self.id);
         }
         mouse.left_released && hover
@@ -298,6 +312,11 @@ impl Button {
         let check = self.check(mouse, ui);
         ui.primitives.extend(self.get_geometry(ui).into_iter());
         ui.primitives.push(self.get_text_box());
+        if check {
+            if let Some(click) =  self.click_sound {
+                ui.sounds.push(click);
+            }
+        }
         check
     }
 }

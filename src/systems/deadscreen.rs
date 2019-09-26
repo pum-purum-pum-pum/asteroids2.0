@@ -66,7 +66,9 @@ impl<'a> System<'a> for DeadScreen {
             false,
             Some(Image(preloaded_images.upg_bar)),
             "To menu".to_string(),
-            Widgets::Upgrade as usize
+            Widgets::Upgrade as usize,
+            None,
+            None
         );
         if to_menu.place_and_check(&mut ui, &*mouse) {
             for (entity, _ship_marker) in (&entities, &ship_markers).join() {

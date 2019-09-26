@@ -70,7 +70,9 @@ impl<'a> System<'a> for ScoreTableRendering {
             false,
             None,
             "Back to Menu".to_string(),
-            Widgets::BackMenu as usize
+            Widgets::BackMenu as usize,
+            None,
+            None,
         );
         if back_to_menu.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::Menu;

@@ -1,6 +1,26 @@
 (
 	[
 		(
+			name: "click",
+			count: 5,
+			gap: (secs: 0, nanos: 1_000_000)
+		),
+		(
+			name: "hover",
+			count: 5,
+			gap: (secs: 0, nanos: 1_000_000)
+		),
+		(
+			name: "play",
+			count: 5,
+			gap: (secs: 0, nanos: 1_000_000)
+		),
+		(
+			name: "deny",
+			count: 5,
+			gap: (secs: 0, nanos: 1_000_000)
+		),
+		(
 			name: "shot",
 			count: 3,
 			gap: (secs: 0, nanos: 100_000_000)

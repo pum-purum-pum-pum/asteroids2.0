@@ -85,7 +85,9 @@ impl<'a> System<'a> for UpgradeGUI {
                     false,
                     Some(upg.image),
                     "".to_string(),
-                    widget_ids[i] as usize
+                    widget_ids[i] as usize,
+                    None,
+                    None,
                 );
                 ui.primitives.push(
                     Primitive {
@@ -125,7 +127,9 @@ impl<'a> System<'a> for UpgradeGUI {
             false,
             Some(Image(preloaded_images.upg_bar)),
             "Upgrade!".to_string(),
-            Widgets::Upgrade as usize
+            Widgets::Upgrade as usize,
+            None,
+            None,
         );
 
         if spawned_upgrades.len() > 0 {
@@ -153,7 +157,9 @@ impl<'a> System<'a> for UpgradeGUI {
             false,
             Some(Image(preloaded_images.upg_bar)),
             "Done".to_string(),
-            Widgets::Done as usize
+            Widgets::Done as usize,
+            None,
+            None,
         );
         if done_button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::Play(PlayState::Action);
