@@ -35,13 +35,17 @@ fn visible(
 #[repr(usize)]
 pub enum Widgets {
     BackMenu,
-    LazerGun, 
     BlasterGun, 
+    LazerGun, 
     ShotGun,
+    LockedBlasterGun,
+    LockedLazerGun,
     BasicShip,
     HeavyShip,
+    SuperShip,
     LockedBasicShip,
     LockedHeavyShip,
+    LockedSuperShip,
     ScoreTable,
     Play,
     Upgrade1,
@@ -340,7 +344,7 @@ impl<'a> System<'a> for RenderingSystem {
             }
         };
 
-        for (_entity, iso, image, size, _stars) in
+        for (_entity, iso, image, size, _fog) in
             (&entities, &isometries, &image_ids, &sizes, &_fog_markers).join() {
             let image_data = image_datas.get(image.0).unwrap();
             canvas
@@ -459,7 +463,7 @@ impl<'a> System<'a> for RenderingSystem {
                     &mut frame,
                     &geometry_data,
                     &iso.0,
-                    RenderMode::Draw,
+                    RenderMode::StencilCheck,
                     Point3::new(1.0, 0.0, 0.0)
                 );
             }

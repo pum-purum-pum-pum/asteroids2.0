@@ -154,6 +154,7 @@ pub struct LoopSound {
 #[derive(Debug)]
 pub struct Description {
     pub ship_costs: Vec<usize>,
+    pub gun_costs: Vec<usize>,
     pub player_ships: Vec<(ShipKind)>,
     pub player_guns: Vec<GunKind>,
     pub enemies: Vec<EnemyKind>
@@ -180,7 +181,8 @@ pub enum EntityType {
 pub enum InsertEvent {
     Character {
         gun_kind: GunKind,
-        ship_stats: ShipStats
+        ship_stats: ShipStats,
+        image: Image
     },
     Asteroid {
         iso: Point3,
@@ -471,7 +473,8 @@ pub struct Damage(pub usize);
 pub struct MacroGame {
     pub score_table: Vec<usize>,
     pub coins: usize,
-    pub ships_unlocked: Vec<bool>
+    pub ships_unlocked: Vec<bool>,
+    pub guns_unlocked: Vec<bool>,
 }
 
 impl Default for MacroGame {
@@ -479,13 +482,11 @@ impl Default for MacroGame {
         MacroGame {
             score_table: vec![],
             coins: 0,
-            ships_unlocked: vec![true, false]
+            ships_unlocked: vec![true, false],
+            guns_unlocked: vec![true, false]
         }
     }
 }
-
-// #[derive(Default)]
-// pub struct CurrentScore(pub usize);
 
 #[derive(Default, Clone, Copy)]
 pub struct Progress {
@@ -559,10 +560,14 @@ pub struct PreloadedImages {
     pub side_bullet_ability: specs::Entity,
     pub bar: specs::Entity,
     pub upg_bar: specs::Entity,
+    pub transparent_sqr: specs::Entity,
     pub basic_ship: specs::Entity,
+    pub heavy_ship: specs::Entity,
+    pub super_ship: specs::Entity,
     pub explosion: Animation,
     pub blast: Animation,
     pub bullet_contact: Animation,
+    pub locked: specs::Entity,
 }
 
 pub struct PreloadedParticles {
@@ -691,6 +696,7 @@ pub struct Projectile {
 pub struct Reflection {
     pub speed: f32,
     pub lifetime: Duration,
+    pub times: Option<usize>,
 }
 
 #[derive(Component)]

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use super::*;
 use log::info;
 
@@ -13,23 +14,15 @@ impl InsertSystem {
 
 impl<'a> System<'a> for InsertSystem {
     type SystemData = (
-        (
-            Entities<'a>,
-            WriteStorage<'a, PhysicsComponent>,
-            WriteStorage<'a, Geometry>,
-            WriteStorage<'a, Isometry>,
-            WriteStorage<'a, Velocity>,
-            WriteStorage<'a, Spin>,
-            WriteStorage<'a, Image>,
-            WriteStorage<'a, Size>,
-        ),
-        (
-            WriteStorage<'a, StarsMarker>,
-            WriteStorage<'a, NebulaMarker>,
-            WriteStorage<'a, PlanetMarker>,
-            WriteStorage<'a, AttachPosition>,
-            WriteStorage<'a, LightMarker>,
-        ),
+        Entities<'a>,
+        WriteStorage<'a, PhysicsComponent>,
+        WriteStorage<'a, Isometry>,
+        WriteStorage<'a, Velocity>,
+        WriteStorage<'a, Spin>,
+        WriteStorage<'a, Image>,
+        WriteStorage<'a, Size>,
+        WriteStorage<'a, AttachPosition>,
+        WriteStorage<'a, LightMarker>,
         ReadExpect<'a, ThreadPin<red::GL>>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -42,23 +35,15 @@ impl<'a> System<'a> for InsertSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            (
-                entities,
-                mut physics,
-                _geometries,
-                mut isometries,
-                mut velocities,
-                mut spins,
-                mut images,
-                mut sizes,
-            ),
-            (
-                _stars,
-                _nebulas,
-                _planets,
-                mut attach_positions,
-                mut lights,
-            ),
+            entities,
+            mut physics,
+            mut isometries,
+            mut velocities,
+            mut spins,
+            mut images,
+            mut sizes,
+            mut attach_positions,
+            mut lights,
             gl,
             preloaded_images,
             mut world,
@@ -74,7 +59,8 @@ impl<'a> System<'a> for InsertSystem {
             match insert {
                 InsertEvent::Character {
                     gun_kind,
-                    ship_stats
+                    ship_stats,
+                    image
                 } => {
                     *progress = Progress::default();
                     let char_size = 0.5f32;
@@ -102,7 +88,7 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(character, CharacterMarker::default());
                     lazy_update.insert(character, Damage(ship_stats.damage));
                     lazy_update.insert(character, ShipMarker::default());
-                    lazy_update.insert(character, Image(preloaded_images.character));
+                    lazy_update.insert(character, *image);
                     lazy_update.insert(character, Spin::default());
                     lazy_update.insert(character, character_shape);
                     lazy_update.insert(character, Size(char_size));

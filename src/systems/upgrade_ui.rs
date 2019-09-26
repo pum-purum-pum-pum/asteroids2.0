@@ -53,106 +53,111 @@ impl<'a> System<'a> for UpgradeGUI {
         let upgrade_button_h = upgrade_button_w;
         let (choose_button_w, choose_button_h) = (w/6f32, h/10f32);
         let shift = upgrade_button_h / 10f32;
-        // dbg!(avaliable_upgrades.len());
-        match *app_state {
-            AppState::Play(PlayState::Upgrade) => {
-                let mut buttons = vec![];
-                let upgrades = spawned_upgrades.last();
-                // dbg!(&upgrades);
-                if let Some(upgrades) = upgrades {
-                    let widget_ids = [Widgets::Upgrade1, Widgets::Upgrade2];
-                    for (i, upg_id) in upgrades.iter().enumerate() {
-                        let upg = &avaliable_upgrades[*upg_id];
-                        let current_point = 
-                            Point2::new(
-                                w / 2.0 - upgrade_button_w - shift 
-                                + i as f32 * (upgrade_button_w + shift), 
-                                shift
-                            );
-                        let upgrade_button = Button::new(
-                            current_point,
-                            upgrade_button_w, upgrade_button_h, 
-                            None,
-                            false,
-                            Some(upg.image),
-                            "".to_string(),
-                            widget_ids[i] as usize
-                        );
-                        ui.primitives.push(
-                            Primitive {
-                                kind: PrimitiveKind::Text(Text {
-                                    position: Point2::new(current_point.x + upgrade_button_h / 2.0, upgrade_button_h + 2.0 * shift),
-                                    text: upg.name.clone()
-                                }),
-                                with_projection: false,
-                            }
-                        );
-                        buttons.push(upgrade_button);
-                    }
-                    let upgrade_selector = Selector {
-                        buttons: buttons,
-                        id: Widgets::WeaponSelector as usize,
-                        mask: None,
-                    };
-                    if let Some(selected_id) = upgrade_selector.place_and_check(
-                        &mut ui,
-                        &*mouse
-                    ) {
-                        match Widgets::try_from(selected_id).expect("unknown widget id") {
-                            Widgets::Upgrade1 => {
-                                ui_state.choosed_upgrade = Some(upgrades[0]);
-                            }
-                            Widgets::Upgrade2 => {
-                                ui_state.choosed_upgrade = Some(upgrades[1]);
-                            }
-                            _ => ()
-                        }
-                    }
-                }
-                let select_upgrade = Button::new(
-                    Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
-                    choose_button_w, choose_button_h, 
+        // dark background
+        ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Picture(Picture{
+                    position: Point2::new(0f32, 0f32),
+                    width: w, 
+                    height: h,
+                    image: Image(preloaded_images.transparent_sqr)
+                }),
+                with_projection: false,
+            }
+        );
+        let mut buttons = vec![];
+        let upgrades = spawned_upgrades.last();
+        // dbg!(&upgrades);
+        if let Some(upgrades) = upgrades {
+            let widget_ids = [Widgets::Upgrade1, Widgets::Upgrade2];
+            for (i, upg_id) in upgrades.iter().enumerate() {
+                let upg = &avaliable_upgrades[*upg_id];
+                let current_point = 
+                    Point2::new(
+                        w / 2.0 - upgrade_button_w - shift 
+                        + i as f32 * (upgrade_button_w + shift), 
+                        shift
+                    );
+                let upgrade_button = Button::new(
+                    current_point,
+                    upgrade_button_w, upgrade_button_h, 
                     None,
                     false,
-                    Some(Image(preloaded_images.upg_bar)),
-                    "Upgrade!".to_string(),
-                    Widgets::Upgrade as usize
+                    Some(upg.image),
+                    "".to_string(),
+                    widget_ids[i] as usize
                 );
-
-                if spawned_upgrades.len() > 0 {
-                    if let Some(upgrade) = ui_state.choosed_upgrade {
-                        ui.primitives.push(
-                            Primitive {
-                                kind: PrimitiveKind::Text(Text {
-                                    position: Point2::new(w / 2.0, upgrade_button_h + 4.0 * shift),
-                                    text: avaliable_upgrades[upgrade].description.clone()
-                                }),
-                                with_projection: false,
-                            }
-                        );
-                        if select_upgrade.place_and_check(&mut ui, &*mouse) {
-                            current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
-                            ui_state.choosed_upgrade = None;
-                            spawned_upgrades.pop();
-                        }
+                ui.primitives.push(
+                    Primitive {
+                        kind: PrimitiveKind::Text(Text {
+                            position: Point2::new(current_point.x + upgrade_button_h / 2.0, upgrade_button_h + 2.0 * shift),
+                            text: upg.name.clone()
+                        }),
+                        with_projection: false,
                     }
-                }
-                let done_button = Button::new(
-                    Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
-                    choose_button_w, choose_button_h, 
-                    None,
-                    false,
-                    Some(Image(preloaded_images.upg_bar)),
-                    "Done".to_string(),
-                    Widgets::Done as usize
                 );
-                if done_button.place_and_check(&mut ui, &*mouse) {
-                    *app_state = AppState::Play(PlayState::Action);
+                buttons.push(upgrade_button);
+            }
+            let upgrade_selector = Selector {
+                buttons: buttons,
+                id: Widgets::WeaponSelector as usize,
+                mask: None,
+            };
+            if let Some(selected_id) = upgrade_selector.place_and_check(
+                &mut ui,
+                &*mouse
+            ) {
+                match Widgets::try_from(selected_id).expect("unknown widget id") {
+                    Widgets::Upgrade1 => {
+                        ui_state.choosed_upgrade = Some(upgrades[0]);
+                    }
+                    Widgets::Upgrade2 => {
+                        ui_state.choosed_upgrade = Some(upgrades[1]);
+                    }
+                    _ => ()
                 }
             }
-            _ => ()
         }
+        let select_upgrade = Button::new(
+            Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
+            choose_button_w, choose_button_h, 
+            None,
+            false,
+            Some(Image(preloaded_images.upg_bar)),
+            "Upgrade!".to_string(),
+            Widgets::Upgrade as usize
+        );
 
+        if spawned_upgrades.len() > 0 {
+            if let Some(upgrade) = ui_state.choosed_upgrade {
+                ui.primitives.push(
+                    Primitive {
+                        kind: PrimitiveKind::Text(Text {
+                            position: Point2::new(w / 2.0, upgrade_button_h + 4.0 * shift),
+                            text: avaliable_upgrades[upgrade].description.clone()
+                        }),
+                        with_projection: false,
+                    }
+                );
+                if select_upgrade.place_and_check(&mut ui, &*mouse) {
+                    current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
+                    ui_state.choosed_upgrade = None;
+                    spawned_upgrades.pop();
+                }
+            }
+        }
+        let done_button = Button::new(
+            Point2::new(w / 2.0 + shift, h - 1.0 * choose_button_h),
+            choose_button_w, choose_button_h, 
+            None,
+            false,
+            Some(Image(preloaded_images.upg_bar)),
+            "Done".to_string(),
+            Widgets::Done as usize
+        );
+        if done_button.place_and_check(&mut ui, &*mouse) {
+            *app_state = AppState::Play(PlayState::Action);
+        }
 
         match current_upgrade {
             Some(choosed_upgrade) => {
@@ -180,7 +185,7 @@ impl<'a> System<'a> for UpgradeGUI {
                                 // reflection.speed += 0.5;
                                 reflection.lifetime += Duration::from_millis(200);
                             } else {
-                                gun.reflection = Some(Reflection{speed: 0.4, lifetime: Duration::from_millis(1500)})
+                                gun.reflection = Some(Reflection{speed: 0.4, lifetime: Duration::from_millis(1500), times: None})
                             }
                         }
                     }

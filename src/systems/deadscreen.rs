@@ -36,6 +36,18 @@ impl<'a> System<'a> for DeadScreen {
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
+        // dark background
+        ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Picture(Picture{
+                    position: Point2::new(0f32, 0f32),
+                    width: w, 
+                    height: h,
+                    image: Image(preloaded_images.transparent_sqr)
+                }),
+                with_projection: false,
+            }
+        );
         ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
@@ -46,9 +58,9 @@ impl<'a> System<'a> for DeadScreen {
             }
         );
         let to_menu_w = w / 10f32;
-        let to_menu_h = h / 10f32;
+        let to_menu_h = h / 10f32 / 4.0;
         let to_menu = Button::new(
-            Point2::new(w / 2.0 - to_menu_w, h - 1.0 * to_menu_h),
+            Point2::new(w / 2.0 - to_menu_w, h - 3.0 * to_menu_h),
             to_menu_w, to_menu_h, 
             None,
             false,

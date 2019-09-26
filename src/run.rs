@@ -76,7 +76,7 @@ pub fn run() -> Result<(), String> {
         let _guard = slog_scope::set_global_logger(logger);
 
         // register slog_stdlog as the log handler with the log crate
-        slog_stdlog::init().unwrap();
+        // slog_stdlog::init().unwrap();
     info!("asteroids: logging crazyness");
     let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
     let mut telegraph = TeleGraph::new(Duration::from_secs(10));
@@ -225,11 +225,15 @@ pub fn run() -> Result<(), String> {
     specs_world.register::<SoundPlacement>();
     specs_world.register::<Rift>();
 
-    // TODO: load all this images automagicly (assets pack?)
+    // TODO: load all this images automagicly (and with assets pack)
     let images = [
         "back",
         "player_ship1",
         "basic",
+        "basic_select",
+        "heavy",
+        "heavy_select",
+        "super_ship",
         "asteroid",
         "light",
         "light_sea",
@@ -284,7 +288,9 @@ pub fn run() -> Result<(), String> {
         "fish",
         "player",
         "enemy_projectile_old",
-        "maneuverability"
+        "maneuverability",
+        "transparent_sqr",
+        "locked",
     ];
     let mut name_to_animation = HashMap::new();
     { // load animations
@@ -373,6 +379,7 @@ pub fn run() -> Result<(), String> {
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
             ship_costs: Vec<usize>,
+            gun_costs: Vec<usize>,
             player_ships: Vec<ShipKindSave>,
             player_guns: Vec<GunKindSave>,
             enemies: Vec<EnemyKindSave>
@@ -383,6 +390,7 @@ pub fn run() -> Result<(), String> {
             name_to_image: &HashMap<String, specs::Entity>
         ) -> Description {
             Description {
+                gun_costs: description_save.gun_costs,
                 ship_costs: description_save.ship_costs,
                 player_ships: description_save.player_ships.iter().map(|x| x.clone().load(name_to_image)).collect(),
                 player_guns: description_save.player_guns
@@ -529,12 +537,16 @@ pub fn run() -> Result<(), String> {
         exp: name_to_image["exp"],
         bar: name_to_image["bar"],
         upg_bar: name_to_image["upg_bar"],
+        transparent_sqr: name_to_image["transparent_sqr"],
         explosion: name_to_animation["explosion"].clone(),
         blast: name_to_animation["blast2"].clone(),
         bullet_contact: name_to_animation["bullet_contact"].clone(),
         double_coin: name_to_image["double_coin"],
         double_exp: name_to_image["double_exp"],
         basic_ship: name_to_image["basic"],
+        heavy_ship: name_to_image["heavy"],
+        super_ship: name_to_image["super_ship"],
+        locked: name_to_image["locked"],
     };
 
 
@@ -582,7 +594,7 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
     specs_world.add_resource(StarsGrid::new(3, 40f32, 40f32, 4f32, 4f32));
     specs_world.add_resource(FogGrid::new(2, 50f32, 50f32, 5f32, 5f32));
-
+    
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));

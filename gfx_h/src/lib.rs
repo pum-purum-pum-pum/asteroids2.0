@@ -227,7 +227,7 @@ pub fn create_shader_program(gl: &red::GL, pref: &str, name: &str, glsl_version:
 
 pub enum RenderMode {
     StencilWrite,
-    _StencilCheck,
+    StencilCheck,
     Draw
 }
 
@@ -253,7 +253,7 @@ impl Into<DrawParams> for RenderMode {
                     ..Default::default()
                 }
             }
-            RenderMode::_StencilCheck => {
+            RenderMode::StencilCheck => {
                 red::DrawParams{
                     draw_type: DrawType::Standart,
                     stencil: Some(Stencil {

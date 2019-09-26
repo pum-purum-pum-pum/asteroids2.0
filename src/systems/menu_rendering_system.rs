@@ -1,5 +1,4 @@
-use gfx_h::MenuParticles;
-use gfx_h::TextData;
+use gfx_h::{Image, MenuParticles};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use super::*;
@@ -19,7 +18,6 @@ impl MenuRenderingSystem {
 
 impl<'a> System<'a> for MenuRenderingSystem {
     type SystemData = (
-        ReadStorage<'a, ThreadPin<ImageData>>,
         ReadExpect<'a, ThreadPin<red::GL>>,
         WriteExpect<'a, Canvas>,
         ReadExpect<'a, red::Viewport>,
@@ -31,7 +29,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
         WriteExpect<'a, ThreadPin<MenuParticles>>,
         Read<'a, Mouse>,
         Write<'a, AppState>,
-        WriteExpect<'a, ThreadPin<TextData<'static>>>,
         ReadExpect<'a, Description>,
         Read<'a, Vec<UpgradeCardRaw>>,
         Write<'a, Vec<UpgradeCard>>,
@@ -41,9 +38,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
 
     fn run(&mut self, data: Self::SystemData) {
         let (
-            image_datas,
             gl,
-            mut canvas,
+            canvas,
             viewport,
             mut primitives_channel,
             mut ui,
@@ -54,7 +50,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
             mouse,
             mut app_state,
             // text_data
-            mut text_data,
             description,
             upgrade_cards_raw,
             mut avaliable_upgrades,
@@ -68,6 +63,18 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         // return;
 
+        // darker background
+        ui.primitives.push(
+            Primitive {
+                kind: PrimitiveKind::Picture(Picture{
+                    position: Point2::new(0f32, 0f32),
+                    width: w, 
+                    height: h,
+                    image: Image(preloaded_images.transparent_sqr)
+                }),
+                with_projection: false,
+            }
+        );
         ui.primitives.push(
             Primitive {
                 kind: PrimitiveKind::Text(Text {
@@ -84,58 +91,83 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let button_w = w/12f32;
         let button_h = button_w;
         let mut buttons = vec![];
-        let buttons_names = vec!["", "", ""];
-        let guns = vec![Widgets::LazerGun, Widgets::BlasterGun, Widgets::ShotGun];
+        let buttons_names = vec!["", ""];
+        let guns = vec![Widgets::BlasterGun, Widgets::LazerGun];
+        let locked_guns_ids = vec![Widgets::LockedBlasterGun, Widgets::LockedLazerGun];
         let buttons_num = buttons_names.len();
         let button_images = vec![
-            preloaded_images.lazer, 
             preloaded_images.blaster, 
+            preloaded_images.lazer, 
             preloaded_images.shotgun
         ];
         let shift_between = w / 20f32;
         let shift_init = w / 2.0 - shift_between - button_w - button_w / 2.0; 
                 // -button_w / 2.0 since start draw from left corner :)
         for i in 0..buttons_num {
-            let button = Button::new(
-                Point2::new(
-                    shift_init + i as f32 * (shift_between + button_w), 
-                    button_h / 2f32
-                ),
-                button_w,
-                button_h,
-                None,
-                false,
-                Some(Image(button_images[i])),
-                buttons_names[i].to_string(),
-                guns[i] as usize
+            let unlocked = macro_game.guns_unlocked[i];
+            let button_position = Point2::new(
+                shift_init + i as f32 * (shift_between + button_w), 
+                button_h / 2f32
             );
-            buttons.push(button);
+            if unlocked {
+                let button = Button::new(
+                    button_position,
+                    button_w,
+                    button_h,
+                    None,
+                    false,
+                    Some(Image(button_images[i])),
+                    buttons_names[i].to_string(),
+                    guns[i] as usize
+                );
+                buttons.push(button);
+            } else {
+                let button = Button::new(
+                    button_position,
+                    button_w,
+                    button_h,
+                    None,
+                    false,
+                    Some(Image(preloaded_images.locked)),
+                    format!("{} $", description.gun_costs[i]),
+                    locked_guns_ids[i] as usize,
+                );
+                buttons.push(button);
+            }
         }
         let weapon_selector = Selector {
             buttons: buttons,
             id: Widgets::WeaponSelector as usize,
-            mask: None
+            mask: Some(macro_game.guns_unlocked.clone())
         };
         if let Some(selected_id) = weapon_selector.place_and_check(
             &mut ui,
             &*mouse
         ) {
             match Widgets::try_from(selected_id).expect("unknown widget id") {
-                Widgets::LazerGun => {
+                Widgets::BlasterGun => {
                     ui_state.chosed_gun = Some(description.player_guns[0].clone());
                 }
-                Widgets::BlasterGun => {
+                Widgets::LazerGun => {
                     ui_state.chosed_gun = Some(description.player_guns[1].clone());
                 }
                 Widgets::ShotGun => {
                     ui_state.chosed_gun = Some(description.player_guns[2].clone());
                 }
+                Widgets::LockedLazerGun => {
+                    if macro_game.coins >= description.gun_costs[1] {
+                        macro_game.guns_unlocked[1] = true;
+                        macro_game.coins -= description.gun_costs[1];
+                        ui_state.chosed_gun = Some(description.player_guns[1].clone());
+                    }
+                }
                 _ => ()
             }
         }
         let mut buttons = vec![];
-        let ships_ids = vec![Widgets::BasicShip, Widgets::HeavyShip];
-        let locked_ships_ids = vec![Widgets::LockedBasicShip, Widgets::LockedHeavyShip];
+        let ships_ids = vec![Widgets::BasicShip, Widgets::HeavyShip, Widgets::SuperShip];
+        let ship_images = vec![preloaded_images.basic_ship, preloaded_images.heavy_ship, preloaded_images.super_ship];
+        let locked_ships_ids = vec![Widgets::LockedBasicShip, Widgets::LockedHeavyShip, Widgets::LockedSuperShip];
         for (i, ship) in description.player_ships.iter().enumerate() {
             let unlocked = macro_game.ships_unlocked[i];
             let button_position = 
@@ -162,7 +194,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     button_h,
                     None,
                     false,
-                    Some(ship.image),
+                    Some(Image(preloaded_images.locked)),
                     format!("{} $", description.ship_costs[i]),
                     locked_ships_ids[i] as usize,
                 );
@@ -196,12 +228,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 _ => ()
             }
         }
-        // for i in 0..buttons.len() {
-        //     if buttons[i].place_and_check(&mut ui, &*mouse) {
-        //         dbg!(&format!("ship button {}", i));
-        //     }
-        // }
-
         let button_w = w / 6.0;
         let button_h = button_w;
         let score_table_button = Button::new(
@@ -235,11 +261,11 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
             // Point2::new(0f32, 0f32),
             button_w, 
-            button_h, 
+            button_h / 4.0, 
             None,
             false, 
-            Some(Image(preloaded_images.play)),
-            "".to_string(),
+            Some(Image(preloaded_images.upg_bar)),
+            "Play".to_string(),
             Widgets::Play as usize
         );
         if let (Some(ship), Some(gun)) = (ui_state.chosed_ship.clone(), ui_state.chosed_gun.clone()) {
@@ -247,7 +273,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 *app_state = AppState::Play(PlayState::Action);
                 insert_channel.single_write(InsertEvent::Character{ 
                     gun_kind: gun.clone(), 
-                    ship_stats: description.player_ships[ship].ship_stats
+                    ship_stats: description.player_ships[ship].ship_stats,
+                    image: Image(ship_images[ship]),
                 });
                 *avaliable_upgrades = get_avaliable_cards(
                     &upgrade_cards_raw,

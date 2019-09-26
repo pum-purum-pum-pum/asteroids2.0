@@ -1,5 +1,6 @@
 (
-    ship_costs: [0, 100, 1000, 10000],
+    ship_costs: [0, 300, 5000, 10000],
+    gun_costs: [0, 300, 5000, 10000],
     player_ships: [
         (
             ship_stats: (
@@ -12,35 +13,36 @@
                 max_shield: 500,
                 damage: 10
             ),
-            image: "basic"
+            image: "basic_select"
         ),
         (
             ship_stats: (
-                thrust_force: 0.003,
-                maneuverability: Some(6.0),
-                torque: 0.05,
+                thrust_force: 0.002,
+                maneuverability: Some(1.0),
+                torque: 0.07,
                 health_regen: 0,
                 shield_regen: 1,
                 max_health: 2000,
                 max_shield: 2000,
                 damage: 20
             ),
-            image: "basic"
+            image: "heavy_select"
+        ),
+        (
+            ship_stats: (
+                thrust_force: 0.003,
+                maneuverability: Some(6.0),
+                torque: 0.2,
+                health_regen: 0,
+                shield_regen: 1,
+                max_health: 2000,
+                max_shield: 2000,
+                damage: 20
+            ),
+            image: "super_ship"
         )
     ],
     player_guns: [
-        MultyLazer((
-            angle: 0.25,
-            lazers_limit: Some(3),
-            lazers: [
-                Lazer(
-                    damage: 3,
-                    active: false,
-                    distance: 5,
-                    current_distance: 8,
-                ),
-            ]
-        )),
         ShotGun((
             recharge_state: 0,
             recharge_time: (secs: 0, nanos: 300_000_000),
@@ -54,6 +56,18 @@
             bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 1, nanos: 200_000_000),
             bullet_image: "player_projectile"
+        )),
+        MultyLazer((
+            angle: 0.25,
+            lazers_limit: Some(3),
+            lazers: [
+                Lazer(
+                    damage: 3,
+                    active: false,
+                    distance: 5,
+                    current_distance: 8,
+                ),
+            ]
         )),
         ShotGun((
             recharge_state: 0,

@@ -14,7 +14,6 @@ crate-type = ["cdylib"]
 android_log = "*"
 log = "*"
 
-
 [dependencies]
 components = {path = "components"}
 geometry = {path = "geometry"}
@@ -111,7 +110,9 @@ opt-level = 3
 
 [profile.dev.overrides.nphysics2d]
 opt-level = 3
-codegen-units = 60
+codegen-units = 16
 
-# [profile.release]
+[profile.release]
 # lto = true
+incremental = true
+codegen-units = 16

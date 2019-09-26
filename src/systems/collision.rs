@@ -5,10 +5,11 @@ fn reflect_bullet(
     projectile: specs::Entity,
     physics_components: &ReadStorage<PhysicsComponent>,
     world: &mut Write<World<f32>>,
-    reflection: &Reflection,
+    reflections: &mut WriteStorage<Reflection>,
     normal: Vector2,
     lifetimes: &mut WriteStorage<Lifetime>,
 ) {
+    let reflection = reflections.get_mut(projectile).unwrap();
     let physics_component = physics_components.get(projectile).unwrap();
     let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
     let position = body.position();
@@ -21,7 +22,18 @@ fn reflect_bullet(
         Vector2::new(position.translation.vector.x, position.translation.vector.y),
         alpha
     );
-    *lifetimes.get_mut(projectile).unwrap() = Lifetime::new(reflection.lifetime);
+    let mut new_reflection = reflection.clone();
+    new_reflection.times = Some(1);
+    let lifetime = if let Some(times) = reflection.times {
+        new_reflection.times = Some(times + 1);
+        // mb tweak this later
+        Duration::from_secs(0)
+    } else {
+        new_reflection.times = Some(1);
+        reflection.lifetime
+    };
+    *lifetimes.get_mut(projectile).unwrap() = Lifetime::new(lifetime);
+    *reflection = new_reflection;
     body.set_position(position);
     body.set_velocity(velocity);
 
@@ -100,7 +112,7 @@ impl<'a> System<'a> for CollisionSystem {
         ReadStorage<'a, CharacterMarker>,
         ReadStorage<'a, ShipMarker>,
         ReadStorage<'a, Projectile>,
-        ReadStorage<'a, Reflection>,
+        WriteStorage<'a, Reflection>,
         WriteStorage<'a, Lifes>,
         WriteStorage<'a, Shield>,
         WriteStorage<'a, Lifetime>,
@@ -128,7 +140,7 @@ impl<'a> System<'a> for CollisionSystem {
             character_markers,
             ships,
             projectiles,
-            reflections,
+            mut reflections,
             mut lifes,
             mut shields,
             mut lifetimes,
@@ -205,12 +217,12 @@ impl<'a> System<'a> for CollisionSystem {
                     let projectile = entity2;
                     let projectile_damage = damages.get(projectile).unwrap().0;
                     if projectile_damage != 0 {
-                        if let Some(reflection) = reflections.get(projectile) {
+                        if reflections.get(projectile).is_some() {
                             reflect_bullet(
                                 projectile, 
                                 &physics_components, 
                                 &mut world, 
-                                &reflection, 
+                                &mut reflections, 
                                 *normal, 
                                 &mut lifetimes
                             );
@@ -325,8 +337,8 @@ impl<'a> System<'a> for CollisionSystem {
                 );
                 // Kludge
                 if projectile_damage != 0 {
-                    if let Some(reflection) = reflections.get(projectile) {
-                        reflect_bullet(projectile, &physics_components, &mut world, &reflection, *normal, &mut lifetimes);
+                    if reflections.get(projectile).is_some() {
+                        reflect_bullet(projectile, &physics_components, &mut world, &mut reflections, *normal, &mut lifetimes);
                     } else {
                         entities.delete(projectile).unwrap();
                     }
