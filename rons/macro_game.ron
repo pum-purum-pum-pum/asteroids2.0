@@ -1,6 +1,6 @@
 (
-    score_table: [1057,903,1,],
-    coins: 10006,
+    score_table: [36803,4510,4353,1057,903,750,600,300,300,1,],
+    coins: 6,
     ships_unlocked: [true,false,false,],
     guns_unlocked: [true,false,false,],
 )

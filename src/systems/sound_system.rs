@@ -86,7 +86,7 @@ impl<'a> System<'a> for SoundSystem {
                     let music_id = rng.gen_range(0, music_data.battle_music.len());
                     sdl2::mixer::Music::halt();
                     music.menu_play = false;
-                    // music_data.battle_music[music_id].play(-1).unwrap();
+                    music_data.battle_music[music_id].play(-1).unwrap();
                     music.current_battle = Some(music_id);
                 }
             }
@@ -97,7 +97,7 @@ impl<'a> System<'a> for SoundSystem {
                     music.current_battle = None;
                 }
                 if !music.menu_play {
-                    // music_data.menu_music.play(-1).unwrap();
+                    music_data.menu_music.play(-1).unwrap();
                     music.menu_play = true;
                 }
             }

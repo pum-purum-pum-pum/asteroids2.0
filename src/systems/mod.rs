@@ -244,7 +244,7 @@ fn ship_explode(
     );
     let effect = InsertEvent::Explosion {
         position: ship_pos,
-        num: 20,
+        num: 30,
         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
         with_animation: Some(1f32)
     };
@@ -297,7 +297,7 @@ fn asteroid_explode(
     );
     let effect = InsertEvent::Explosion {
         position: Point2::new(explode_position.x, explode_position.y),
-        num: 10usize,
+        num: 30usize,
         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
         with_animation: Some(size)
     };

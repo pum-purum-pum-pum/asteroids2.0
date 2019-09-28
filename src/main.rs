@@ -24,7 +24,7 @@ pub use derive_deref;
 pub use nalgebra;
 pub use nphysics2d;
 pub use ncollide2d;
-pub use vorod;
+pub use voronois;
 
 // int SDL_main(int argc, char *argv[])
 #[no_mangle]

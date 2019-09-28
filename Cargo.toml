@@ -51,7 +51,7 @@ red = {path = "red"}
 glyph_brush = "0.5.3"
 ron = "0.5.1"
 serde = "1.0.97"
-vorod = {path="voronois"}
+voronois = {path="voronois"}
 
 [dependencies.sdl2]
 version = "0.32.2"
@@ -115,4 +115,4 @@ codegen-units = 16
 [profile.release]
 # lto = true
 incremental = true
-codegen-units = 16
+# codegen-units = 16

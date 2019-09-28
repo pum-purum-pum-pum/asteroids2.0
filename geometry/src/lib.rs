@@ -4,7 +4,7 @@ use ncollide2d::transformation::convex_hull_idx;
 use rand::prelude::*;
 use specs::prelude::*;
 use specs_derive::Component;
-use vorod::destruction;
+use voronois::destruction;
 
 pub const EPS: f32 = 1E-3;
 pub const SHADOW_LENGTH: f32 = 100f32;

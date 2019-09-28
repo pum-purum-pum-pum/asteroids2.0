@@ -1,0 +1,6 @@
+[submodule "red"]
+	path = red
+	url = https://github.com/pum-purum-pum-pum/red.git
+[submodule "voronois"]
+	path = voronois
+	url = https://github.com/pum-purum-pum-pum/voronois.git

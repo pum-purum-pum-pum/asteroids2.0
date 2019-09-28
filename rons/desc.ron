@@ -1,6 +1,6 @@
 (
-    ship_costs: [0, 300, 5000, 10000],
-    gun_costs: [0, 300, 5000, 10000],
+    ship_costs: [0, 200, 300, 10000],
+    gun_costs: [0, 100, 300, 10000],
     player_ships: [
         (
             ship_stats: (
@@ -151,7 +151,7 @@
                 angle_shift: 0.25,
                 bullet_speed: 0.2,
                 bullet_size: 0.7,
-                reflection: Some((speed: 0.2, lifetime: (secs:3, nanos: 000_000_000))),
+                reflection: Some((speed: 0.2, lifetime: (secs:5, nanos: 000_000_000))),
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 5, nanos: 200_000_000),
                 bullet_image: "reflect_bullet"

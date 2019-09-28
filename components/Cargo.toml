@@ -10,7 +10,7 @@ edition = "2018"
 common = {path = "../common"}
 gfx_h = {path = "../gfx_h"}
 physics = {path = "../physics"}
-vorod = {path="../voronois"}
+voronois = {path="../voronois"}
 geometry = {path = "../geometry"}
 sound = {path = "../sound"}
 noise = "0.5.1"

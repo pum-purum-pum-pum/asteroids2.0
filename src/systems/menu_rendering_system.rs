@@ -237,11 +237,21 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 Widgets::HeavyShip => {
                     ui_state.chosed_ship = Some(1);
                 }
+                Widgets::SuperShip => {
+                    ui_state.chosed_ship = Some(2);
+                }
                 Widgets::LockedHeavyShip => {
                     if macro_game.coins >= description.ship_costs[1] {
                         macro_game.ships_unlocked[1] = true;
                         sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
                         macro_game.coins -= description.ship_costs[1];
+                    }
+                }
+                Widgets::LockedSuperShip => {
+                    if macro_game.coins >= description.ship_costs[2] {
+                        macro_game.ships_unlocked[2] = true;
+                        sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
+                        macro_game.coins -= description.ship_costs[2];
                     }
                 }
                 _ => ()
