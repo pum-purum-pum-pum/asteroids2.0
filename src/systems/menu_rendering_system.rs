@@ -1,8 +1,8 @@
+use super::rendering::*;
+use super::*;
 use gfx_h::{Image, MenuParticles};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use super::*;
-use super::rendering::*;
 
 pub struct MenuRenderingSystem {
     reader: ReaderId<Primitive>,
@@ -10,9 +10,7 @@ pub struct MenuRenderingSystem {
 
 impl MenuRenderingSystem {
     pub fn new(reader: ReaderId<Primitive>) -> Self {
-        MenuRenderingSystem{
-            reader: reader
-        }
+        MenuRenderingSystem { reader: reader }
     }
 }
 
@@ -68,31 +66,24 @@ impl<'a> System<'a> for MenuRenderingSystem {
         // return;
 
         // darker background
-        ui.primitives.push(
-            Primitive {
-                kind: PrimitiveKind::Picture(Picture{
-                    position: Point2::new(0f32, 0f32),
-                    width: w, 
-                    height: h,
-                    image: Image(preloaded_images.transparent_sqr)
-                }),
-                with_projection: false,
-            }
-        );
-        ui.primitives.push(
-            Primitive {
-                kind: PrimitiveKind::Text(Text {
-                    position: Point2::new(w - w/7.0, h / 20.0), 
-                    text: format!(
-                        "$ {}", 
-                        macro_game.coins
-                    ).to_string()
-                }),
-                with_projection: false,
-            }
-        );
+        ui.primitives.push(Primitive {
+            kind: PrimitiveKind::Picture(Picture {
+                position: Point2::new(0f32, 0f32),
+                width: w,
+                height: h,
+                image: Image(preloaded_images.transparent_sqr),
+            }),
+            with_projection: false,
+        });
+        ui.primitives.push(Primitive {
+            kind: PrimitiveKind::Text(Text {
+                position: Point2::new(w - w / 7.0, h / 20.0),
+                text: format!("$ {}", macro_game.coins).to_string(),
+            }),
+            with_projection: false,
+        });
 
-        let button_w = w/12f32;
+        let button_w = w / 12f32;
         let button_h = button_w;
         let mut buttons = vec![];
         let buttons_names = vec!["", ""];
@@ -100,18 +91,18 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let locked_guns_ids = vec![Widgets::LockedBlasterGun, Widgets::LockedLazerGun];
         let buttons_num = buttons_names.len();
         let button_images = vec![
-            preloaded_images.blaster, 
-            preloaded_images.lazer, 
-            preloaded_images.shotgun
+            preloaded_images.blaster,
+            preloaded_images.lazer,
+            preloaded_images.shotgun,
         ];
         let shift_between = w / 20f32;
-        let shift_init = w / 2.0 - shift_between - button_w - button_w / 2.0; 
-                // -button_w / 2.0 since start draw from left corner :)
+        let shift_init = w / 2.0 - shift_between - button_w - button_w / 2.0;
+        // -button_w / 2.0 since start draw from left corner :)
         for i in 0..buttons_num {
             let unlocked = macro_game.guns_unlocked[i];
             let button_position = Point2::new(
-                shift_init + i as f32 * (shift_between + button_w), 
-                button_h / 2f32
+                shift_init + i as f32 * (shift_between + button_w),
+                button_h / 2f32,
             );
             if unlocked {
                 let button = Button::new(
@@ -146,12 +137,9 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let weapon_selector = Selector {
             buttons: buttons,
             id: Widgets::WeaponSelector as usize,
-            mask: Some(macro_game.guns_unlocked.clone())
+            mask: Some(macro_game.guns_unlocked.clone()),
         };
-        if let Some(selected_id) = weapon_selector.place_and_check(
-            &mut ui,
-            &*mouse
-        ) {
+        if let Some(selected_id) = weapon_selector.place_and_check(&mut ui, &*mouse) {
             match Widgets::try_from(selected_id).expect("unknown widget id") {
                 Widgets::BlasterGun => {
                     ui_state.chosed_gun = Some(description.player_guns[0].clone());
@@ -170,25 +158,33 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 Widgets::LockedLazerGun => {
                     if macro_game.coins >= description.gun_costs[1] {
                         macro_game.guns_unlocked[1] = true;
-                        sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
+                        sounds_channel
+                            .single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
                         macro_game.coins -= description.gun_costs[1];
                         ui_state.chosed_gun = Some(description.player_guns[1].clone());
                     }
                 }
-                _ => ()
+                _ => (),
             }
         }
         let mut buttons = vec![];
         let ships_ids = vec![Widgets::BasicShip, Widgets::HeavyShip, Widgets::SuperShip];
-        let ship_images = vec![preloaded_images.basic_ship, preloaded_images.heavy_ship, preloaded_images.super_ship];
-        let locked_ships_ids = vec![Widgets::LockedBasicShip, Widgets::LockedHeavyShip, Widgets::LockedSuperShip];
+        let ship_images = vec![
+            preloaded_images.basic_ship,
+            preloaded_images.heavy_ship,
+            preloaded_images.super_ship,
+        ];
+        let locked_ships_ids = vec![
+            Widgets::LockedBasicShip,
+            Widgets::LockedHeavyShip,
+            Widgets::LockedSuperShip,
+        ];
         for (i, ship) in description.player_ships.iter().enumerate() {
             let unlocked = macro_game.ships_unlocked[i];
-            let button_position = 
-                Point2::new(
-                    shift_init + i as f32 * (shift_between + button_w), 
-                    button_h + button_h
-                );
+            let button_position = Point2::new(
+                shift_init + i as f32 * (shift_between + button_w),
+                button_h + button_h,
+            );
             if unlocked {
                 let button = Button::new(
                     button_position,
@@ -223,12 +219,9 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let ships_selector = Selector {
             buttons: buttons,
             id: Widgets::ShipsSelector as usize,
-            mask: Some(macro_game.ships_unlocked.clone())
+            mask: Some(macro_game.ships_unlocked.clone()),
         };
-        if let Some(selected_id) = ships_selector.place_and_check(
-            &mut ui,
-            &* mouse
-        ) {
+        if let Some(selected_id) = ships_selector.place_and_check(&mut ui, &*mouse) {
             // ui_state.chosed_ship = Some(selected_id);
             match Widgets::try_from(selected_id).expect("unknown widget id") {
                 Widgets::BasicShip => {
@@ -243,18 +236,20 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 Widgets::LockedHeavyShip => {
                     if macro_game.coins >= description.ship_costs[1] {
                         macro_game.ships_unlocked[1] = true;
-                        sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
+                        sounds_channel
+                            .single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
                         macro_game.coins -= description.ship_costs[1];
                     }
                 }
                 Widgets::LockedSuperShip => {
                     if macro_game.coins >= description.ship_costs[2] {
                         macro_game.ships_unlocked[2] = true;
-                        sounds_channel.single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
+                        sounds_channel
+                            .single_write(Sound(preloaded_sounds.buy, Point2::new(0f32, 0f32)));
                         macro_game.coins -= description.ship_costs[2];
                     }
                 }
-                _ => ()
+                _ => (),
             }
         }
         let button_w = w / 6.0;
@@ -275,45 +270,42 @@ impl<'a> System<'a> for MenuRenderingSystem {
             *app_state = AppState::ScoreTable;
         }
         menu_particles.update(0.5);
-        canvas
-            .render_instancing(
-                &gl,
-                &viewport,
-                &mut frame,
-                &menu_particles.instancing_data,
-                &Isometry3::new(
-                    Vector3::new(0f32, 0f32, 0f32),
-                    Vector3::new(0f32, 0f32, 0f32),
-                )
-            );
+        canvas.render_instancing(
+            &gl,
+            &viewport,
+            &mut frame,
+            &menu_particles.instancing_data,
+            &Isometry3::new(
+                Vector3::new(0f32, 0f32, 0f32),
+                Vector3::new(0f32, 0f32, 0f32),
+            ),
+        );
         let button_w = button_w / 2.0;
         let button_h = button_w;
         let button = Button::new(
-            Point2::new(w/2.0 - button_w / 2.0, h - button_h), 
+            Point2::new(w / 2.0 - button_w / 2.0, h - button_h),
             // Point2::new(0f32, 0f32),
-            button_w, 
-            button_h / 4.0, 
+            button_w,
+            button_h / 4.0,
             None,
-            false, 
+            false,
             Some(Image(preloaded_images.upg_bar)),
             "Play".to_string(),
             Widgets::Play as usize,
             Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
             Some(Sound(preloaded_sounds.play, Point2::new(0f32, 0f32))),
         );
-        if let (Some(ship), Some(gun)) = (ui_state.chosed_ship.clone(), ui_state.chosed_gun.clone()) {
+        if let (Some(ship), Some(gun)) = (ui_state.chosed_ship.clone(), ui_state.chosed_gun.clone())
+        {
             if button.place_and_check(&mut ui, &*mouse) {
                 *app_state = AppState::Play(PlayState::Action);
-                insert_channel.single_write(InsertEvent::Character{ 
-                    gun_kind: gun.clone(), 
+                insert_channel.single_write(InsertEvent::Character {
+                    gun_kind: gun.clone(),
                     ship_stats: description.player_ships[ship].ship_stats,
                     image: Image(ship_images[ship]),
                 });
-                *avaliable_upgrades = get_avaliable_cards(
-                    &upgrade_cards_raw,
-                    &gun.clone(),
-                    &name_to_image
-                );
+                *avaliable_upgrades =
+                    get_avaliable_cards(&upgrade_cards_raw, &gun.clone(), &name_to_image);
             }
         }
         primitives_channel.iter_write(ui.primitives.drain(..));

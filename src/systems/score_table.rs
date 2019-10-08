@@ -1,5 +1,5 @@
-use gfx_h::TextData;
 use super::*;
+use gfx_h::TextData;
 
 pub struct ScoreTableRendering {
     reader: ReaderId<Primitive>,
@@ -7,9 +7,7 @@ pub struct ScoreTableRendering {
 
 impl ScoreTableRendering {
     pub fn new(reader: ReaderId<Primitive>) -> Self {
-        ScoreTableRendering {
-            reader: reader
-        }
+        ScoreTableRendering { reader: reader }
     }
 }
 
@@ -24,7 +22,7 @@ impl<'a> System<'a> for ScoreTableRendering {
         Read<'a, Mouse>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
         Write<'a, AppState>,
-        ReadExpect<'a, MacroGame>
+        ReadExpect<'a, MacroGame>,
     );
     fn run(&mut self, data: Self::SystemData) {
         let (
@@ -44,23 +42,20 @@ impl<'a> System<'a> for ScoreTableRendering {
         frame.clear_color();
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
-        let (button_w, button_h) = (w/4f32, h/4f32);
+        let (button_w, button_h) = (w / 4f32, h / 4f32);
 
         let mut current_h = h / 20.0;
         let text_gap_h = h / 20.0; // TODO somehow measure it
         for score in macro_game.score_table.iter() {
             current_h += text_gap_h;
-            ui.primitives.push(
-                Primitive {
-                    kind: PrimitiveKind::Text(Text {
-                        position: Point2::new(w/20.0, current_h), 
-                        text: format!("{}", score).to_string(), 
-                    }),
-                    with_projection: false,
-                }
-            );            
+            ui.primitives.push(Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(w / 20.0, current_h),
+                    text: format!("{}", score).to_string(),
+                }),
+                with_projection: false,
+            });
         }
-
 
         let mut back_to_menu = Button::new(
             Point2::new(w / 2.0, 1.5 * button_h),
@@ -90,6 +85,5 @@ impl<'a> System<'a> for ScoreTableRendering {
             &mut primitives_channel,
             &mut text_data,
         );
-
     }
 }

@@ -1,7 +1,7 @@
 use super::*;
 use log::info;
 
-// TODO: probably move out proc gen 
+// TODO: probably move out proc gen
 #[derive(Default)]
 pub struct GamePlaySystem;
 
@@ -43,7 +43,7 @@ impl<'a> System<'a> for GamePlaySystem {
         ReadExpect<'a, PreloadedSounds>,
         Write<'a, AppState>,
         WriteExpect<'a, MacroGame>,
-        WriteExpect<'a, GlobalParams>
+        WriteExpect<'a, GlobalParams>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -84,14 +84,18 @@ impl<'a> System<'a> for GamePlaySystem {
             preloaded_sounds,
             mut app_state,
             mut macro_game,
-            mut global_params
+            mut global_params,
         ) = data;
         info!("asteroids: gameplay started");
-        if let Some((shield, life, ship_stats, _character)) = (&mut shields, &mut lifes, &ships_stats, &character_markers).join().next() {
+        if let Some((shield, life, ship_stats, _character)) =
+            (&mut shields, &mut lifes, &ships_stats, &character_markers)
+                .join()
+                .next()
+        {
             shield.0 = (shield.0 + ship_stats.shield_regen).min(ship_stats.max_shield);
             life.0 = (life.0 + ship_stats.health_regen).min(ship_stats.max_health);
         } else {
-            return
+            return;
         };
         if progress.experience >= progress.current_max_experience() {
             progress.level_up();
@@ -104,7 +108,10 @@ impl<'a> System<'a> for GamePlaySystem {
             spawned_upgrades.push([up_id, second_id]);
             // *app_state = AppState::Play(PlayState::Upgrade);
         }
-        let (char_entity, char_isometry, _char) = (&entities, &isometries, &character_markers).join().next().unwrap();
+        let (char_entity, char_isometry, _char) = (&entities, &isometries, &character_markers)
+            .join()
+            .next()
+            .unwrap();
         let char_isometry = char_isometry.clone(); // to avoid borrow
         let pos3d = char_isometry.0.translation.vector;
         let character_position = Point2::new(pos3d.x, pos3d.y);
@@ -135,18 +142,17 @@ impl<'a> System<'a> for GamePlaySystem {
                         &mut sounds_channel,
                         &preloaded_sounds,
                         &preloaded_images,
-                        blast.blast_radius
+                        blast.blast_radius,
                     );
-                    
+
                     // process_blast_damage
                     let blast_position = isometries.get(entity).unwrap().0.translation.vector;
                     for (entity, life, isometry) in (&entities, &mut lifes, &isometries).join() {
                         let position = isometry.0.translation.vector;
                         let is_character = entity == char_entity;
-                        let is_asteroid = asteroid_markers.get(entity).is_some(); 
-                        let affected = 
-                            is_character && owner != char_entity ||
-                            entity != char_entity && (owner == char_entity || is_asteroid);
+                        let is_asteroid = asteroid_markers.get(entity).is_some();
+                        let affected = is_character && owner != char_entity
+                            || entity != char_entity && (owner == char_entity || is_asteroid);
                         if affected && (blast_position - position).norm() < blast.blast_radius {
                             if is_character {
                                 global_params.damaged(DAMAGED_RED);
@@ -160,17 +166,21 @@ impl<'a> System<'a> for GamePlaySystem {
                                         &mut sounds_channel,
                                         &preloaded_sounds,
                                         &preloaded_images,
-                                        polygon.max_r
+                                        polygon.max_r,
                                     );
                                     spawn_asteroids(
-                                        isometry.0, 
-                                        polygons.get(entity).unwrap(), 
+                                        isometry.0,
+                                        polygons.get(entity).unwrap(),
                                         &mut insert_channel,
-                                        None
+                                        None,
                                     );
                                 }
                                 if is_character {
-                                    to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
+                                    to_menu(
+                                        &mut app_state,
+                                        &mut progress,
+                                        &mut macro_game.score_table,
+                                    );
                                 }
                                 // delete character
                                 entities.delete(entity).unwrap();
@@ -198,27 +208,23 @@ impl<'a> System<'a> for GamePlaySystem {
                         preloaded_sounds.coin2
                     };
                     sounds_channel.single_write(Sound(
-                            coin_sound,
-                            Point2::new(collectable_position.x, collectable_position.y)
-                        )
-                    );
+                        coin_sound,
+                        Point2::new(collectable_position.x, collectable_position.y),
+                    ));
                     progress.add_coins(coin.0);
                     progress.add_score(coin.0);
                     macro_game.coins += coin.0;
                 }
                 if let Some(exp) = exps.get(entity) {
-                    sounds_channel.single_write(
-                        Sound(
-                            preloaded_sounds.exp,
-                            Point2::new(collectable_position.x, collectable_position.y)
-                        )
-                    );
+                    sounds_channel.single_write(Sound(
+                        preloaded_sounds.exp,
+                        Point2::new(collectable_position.x, collectable_position.y),
+                    ));
                     progress.add_score(3 * exp.0);
                     progress.add_exp(exp.0);
                 }
                 if let Some(health) = healths.get(entity) {
                     lifes.get_mut(char_entity).unwrap().0 += health.0;
-                    // dbg!("wow");
                 }
                 if side_bullet_collectables.get(entity).is_some() {
                     insert_channel.single_write(InsertEvent::SideBulletAbility);
@@ -242,25 +248,16 @@ impl<'a> System<'a> for GamePlaySystem {
         let wave = &waves.0[current_wave.id];
         let (add_cnt, const_spawn) = if cnt == 1 {
             current_wave.iteration += 1;
-            (
-                wave.ships_number - cnt + 1,
-                true
-            )
+            (wave.ships_number - cnt + 1, true)
         } else {
-            (
-                0,
-                false
-            )
+            (0, false)
         };
         if current_wave.iteration > wave.iterations {
             current_wave.iteration = 0;
             current_wave.id = (waves.0.len() - 1).min(current_wave.id + 1);
         }
         let mut rng = thread_rng();
-        fn ships2insert(
-            spawn_pos: Point2,
-            enemy: EnemyKind
-        ) -> InsertEvent {
+        fn ships2insert(spawn_pos: Point2, enemy: EnemyKind) -> InsertEvent {
             InsertEvent::Ship {
                 iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
                 light_shape: Geometry::Circle { radius: 1f32 },
@@ -277,12 +274,16 @@ impl<'a> System<'a> for GamePlaySystem {
         for _ in 0..add_cnt {
             if wave.distribution.len() > 0 {
                 let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
-                // TODO move from loop 
+                // TODO move from loop
                 let ships = &description.enemies;
-                let ship_id = wave.distribution.choose_weighted(&mut rng, |item| item.1).unwrap().0;
+                let ship_id = wave
+                    .distribution
+                    .choose_weighted(&mut rng, |item| item.1)
+                    .unwrap()
+                    .0;
                 insert_channel.single_write(ships2insert(spawn_pos, ships[ship_id].clone()));
             }
-        };
+        }
         if const_spawn {
             for kind in wave.const_distribution.iter() {
                 // dbg!(kind);

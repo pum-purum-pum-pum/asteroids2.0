@@ -1,5 +1,3 @@
-
-
 use crate::nalgebra::Rotation2;
 
 use sdl2::mixer::{InitFlag, AUDIO_S16LSB, DEFAULT_CHANNELS};

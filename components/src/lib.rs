@@ -1,29 +1,27 @@
+use std::collections::HashMap;
 use std::ops::AddAssign;
-use std::collections::{HashMap};
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
-pub use geometry::{Polygon, NebulaGrid, PlanetGrid, StarsGrid, FogGrid, Geometry, BlockSegment};
-pub use physics::{BodiesMap, PhysicsComponent};
-pub use gfx_h::{Image, ImageData};
-pub use gfx_h::animation::{Animation, AnimationFrame};
-use gfx_h::{unproject_with_z, ortho_unproject, Canvas as SDLCanvas};
-pub use sound::{SoundData, SoundPlacement};
 use common::*;
+pub use geometry::{BlockSegment, FogGrid, Geometry, NebulaGrid, PlanetGrid, Polygon, StarsGrid};
+pub use gfx_h::animation::{Animation, AnimationFrame};
+use gfx_h::{ortho_unproject, unproject_with_z, Canvas as SDLCanvas};
+pub use gfx_h::{Image, ImageData};
+pub use physics::{BodiesMap, PhysicsComponent};
+pub use sound::{SoundData, SoundPlacement};
 
+use serde::{Deserialize, Serialize};
 use specs::prelude::*;
-use serde::{Serialize, Deserialize};
-use specs_derive::{Component};
+use specs_derive::Component;
 pub const FINGER_NUMBER: usize = 20;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
 
 pub const ASTEROID_MAX_LIFES: usize = 300usize;
 
-
 pub const BULLET_SPEED_INIT: f32 = 0.5;
 pub const THRUST_FORCE_INIT: f32 = 0.01;
 pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
-
 
 // pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
@@ -71,18 +69,17 @@ impl GlobalParams {
     }
 }
 
-
 #[derive(Debug, Default)]
-pub struct CurrentWave{
+pub struct CurrentWave {
     pub id: usize,
-    pub iteration: usize
+    pub iteration: usize,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Waves (pub Vec<Wave>);
+pub struct Waves(pub Vec<Wave>);
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct WavesSave (pub Vec<WaveSave>);
+pub struct WavesSave(pub Vec<WaveSave>);
 
 pub struct Pallete {
     pub life_color: Point3,
@@ -95,7 +92,7 @@ pub struct Pallete {
 impl Pallete {
     pub fn new() -> Self {
         let life_color = Point3::new(0.5, 0.9, 0.7); // TODO move in consts?
-        let shield_color = Point3::new(0.5, 0.7, 0.9); 
+        let shield_color = Point3::new(0.5, 0.7, 0.9);
         let experience_color = Point3::new(0.8, 0.8, 0.8);
         let white_color = Point3::new(1.0, 1.0, 1.0);
         let grey_color = Point3::new(0.5, 0.5, 0.5);
@@ -105,7 +102,7 @@ impl Pallete {
             shield_color: shield_color,
             experience_color: experience_color,
             white_color: white_color,
-            grey_color: grey_color
+            grey_color: grey_color,
         }
     }
 }
@@ -115,7 +112,7 @@ pub struct Wave {
     pub distribution: Vec<(usize, f32)>,
     pub ships_number: usize,
     pub const_distribution: Vec<(usize, usize)>,
-    pub iterations: usize
+    pub iterations: usize,
 }
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
@@ -123,7 +120,7 @@ pub struct WaveSave {
     pub distribution: Vec<(String, f32)>,
     pub ships_number: usize,
     pub const_distribution: Vec<(String, usize)>,
-    pub iterations: usize
+    pub iterations: usize,
 }
 
 #[derive(Debug, Default)]
@@ -148,7 +145,7 @@ pub struct UIState {
 #[derive(Debug, Default)]
 pub struct LoopSound {
     pub player_lazer_channel: Option<Channel>,
-    pub player_engine_channel: Option<Channel>
+    pub player_engine_channel: Option<Channel>,
 }
 
 #[derive(Debug)]
@@ -157,7 +154,7 @@ pub struct Description {
     pub gun_costs: Vec<usize>,
     pub player_ships: Vec<(ShipKind)>,
     pub player_guns: Vec<GunKind>,
-    pub enemies: Vec<EnemyKind>
+    pub enemies: Vec<EnemyKind>,
 }
 
 #[derive(Debug, Clone)]
@@ -182,7 +179,7 @@ pub enum InsertEvent {
     Character {
         gun_kind: GunKind,
         ship_stats: ShipStats,
-        image: Image
+        image: Image,
     },
     Asteroid {
         iso: Point3,
@@ -200,7 +197,7 @@ pub enum InsertEvent {
         image: Image,
         size: f32,
         snake: Option<usize>,
-        rift: Option<Rift>
+        rift: Option<Rift>,
     },
     Bullet {
         kind: EntityType,
@@ -223,18 +220,18 @@ pub enum InsertEvent {
     },
     Coin {
         value: usize,
-        position: Point2
+        position: Point2,
     },
     DoubleCoinsAbility,
     DoubleCoinsCollectable {
-        position: Point2
+        position: Point2,
     },
     DoubleExpAbility,
     DoubleExpCollectable {
-        position: Point2
+        position: Point2,
     },
     SideBulletCollectable {
-        position: Point2
+        position: Point2,
     },
     SideBulletAbility,
     Exp {
@@ -243,7 +240,7 @@ pub enum InsertEvent {
     },
     Health {
         value: usize,
-        position: Point2
+        position: Point2,
     },
     // Lazer {
     //     kind: EntityType,
@@ -259,24 +256,24 @@ pub enum InsertEvent {
         with_animation: Option<f32>,
     },
     Nebula {
-        iso: Point3
+        iso: Point3,
     },
     Stars {
-        iso: Point3
+        iso: Point3,
     },
     Fog {
-        iso: Point3
+        iso: Point3,
     },
     Planet {
-        iso: Point3
+        iso: Point3,
     },
     Wobble(f32),
     Animation {
         animation: Animation,
         lifetime: Duration,
         pos: Point2,
-        size: f32
-    }
+        size: f32,
+    },
 }
 
 // #[derive(Default, Clone)]
@@ -287,7 +284,7 @@ pub struct UpgradeCard {
     pub upgrade_type: UpgradeType,
     pub image: Image,
     pub name: String,
-    pub description: String
+    pub description: String,
 }
 
 pub type AvaliableUpgrades = Vec<UpgradeCard>;
@@ -308,12 +305,12 @@ pub enum UpgradeType {
     HealthSize,
     LazerLength,
     BulletReflection,
-    Maneuverability
+    Maneuverability,
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
 pub struct AI {
-    pub kinds: Vec<AIType>
+    pub kinds: Vec<AIType>,
 }
 
 #[derive(Component, Debug, Clone, Copy, Serialize, Deserialize)]
@@ -359,7 +356,7 @@ impl ShipKindSave {
     pub fn load(self, name_to_image: &HashMap<String, specs::Entity>) -> ShipKind {
         ShipKind {
             ship_stats: self.ship_stats,
-            image: Image(name_to_image[&self.image])
+            image: Image(name_to_image[&self.image]),
         }
     }
 }
@@ -376,7 +373,7 @@ impl ShipKindSave {
 #[derive(Debug, Clone, Copy)]
 pub enum PlayState {
     Action,
-    Upgrade
+    Upgrade,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -442,7 +439,7 @@ impl Gun for Charge {
         _bullet_speed: f32,
         _bullet_damage: usize,
         _ship_velocity: Vector2,
-        _owner: specs::Entity
+        _owner: specs::Entity,
     ) -> Vec<InsertEvent> {
         unimplemented!();
     }
@@ -483,7 +480,7 @@ impl Default for MacroGame {
             score_table: vec![],
             coins: 0,
             ships_unlocked: vec![true, false],
-            guns_unlocked: vec![true, false]
+            guns_unlocked: vec![true, false],
         }
     }
 }
@@ -498,7 +495,7 @@ pub struct Progress {
 
 impl Progress {
     pub fn current_max_experience(&self) -> usize {
-        100usize * (1f32 +1.2f32.powf(self.level as f32)) as usize
+        100usize * (1f32 + 1.2f32.powf(self.level as f32)) as usize
     }
 
     pub fn level_up(&mut self) {
@@ -581,25 +578,41 @@ pub struct Finger {
     pub y: f32,
     pub x_o: f32,
     pub y_o: f32,
-    pub pressure: f32
+    pub pressure: f32,
 }
 
 impl Finger {
-    pub fn new(id: usize, x: f32, y: f32, observer: Point3, pressure: f32, width_u: u32, height_u: u32, z_far: f32) -> Self {
+    pub fn new(
+        id: usize,
+        x: f32,
+        y: f32,
+        observer: Point3,
+        pressure: f32,
+        width_u: u32,
+        height_u: u32,
+        z_far: f32,
+    ) -> Self {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
         let (x, y) = (x as f32, height_u as f32 - y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
         let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));
-        let point = unproject_with_z(observer, &Point2::new(x, -y), 0f32, width_u, height_u, z_far);
-        Finger{
+        let point = unproject_with_z(
+            observer,
+            &Point2::new(x, -y),
+            0f32,
+            width_u,
+            height_u,
+            z_far,
+        );
+        Finger {
             id: id,
             x: point.x,
             y: point.y,
             x_o: ortho_point.x,
             y_o: ortho_point.y,
-            pressure: pressure
+            pressure: pressure,
         }
     }
 }
@@ -609,7 +622,7 @@ pub type Touches = [Option<Finger>; FINGER_NUMBER];
 #[derive(Default, Debug)]
 pub struct Mouse {
     pub x01: f32,
-    pub y01:f32,
+    pub y01: f32,
     pub o_x: f32,
     pub o_y: f32,
     pub x: f32,
@@ -624,7 +637,15 @@ pub struct Mouse {
 
 impl Mouse {
     /// get system location of mouse and then unproject it into canvas coordinates
-    pub fn set_position(&mut self, x: i32, y: i32, observer: Point3, width_u: u32, height_u: u32, z_far: f32) {
+    pub fn set_position(
+        &mut self,
+        x: i32,
+        y: i32,
+        observer: Point3,
+        width_u: u32,
+        height_u: u32,
+        z_far: f32,
+    ) {
         let (width, height) = (width_u as f32, height_u as f32);
         // dpi already multiplyed
         let (x, y) = (x as f32, y as f32);
@@ -761,7 +782,7 @@ pub enum GunKindMarker {
     ShotGun,
     MultyLazer,
     Cannon,
-    RocketGun
+    RocketGun,
 }
 
 impl Into<GunKindMarker> for &GunKind {
@@ -787,30 +808,28 @@ pub struct UpgradeCardRaw {
     pub image: String,
     pub name: String,
     pub description: String,
-    pub assigned: Vec<Assigned>
+    pub assigned: Vec<Assigned>,
 }
 
 pub fn get_avaliable_cards(
-    cards: &[UpgradeCardRaw], 
+    cards: &[UpgradeCardRaw],
     gun: &GunKind,
-    name_to_image: &HashMap<String, specs::Entity>
+    name_to_image: &HashMap<String, specs::Entity>,
 ) -> Vec<UpgradeCard> {
     let gun_marker: GunKindMarker = gun.into();
-    let avaliable_cards: Vec<UpgradeCard> = cards.iter().filter(
-        |raw_card| {
-            raw_card.assigned.contains(&Assigned::General) ||
-            raw_card.assigned.contains(&Assigned::ToGun(gun_marker))
-        }
-    ).map(
-        |upgrade| {
-            UpgradeCard {
-                upgrade_type: upgrade.upgrade_type,
-                image: Image(name_to_image[&upgrade.image]),
-                name: upgrade.name.clone(),
-                description: upgrade.description.clone()
-            }
-        }
-    ).collect();
+    let avaliable_cards: Vec<UpgradeCard> = cards
+        .iter()
+        .filter(|raw_card| {
+            raw_card.assigned.contains(&Assigned::General)
+                || raw_card.assigned.contains(&Assigned::ToGun(gun_marker))
+        })
+        .map(|upgrade| UpgradeCard {
+            upgrade_type: upgrade.upgrade_type,
+            image: Image(name_to_image[&upgrade.image]),
+            name: upgrade.name.clone(),
+            description: upgrade.description.clone(),
+        })
+        .collect();
     avaliable_cards
 }
 
@@ -820,7 +839,6 @@ pub struct AttachPosition(pub specs::Entity);
 
 #[derive(Component, Debug, Clone)]
 pub struct AttachAim(pub specs::Entity);
-
 
 #[derive(Debug, Clone)]
 pub enum GunKind {
@@ -844,12 +862,8 @@ impl GunKindSave {
             GunKindSave::ShotGun(shotgun_save) => {
                 GunKind::ShotGun(shotgun_save.convert(name_to_image))
             }
-            GunKindSave::MultyLazer(multy_lazer) => {
-                GunKind::MultyLazer(multy_lazer.clone())
-            }
-            GunKindSave::Cannon(cannon_save) => {
-                GunKind::Cannon(cannon_save.convert(name_to_image))
-            }
+            GunKindSave::MultyLazer(multy_lazer) => GunKind::MultyLazer(multy_lazer.clone()),
+            GunKindSave::Cannon(cannon_save) => GunKind::Cannon(cannon_save.convert(name_to_image)),
             GunKindSave::RocketGun(rocket_save) => {
                 GunKind::RocketGun(rocket_save.convert(name_to_image))
             }
@@ -921,7 +935,8 @@ impl MultyLazer {
                 &mut self.lazers[0..limit.min(lazers_num)]
             } else {
                 &mut self.lazers
-            }.iter_mut()
+            }
+            .iter_mut(),
         )
     }
 }
@@ -946,7 +961,7 @@ impl Lazer {
             damage: damage,
             active: false,
             distance: distance,
-            current_distance: distance
+            current_distance: distance,
         }
     }
 }
@@ -977,7 +992,7 @@ pub trait Gun {
         bullet_speed: f32,
         bullet_damage: usize,
         ship_velocity: Vector2,
-        owner: specs::Entity
+        owner: specs::Entity,
     ) -> Vec<InsertEvent>;
 }
 
@@ -994,7 +1009,7 @@ pub struct ShotGun {
     pub reflection: Option<Reflection>,
     pub bullet_lifetime: Duration,
     pub bullet_reflection_lifetime: Duration,
-    pub bullet_image: Image
+    pub bullet_image: Image,
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -1009,7 +1024,7 @@ pub struct ShotGunSave {
     pub reflection: Option<Reflection>,
     pub bullet_lifetime: Duration,
     pub bullet_reflection_lifetime: Duration,
-    pub bullet_image: String
+    pub bullet_image: String,
 }
 
 impl ShotGunSave {
@@ -1025,18 +1040,18 @@ impl ShotGunSave {
             self.reflection,
             self.bullet_reflection_lifetime,
             self.bullet_lifetime,
-            Image(name_to_image[&self.bullet_image])
+            Image(name_to_image[&self.bullet_image]),
         )
     }
 }
 
 impl ShotGun {
     pub fn new(
-        recharge_time: Duration, 
-        bullets_damage: usize, 
+        recharge_time: Duration,
+        bullets_damage: usize,
         side_projectiles_number: usize,
         side_projectiles_limit: Option<usize>,
-        angle_shift: f32, 
+        angle_shift: f32,
         bullet_speed: f32,
         bullet_size: f32,
         reflection: Option<Reflection>,
@@ -1056,7 +1071,7 @@ impl ShotGun {
             reflection: reflection,
             bullet_reflection_lifetime: bullet_reflection_lifetime,
             bullet_lifetime: bullet_lifetime,
-            bullet_image: bullet_image
+            bullet_image: bullet_image,
         }
     }
 }
@@ -1081,9 +1096,8 @@ impl Gun for ShotGun {
         bullet_speed: f32,
         bullet_damage: usize,
         ship_velocity: Vector2,
-        owner: specs::Entity
+        owner: specs::Entity,
     ) -> Vec<InsertEvent> {
-
         let mut res = vec![];
         let position = isometry.translation.vector;
         {
@@ -1092,7 +1106,7 @@ impl Gun for ShotGun {
             let projectile_velocity = Velocity::new(
                 ship_velocity.x + velocity_rel.x,
                 ship_velocity.y + velocity_rel.y,
-            ) ;
+            );
             res.push(InsertEvent::Bullet {
                 kind: entity_type,
                 iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
@@ -1121,13 +1135,13 @@ impl Gun for ShotGun {
                 let projectile_velocity = Velocity::new(
                     ship_velocity.x + velocity_rel.x,
                     ship_velocity.y + velocity_rel.y,
-                ) ;
+                );
                 res.push(InsertEvent::Bullet {
                     kind: entity_type,
                     iso: Point3::new(
-                        position.x, 
-                        position.y, 
-                        isometry.rotation.euler_angles().2 + shift
+                        position.x,
+                        position.y,
+                        isometry.rotation.euler_angles().2 + shift,
                     ),
                     velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
                     size: self.bullet_size,
@@ -1136,7 +1150,7 @@ impl Gun for ShotGun {
                     lifetime: self.bullet_lifetime,
                     bullet_image: self.bullet_image,
                     blast: None,
-                    reflection: self.reflection
+                    reflection: self.reflection,
                 });
             }
         }
@@ -1153,7 +1167,7 @@ pub struct Cannon {
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
     pub bullet_lifetime: Duration,
-    pub bullet_image: Image
+    pub bullet_image: Image,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -1162,14 +1176,14 @@ pub struct RocketGun {
     pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
-    pub bullet_image: Image
+    pub bullet_image: Image,
 }
 
 impl RocketGun {
     pub fn new(
-        recharge_time: Duration, 
-        bullets_damage: usize, 
-        bullet_speed: f32, 
+        recharge_time: Duration,
+        bullets_damage: usize,
+        bullet_speed: f32,
         bullet_image: Image,
     ) -> Self {
         Self {
@@ -1177,7 +1191,7 @@ impl RocketGun {
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
             bullet_speed: bullet_speed,
-            bullet_image: bullet_image
+            bullet_image: bullet_image,
         }
     }
 }
@@ -1188,7 +1202,7 @@ pub struct RocketGunSave {
     pub bullets_damage: usize,
     pub bullet_speed: f32,
     pub bullet_lifetime: Duration,
-    pub bullet_image: String
+    pub bullet_image: String,
 }
 
 impl RocketGunSave {
@@ -1197,7 +1211,7 @@ impl RocketGunSave {
             self.recharge_time,
             self.bullets_damage,
             self.bullet_speed,
-            Image(name_to_image[&self.bullet_image])
+            Image(name_to_image[&self.bullet_image]),
         )
     }
 }
@@ -1210,7 +1224,7 @@ pub struct CannonSave {
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
     pub bullet_lifetime: Duration,
-    pub bullet_image: String
+    pub bullet_image: String,
 }
 
 impl CannonSave {
@@ -1222,18 +1236,18 @@ impl CannonSave {
             self.bullet_speed,
             self.bullet_blast,
             self.bullet_lifetime,
-            Image(name_to_image[&self.bullet_image])
+            Image(name_to_image[&self.bullet_image]),
         )
     }
 }
 
 impl Cannon {
     pub fn new(
-        recharge_time: Duration, 
-        bullets_damage: usize, 
+        recharge_time: Duration,
+        bullets_damage: usize,
         bullet_size: f32,
-        bullet_speed: f32, 
-        bullet_blast: Blast, 
+        bullet_speed: f32,
+        bullet_blast: Blast,
         bullet_lifetime: Duration,
         bullet_image: Image,
     ) -> Self {
@@ -1245,7 +1259,7 @@ impl Cannon {
             bullet_speed: bullet_speed,
             bullet_blast: bullet_blast,
             bullet_lifetime: bullet_lifetime,
-            bullet_image: bullet_image
+            bullet_image: bullet_image,
         }
     }
 }
@@ -1270,7 +1284,7 @@ impl Gun for RocketGun {
         _bullet_speed: f32,
         bullet_damage: usize,
         _ship_velocity: Vector2,
-        owner: specs::Entity
+        owner: specs::Entity,
     ) -> Vec<InsertEvent> {
         let mut res = vec![];
         {
@@ -1316,7 +1330,7 @@ impl Gun for Cannon {
         bullet_speed: f32,
         bullet_damage: usize,
         ship_velocity: Vector2,
-        owner: specs::Entity
+        owner: specs::Entity,
     ) -> Vec<InsertEvent> {
         let mut res = vec![];
         {
@@ -1328,7 +1342,7 @@ impl Gun for Cannon {
             let projectile_velocity = Velocity::new(
                 ship_velocity.x + velocity_rel.x,
                 ship_velocity.y + velocity_rel.y,
-            ) ;
+            );
             let insert_event = InsertEvent::Bullet {
                 kind: entity_type,
                 iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
@@ -1339,7 +1353,7 @@ impl Gun for Cannon {
                 bullet_image: self.bullet_image,
                 lifetime: self.bullet_lifetime,
                 blast: Some(self.bullet_blast),
-                reflection: None
+                reflection: None,
             };
             res.push(insert_event)
         }

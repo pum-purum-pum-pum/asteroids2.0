@@ -1,7 +1,6 @@
 use super::*;
 use log::info;
 
-
 /// here we update isometry, velocity
 pub struct KinematicSystem;
 
@@ -74,11 +73,11 @@ impl<'a> System<'a> for KinematicSystem {
         for (entity, attach) in attach_pairs.iter() {
             // let physics_component = physics.get(*attach).unwrap();
             // let iso2 = world.rigid_body(physics_component.body_handle).position();
-            match  isometries.get(*attach) {
+            match isometries.get(*attach) {
                 Some(isometry) => {
                     let iso = isometry;
-                    isometries.get_mut(*entity).unwrap().0.translation.vector 
-                        = iso.0.translation.vector;
+                    isometries.get_mut(*entity).unwrap().0.translation.vector =
+                        iso.0.translation.vector;
                 }
                 None => {
                     entities.delete(*entity).unwrap();
@@ -88,4 +87,3 @@ impl<'a> System<'a> for KinematicSystem {
         info!("asteroids: kinematic system ended");
     }
 }
-

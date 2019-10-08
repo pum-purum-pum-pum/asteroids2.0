@@ -1,46 +1,44 @@
-use std::io::{Read};
+#[cfg(any(target_os = "android"))]
+use backtrace::Backtrace;
 use nphysics2d::world::World;
+use red::glow::RenderLoop;
+use red::{self, glow, GL};
+use ron::de::from_str;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::rwops::RWops;
+use serde::{Deserialize, Serialize};
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
-use red::{self, GL, glow};
-use red::glow::RenderLoop;
-#[cfg(any(target_os = "android"))]
-use backtrace::Backtrace;
+use std::collections::HashMap;
+use std::io::Read;
 #[cfg(any(target_os = "android"))]
 use std::panic;
-use std::collections::{HashMap};
 use std::time::Duration;
-use ron::de::{from_str};
-use serde::{Serialize, Deserialize};
 // use rand::prelude::*;
-use slog::o;
 use log::info;
+use slog::o;
 
-use std::path::Path;
-use std::fs::File;
-use telemetry::{TeleGraph, TimeSpans};
+use crate::gui::{Primitive, UI};
+use crate::systems::{
+    AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen, GUISystem, GamePlaySystem,
+    InsertSystem, KinematicSystem, MenuRenderingSystem, RenderingSystem, ScoreTableRendering,
+    SoundSystem, UpgradeGUI,
+};
 use common::*;
 use components::*;
 use gfx_h::{
-    Canvas, GlyphVertex, TextVertexBuffer, 
-    TextData, ParticlesData, MovementParticles,
-    effects::MenuParticles, GeometryData
+    effects::MenuParticles, Canvas, GeometryData, GlyphVertex, MovementParticles, ParticlesData,
+    TextData, TextVertexBuffer,
 };
+use glyph_brush::*;
 use physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
-use physics_system::{PhysicsSystem};
-use sound::{init_sound, };
-use crate::systems::{
-    AISystem, CollisionSystem, ControlSystem, GamePlaySystem, CommonRespawn, InsertSystem,
-    KinematicSystem, RenderingSystem, SoundSystem, MenuRenderingSystem,
-    ScoreTableRendering, UpgradeGUI, GUISystem, DeadScreen
-};
-use glyph_brush::{*};
-use crate::gui::{UI, Primitive};
-
+use physics_system::PhysicsSystem;
+use sound::init_sound;
+use std::fs::File;
+use std::path::Path;
+use telemetry::{TeleGraph, TimeSpans};
 
 const NEBULAS_NUM: usize = 3usize;
 
@@ -57,26 +55,26 @@ pub fn just_read(file: &str) -> Result<String, String> {
 pub fn run() -> Result<(), String> {
     // LOGGING
 
-        use std::fs::OpenOptions;
-        use slog::Drain;
-        let log_path = "game.log";
-        let file = OpenOptions::new()
-            .create(true)
-            .write(true)
-            .truncate(true)
-            .open(log_path)
-            .unwrap();
+    use slog::Drain;
+    use std::fs::OpenOptions;
+    let log_path = "game.log";
+    let file = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(log_path)
+        .unwrap();
 
-        // create logger
-        let decorator = slog_term::PlainSyncDecorator::new(file);
-        let drain = slog_term::FullFormat::new(decorator).build().fuse();
-        let logger = slog::Logger::root(drain, o!());
+    // create logger
+    let decorator = slog_term::PlainSyncDecorator::new(file);
+    let drain = slog_term::FullFormat::new(decorator).build().fuse();
+    let logger = slog::Logger::root(drain, o!());
 
-        // slog_stdlog uses the logger from slog_scope, so set a logger there
-        let _guard = slog_scope::set_global_logger(logger);
+    // slog_stdlog uses the logger from slog_scope, so set a logger there
+    let _guard = slog_scope::set_global_logger(logger);
 
-        // register slog_stdlog as the log handler with the log crate
-        // slog_stdlog::init().unwrap();
+    // register slog_stdlog as the log handler with the log crate
+    // slog_stdlog::init().unwrap();
     info!("asteroids: logging crazyness");
     let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
     let mut telegraph = TeleGraph::new(Duration::from_secs(10));
@@ -87,7 +85,8 @@ pub fn run() -> Result<(), String> {
     telegraph.set_color("fps".to_string(), Point3::new(1.0, 1.0, 0.0));
 
     let time_spans = TimeSpans::new();
-    let glyph_brush: GlyphBrush<GlyphVertex, _> = GlyphBrushBuilder::using_font_bytes(dejavu).build();
+    let glyph_brush: GlyphBrush<GlyphVertex, _> =
+        GlyphBrushBuilder::using_font_bytes(dejavu).build();
     #[cfg(any(target_os = "android"))]
     panic::set_hook(Box::new(|panic_info| {
         trace!("AAA PANIC");
@@ -102,15 +101,18 @@ pub fn run() -> Result<(), String> {
     let viewport = red::Viewport::for_window(window_w as i32, window_h as i32);
     let mut phys_world: World<f32> = World::new();
     phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
-    {   // nphysics whatever parameters tuning
+    {
+        // nphysics whatever parameters tuning
         phys_world.integration_parameters_mut().erp = 0.01;
-        phys_world.integration_parameters_mut().max_linear_correction = 10.0;
+        phys_world
+            .integration_parameters_mut()
+            .max_linear_correction = 10.0;
     }
     let sdl_context = sdl2::init().unwrap();
     let video = sdl_context.video().unwrap();
     let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
     let gl_attr = video.gl_attr();
-    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]        
+    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
     let glsl_version = "#version 330";
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
     let glsl_version = "#version 300 es";
@@ -133,19 +135,17 @@ pub fn run() -> Result<(), String> {
         .build()
         .unwrap();
     let _gl_context = window.gl_create_context().unwrap();
-    let render_loop =
-        glow::native::RenderLoop::<sdl2::video::Window>::from_sdl_window(window);
-    let context = glow::native::Context::from_loader_function(|s| {
-        video.gl_get_proc_address(s) as *const _
-    });
+    let render_loop = glow::native::RenderLoop::<sdl2::video::Window>::from_sdl_window(window);
+    let context =
+        glow::native::Context::from_loader_function(|s| video.gl_get_proc_address(s) as *const _);
     let context = GL::new(context);
     let text_buffer = TextVertexBuffer::empty_new(&context).unwrap();
     let glyph_texture = red::shader::Texture::new(&context, glyph_brush.texture_dimensions());
-    let text_data = ThreadPin::new(TextData{
+    let text_data = ThreadPin::new(TextData {
         vertex_buffer: text_buffer,
         vertex_num: 0,
         glyph_texture: glyph_texture.clone(),
-        glyph_brush
+        glyph_brush,
     });
 
     let canvas = Canvas::new(&context, "", &glsl_version).unwrap();
@@ -293,7 +293,8 @@ pub fn run() -> Result<(), String> {
         "locked",
     ];
     let mut name_to_animation = HashMap::new();
-    { // load animations
+    {
+        // load animations
         let animations = [
             ("explosion", 7),
             ("explosion2", 7),
@@ -305,108 +306,92 @@ pub fn run() -> Result<(), String> {
             let mut frames = vec![];
             for i in 1..100 {
                 let animation_file = format!("assets/{}/{}.png", animation_name, i);
-                if let Ok(_rw) = RWops::from_file(Path::new(&animation_file), "r") { 
+                if let Ok(_rw) = RWops::from_file(Path::new(&animation_file), "r") {
                     // TODO: Rewrite -- Hacky, what if it's different error?...
                     let animation_file_relative = format!("{}/{}", animation_name, i);
-                    let image_data = ThreadPin::new(
-                        ImageData::new(&context, &animation_file_relative).unwrap()
-                    );
-                    let image = specs_world
-                        .create_entity()
-                        .with(image_data)
-                        .build();        
+                    let image_data =
+                        ThreadPin::new(ImageData::new(&context, &animation_file_relative).unwrap());
+                    let image = specs_world.create_entity().with(image_data).build();
                     let animation_frame = AnimationFrame {
                         image: Image(image),
-                        ticks: *ticks
+                        ticks: *ticks,
                     };
                     frames.push(animation_frame);
-                } else {break};
+                } else {
+                    break;
+                };
             }
-            let animation = Animation::new(
-                frames,
-                1,
-                0
-            );
+            let animation = Animation::new(frames, 1, 0);
             name_to_animation.insert(animation_name.to_string(), animation);
         }
     };
     let mut name_to_image = HashMap::new();
     for image_name in images.iter() {
-        let image_data = ThreadPin::new(
-            ImageData::new(&context, image_name).unwrap()
-        );
-        let image = specs_world
-            .create_entity()
-            .with(image_data)
-            .build();        
+        let image_data = ThreadPin::new(ImageData::new(&context, image_name).unwrap());
+        let image = specs_world.create_entity().with(image_data).build();
         name_to_image.insert(image_name.to_string(), image);
     }
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
-        let nebula_image_data = ThreadPin::new(
-            ImageData::new(&context, &format!("nebula{}", i)).unwrap()
-        );
-        let nebula_image = specs_world
-            .create_entity()
-            .with(nebula_image_data)
-            .build();
+        let nebula_image_data =
+            ThreadPin::new(ImageData::new(&context, &format!("nebula{}", i)).unwrap());
+        let nebula_image = specs_world.create_entity().with(nebula_image_data).build();
         nebula_images.push(nebula_image);
     }
     let mut stars_images = vec![];
     for i in 1..=5 {
-        let stars_image_data = ThreadPin::new(
-            ImageData::new(&context, &format!("stars{}", i)).unwrap()
-        );
-        let stars_image = specs_world
-            .create_entity()
-            .with(stars_image_data)
-            .build();
+        let stars_image_data =
+            ThreadPin::new(ImageData::new(&context, &format!("stars{}", i)).unwrap());
+        let stars_image = specs_world.create_entity().with(stars_image_data).build();
         stars_images.push(stars_image);
     }
     let mut planet_images = vec![];
     for planet_name in vec!["planet1", "jupyterish", "halfmoon"].iter() {
-        let planet_image_data = ThreadPin::new(
-            ImageData::new(&context, &planet_name).unwrap()
-        );
-        let planet_image = specs_world
-            .create_entity()
-            .with(planet_image_data)
-            .build();
+        let planet_image_data = ThreadPin::new(ImageData::new(&context, &planet_name).unwrap());
+        let planet_image = specs_world.create_entity().with(planet_image_data).build();
         planet_images.push(planet_image);
     }
 
-    {   // load .ron files with tweaks
+    {
+        // load .ron files with tweaks
         #[derive(Debug, Serialize, Deserialize)]
         pub struct DescriptionSave {
             ship_costs: Vec<usize>,
             gun_costs: Vec<usize>,
             player_ships: Vec<ShipKindSave>,
             player_guns: Vec<GunKindSave>,
-            enemies: Vec<EnemyKindSave>
+            enemies: Vec<EnemyKindSave>,
         }
-  
+
         fn process_description(
-            description_save: DescriptionSave, 
-            name_to_image: &HashMap<String, specs::Entity>
+            description_save: DescriptionSave,
+            name_to_image: &HashMap<String, specs::Entity>,
         ) -> Description {
             Description {
                 gun_costs: description_save.gun_costs,
                 ship_costs: description_save.ship_costs,
-                player_ships: description_save.player_ships.iter().map(|x| x.clone().load(name_to_image)).collect(),
-                player_guns: description_save.player_guns
+                player_ships: description_save
+                    .player_ships
+                    .iter()
+                    .map(|x| x.clone().load(name_to_image))
+                    .collect(),
+                player_guns: description_save
+                    .player_guns
                     .iter()
                     .map(|gun| gun.convert(name_to_image))
                     .collect(),
-                enemies: description_save.enemies.iter().map(
-                    |enemy| {
-                        load_enemy(enemy, name_to_image)
-                    })
-                .collect()
+                enemies: description_save
+                    .enemies
+                    .iter()
+                    .map(|enemy| load_enemy(enemy, name_to_image))
+                    .collect(),
             }
         }
 
-        fn load_enemy(enemy_save: &EnemyKindSave, name_to_image: &HashMap<String, specs::Entity>) -> EnemyKind {
-
+        fn load_enemy(
+            enemy_save: &EnemyKindSave,
+            name_to_image: &HashMap<String, specs::Entity>,
+        ) -> EnemyKind {
             EnemyKind {
                 ai_kind: enemy_save.ai_kind.clone(),
                 gun_kind: enemy_save.gun_kind.convert(name_to_image),
@@ -425,7 +410,7 @@ pub fn run() -> Result<(), String> {
             pub size: f32,
             pub image_name: String,
             pub snake: Option<usize>,
-            #[serde(default)] 
+            #[serde(default)]
             pub rift: Option<Rift>,
         };
         #[cfg(not(target_os = "android"))]
@@ -456,34 +441,33 @@ pub fn run() -> Result<(), String> {
                 std::process::exit(1);
             }
         };
-        let upgrades: Vec<UpgradeCard> = upgrades_all.iter().map(
-            |upgrade| {
-                UpgradeCard {
-                    upgrade_type: upgrade.upgrade_type,
-                    image: Image(name_to_image[&upgrade.image]),
-                    name: upgrade.name.clone(),
-                    description: upgrade.description.clone()
-                }
-            }
-        ).collect();
+        let upgrades: Vec<UpgradeCard> = upgrades_all
+            .iter()
+            .map(|upgrade| UpgradeCard {
+                upgrade_type: upgrade.upgrade_type,
+                image: Image(name_to_image[&upgrade.image]),
+                name: upgrade.name.clone(),
+                description: upgrade.description.clone(),
+            })
+            .collect();
         let avaliable_upgrades = upgrades;
         specs_world.add_resource(avaliable_upgrades);
         pub fn wave_load(wave: &WaveSave, enemy_name_to_id: &HashMap<String, usize>) -> Wave {
-            let distribution: Vec<(usize, f32)> = 
-                wave.distribution
-                    .iter()
-                    .map(|p| (enemy_name_to_id[&p.0], p.1))
-                    .collect();
-            let const_distribution: Vec<(usize, usize)> =
-                wave.const_distribution
-                    .iter()
-                    .map(|p| (enemy_name_to_id[&p.0], p.1))
-                    .collect();
+            let distribution: Vec<(usize, f32)> = wave
+                .distribution
+                .iter()
+                .map(|p| (enemy_name_to_id[&p.0], p.1))
+                .collect();
+            let const_distribution: Vec<(usize, usize)> = wave
+                .const_distribution
+                .iter()
+                .map(|p| (enemy_name_to_id[&p.0], p.1))
+                .collect();
             Wave {
                 distribution: distribution,
                 ships_number: wave.ships_number,
                 const_distribution: const_distribution,
-                iterations: wave.iterations
+                iterations: wave.iterations,
             }
         }
         #[cfg(target_os = "android")]
@@ -497,10 +481,13 @@ pub fn run() -> Result<(), String> {
                 std::process::exit(1);
             }
         };
-        let waves: Waves = Waves(waves.0
-            .iter()
-            .map(|p| wave_load(p, &enemy_name_to_id))
-            .collect());
+        let waves: Waves = Waves(
+            waves
+                .0
+                .iter()
+                .map(|p| wave_load(p, &enemy_name_to_id))
+                .collect(),
+        );
         specs_world.add_resource(waves);
         specs_world.add_resource(upgrades_all);
         specs_world.add_resource(CurrentWave::default());
@@ -549,7 +536,6 @@ pub fn run() -> Result<(), String> {
         locked: name_to_image["locked"],
     };
 
-
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&context, -size, -size, size, size, 100),
     ));
@@ -589,12 +575,13 @@ pub fn run() -> Result<(), String> {
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
-    let (preloaded_sounds, music_data, _audio, _mixer, timer) = init_sound(&sdl_context, &mut specs_world)?;
+    let (preloaded_sounds, music_data, _audio, _mixer, timer) =
+        init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
     specs_world.add_resource(PlanetGrid::new(1, 60f32, 60f32, 30f32, 30f32));
     specs_world.add_resource(StarsGrid::new(3, 40f32, 40f32, 4f32, 4f32));
     specs_world.add_resource(FogGrid::new(2, 50f32, 50f32, 5f32, 5f32));
-    
+
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
     specs_world.add_resource(name_to_image);
     specs_world.add_resource(ThreadPin::new(music_data));
@@ -603,11 +590,9 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(preloaded_sounds);
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
-    specs_world.add_resource(
-        ThreadPin::new(
-            MenuParticles::new_quad(&context, -size, -size, size, size, -20.0, 20.0, 200)
-        )
-    );
+    specs_world.add_resource(ThreadPin::new(MenuParticles::new_quad(
+        &context, -size, -size, size, size, -20.0, 20.0, 200,
+    )));
     specs_world.add_resource(GlobalParams::default());
     {
         let file = "rons/macro_game.ron";
@@ -712,9 +697,7 @@ pub fn run() -> Result<(), String> {
             let mut mouse_state = specs_world.write_resource::<Mouse>();
             mouse_state.set_left(buttons.contains(&MouseButton::Left));
             mouse_state.set_right(buttons.contains(&MouseButton::Right));
-            let dims = specs_world
-                .read_resource::<red::Viewport>()
-                .dimensions();
+            let dims = specs_world.read_resource::<red::Viewport>().dimensions();
             mouse_state.set_position(
                 state.x(),
                 state.y(),
@@ -728,23 +711,21 @@ pub fn run() -> Result<(), String> {
                 #[cfg(not(target_os = "android"))]
                 {
                     let mut touches = specs_world.write_resource::<Touches>();
-                    
+
                     touches[0] = if mouse_state.left {
                         Some(Finger::new(
                             0,
                             state.x() as f32,
                             state.y() as f32,
-                            specs_world
-                                .read_resource::<ThreadPin<Canvas>>()
-                                .observer(),
-                            0f32, 
+                            specs_world.read_resource::<ThreadPin<Canvas>>().observer(),
+                            0f32,
                             dims.0 as u32,
                             dims.1 as u32,
-                            specs_world
-                                .read_resource::<ThreadPin<Canvas>>()
-                                .z_far,
+                            specs_world.read_resource::<ThreadPin<Canvas>>().z_far,
                         ))
-                    } else {None};
+                    } else {
+                        None
+                    };
                 }
                 #[cfg(target_os = "android")]
                 {
@@ -759,27 +740,23 @@ pub fn run() -> Result<(), String> {
                                         finger.id as usize,
                                         finger.x * dims.0 as f32,
                                         finger.y * dims.1 as f32,
-                                        specs_world
-                                            .read_resource::<ThreadPin<Canvas>>()
-                                            .observer(),
+                                        specs_world.read_resource::<ThreadPin<Canvas>>().observer(),
                                         finger.pressure,
                                         dims.0 as u32,
-                                        dims.1 as u32
+                                        dims.1 as u32,
                                     ));
                                 }
-                                None => ()
+                                None => (),
                             }
                         }
                     }
-                }   
+                }
             }
         }
         flame::end("control crazyness");
         let app_state = *specs_world.read_resource::<AppState>();
         match app_state {
-            AppState::Menu => {
-                menu_dispatcher.dispatch(&specs_world.res)
-            }
+            AppState::Menu => menu_dispatcher.dispatch(&specs_world.res),
             AppState::Play(play_state) => {
                 if let PlayState::Action = play_state {
                     flame::start("dispatch");
@@ -839,18 +816,20 @@ pub fn run() -> Result<(), String> {
                         enumerate_arrays: true,
                         ..PrettyConfig::default()
                     };
-                    let s = to_string_pretty(&*specs_world.write_resource::<MacroGame>(), pretty).expect("Serialization failed");
+                    let s = to_string_pretty(&*specs_world.write_resource::<MacroGame>(), pretty)
+                        .expect("Serialization failed");
                     let file = "rons/macro_game.ron";
                     // let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
                     eprintln!("{}", s);
                     if let Ok(mut rw) = RWops::from_file(Path::new(&file), "w+") {
                         rw.write(s.as_bytes()).expect("failed to load macro game");
                     } else {
-                        let mut rw = RWops::from_file(Path::new(&file), "w").expect("failed to load macro game");
+                        let mut rw = RWops::from_file(Path::new(&file), "w")
+                            .expect("failed to load macro game");
                         rw.write(s.as_bytes()).expect("failed to write");
                     }
                     flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
-                },
+                }
                 sdl2::event::Event::Window {
                     win_event: sdl2::event::WindowEvent::Resized(w, h),
                     ..
@@ -859,10 +838,9 @@ pub fn run() -> Result<(), String> {
                     viewport.update_size(w, h);
                     let context = specs_world.read_resource::<ThreadPin<red::GL>>();
                     viewport.set_used(&*context);
-                },
+                }
                 _ => (),
             }
-
         }
         flame::end("events loop");
         // ::std::thread::sleep(Duration::new(0, 1_000_000_000u32 / 60));
@@ -871,6 +849,6 @@ pub fn run() -> Result<(), String> {
             flame::clear();
         }
     });
-        
+
     Ok(())
 }

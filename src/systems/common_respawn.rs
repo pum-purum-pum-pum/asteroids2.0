@@ -37,9 +37,9 @@ impl<'a> System<'a> for CommonRespawn {
             mut nebula_grid,
             mut planet_grid,
         ) = data;
-        let character_position = 
-            if let Some((_char_entity, char_isometry, _char))
-                = (&entities, &isometries, &character_markers).join().next() {
+        let character_position = if let Some((_char_entity, char_isometry, _char)) =
+            (&entities, &isometries, &character_markers).join().next()
+        {
             let char_vec = char_isometry.0.translation.vector;
             Point2::new(char_vec.x, char_vec.y)
         } else {
@@ -61,11 +61,7 @@ impl<'a> System<'a> for CommonRespawn {
             // let ball = ncollide2d::shape::Ball::new(r);
             let spawn_pos = spawn_position(character_position, PLAYER_AREA, ACTIVE_AREA);
             insert_channel.single_write(InsertEvent::Asteroid {
-                iso: Point3::new(
-                    spawn_pos.x,
-                    spawn_pos.y,
-                    0.0,
-                ),
+                iso: Point3::new(spawn_pos.x, spawn_pos.y, 0.0),
                 velocity: initial_asteroid_velocity(),
                 polygon: poly,
                 spin: spin,
@@ -79,7 +75,7 @@ impl<'a> System<'a> for CommonRespawn {
             let point = Point2::new(position.x, position.y);
             match big_star_grid.grid.update(point, true) {
                 Ok(_) => (),
-                Err(_) => ()
+                Err(_) => (),
             }
         }
 
@@ -92,7 +88,7 @@ impl<'a> System<'a> for CommonRespawn {
                     let mut rng = thread_rng();
                     let angle = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
                     insert_channel.single_write(InsertEvent::Fog {
-                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle)
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle),
                     })
                 }
             }
@@ -100,11 +96,12 @@ impl<'a> System<'a> for CommonRespawn {
 
         for (entity, isometry, _star) in (&entities, &isometries, &big_star_markers).join() {
             let pos3d = isometry.0.translation.vector;
-            if  (pos3d.x - character_position.x).abs() > big_star_grid.grid.max_w ||
-                (pos3d.y - character_position.y).abs() > big_star_grid.grid.max_h {
+            if (pos3d.x - character_position.x).abs() > big_star_grid.grid.max_w
+                || (pos3d.y - character_position.y).abs() > big_star_grid.grid.max_h
+            {
                 entities.delete(entity).unwrap();
             }
-        }        
+        }
 
         // TOOOOOO MANY COOPY PASTE %-P
         stars_grid.grid.reset();
@@ -113,7 +110,7 @@ impl<'a> System<'a> for CommonRespawn {
             let point = Point2::new(position.x, position.y);
             match stars_grid.grid.update(point, true) {
                 Ok(_) => (),
-                Err(_) => ()
+                Err(_) => (),
             }
         }
 
@@ -126,7 +123,7 @@ impl<'a> System<'a> for CommonRespawn {
                     let mut rng = thread_rng();
                     let angle = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
                     insert_channel.single_write(InsertEvent::Stars {
-                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle)
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle),
                     })
                 }
             }
@@ -134,8 +131,9 @@ impl<'a> System<'a> for CommonRespawn {
 
         for (entity, isometry, _stars) in (&entities, &isometries, &stars).join() {
             let pos3d = isometry.0.translation.vector;
-            if  (pos3d.x - character_position.x).abs() > stars_grid.grid.max_w ||
-                (pos3d.y - character_position.y).abs() > stars_grid.grid.max_h {
+            if (pos3d.x - character_position.x).abs() > stars_grid.grid.max_w
+                || (pos3d.y - character_position.y).abs() > stars_grid.grid.max_h
+            {
                 entities.delete(entity).unwrap();
             }
         }
@@ -147,7 +145,7 @@ impl<'a> System<'a> for CommonRespawn {
             let point = Point2::new(position.x, position.y);
             match planet_grid.grid.update(point, true) {
                 Ok(_) => (),
-                Err(_) => ()
+                Err(_) => (),
             }
         }
 
@@ -160,7 +158,7 @@ impl<'a> System<'a> for CommonRespawn {
                     let mut rng = thread_rng();
                     let angle = rng.gen_range(0.0, 2.0 * std::f32::consts::PI);
                     insert_channel.single_write(InsertEvent::Planet {
-                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle)
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, angle),
                     })
                 }
             }
@@ -168,8 +166,9 @@ impl<'a> System<'a> for CommonRespawn {
 
         for (entity, isometry, _planet) in (&entities, &isometries, &planets).join() {
             let pos3d = isometry.0.translation.vector;
-            if  (pos3d.x - character_position.x).abs() > planet_grid.grid.max_w ||
-                (pos3d.y - character_position.y).abs() > planet_grid.grid.max_h {
+            if (pos3d.x - character_position.x).abs() > planet_grid.grid.max_w
+                || (pos3d.y - character_position.y).abs() > planet_grid.grid.max_h
+            {
                 entities.delete(entity).unwrap();
             }
         }
@@ -181,7 +180,7 @@ impl<'a> System<'a> for CommonRespawn {
             let point = Point2::new(position.x, position.y);
             match nebula_grid.grid.update(point, true) {
                 Ok(_) => (),
-                Err(_) => ()
+                Err(_) => (),
             }
         }
         for i in 0..nebula_grid.grid.size {
@@ -191,7 +190,7 @@ impl<'a> System<'a> for CommonRespawn {
                     let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
                     let spawn_pos = spawn_in_rectangle(min_w, max_w, min_h, max_h);
                     insert_channel.single_write(InsertEvent::Nebula {
-                        iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32)
+                        iso: Point3::new(spawn_pos.x, spawn_pos.y, 0f32),
                     })
                 }
             }
@@ -199,24 +198,32 @@ impl<'a> System<'a> for CommonRespawn {
 
         for (entity, isometry, _nebula) in (&entities, &isometries, &nebulas).join() {
             let pos3d = isometry.0.translation.vector;
-            if  (pos3d.x - character_position.x).abs() > nebula_grid.grid.max_w ||
-                (pos3d.y - character_position.y).abs() > nebula_grid.grid.max_h {
+            if (pos3d.x - character_position.x).abs() > nebula_grid.grid.max_w
+                || (pos3d.y - character_position.y).abs() > nebula_grid.grid.max_h
+            {
                 entities.delete(entity).unwrap();
             }
         }
         for (entity, isometry, _asteroid) in (&entities, &isometries, &asteroid_markers).join() {
             let pos3d = isometry.0.translation.vector;
-            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), ACTIVE_AREA) {
+            if !is_active(
+                character_position,
+                Point2::new(pos3d.x, pos3d.y),
+                ACTIVE_AREA,
+            ) {
                 entities.delete(entity).unwrap();
             }
         }
         for (entity, isometry, _ship) in (&entities, &isometries, &ships).join() {
             let pos3d = isometry.0.translation.vector;
-            if !is_active(character_position, Point2::new(pos3d.x, pos3d.y), ACTIVE_AREA) {
+            if !is_active(
+                character_position,
+                Point2::new(pos3d.x, pos3d.y),
+                ACTIVE_AREA,
+            ) {
                 entities.delete(entity).unwrap();
             }
         }
+        dbg!((&entities).join().count());
     }
 }
-
-

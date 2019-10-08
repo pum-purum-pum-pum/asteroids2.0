@@ -20,7 +20,7 @@ fn reflect_bullet(
     let alpha = Rotation2::rotation_between(&standart, &velocity.linear).angle();
     let position = Isometry2::new(
         Vector2::new(position.translation.vector.x, position.translation.vector.y),
-        alpha
+        alpha,
     );
     let mut new_reflection = reflection.clone();
     new_reflection.times = Some(1);
@@ -36,7 +36,6 @@ fn reflect_bullet(
     *reflection = new_reflection;
     body.set_position(position);
     body.set_velocity(velocity);
-
 }
 
 fn damage_ship(
@@ -56,7 +55,7 @@ fn damage_ship(
     contact_pos: Point2,
     ship_pos: Point2,
     damage: usize,
-    bullet: bool
+    bullet: bool,
 ) {
     if is_character {
         if bullet {
@@ -73,34 +72,20 @@ fn damage_ship(
             preloaded_images,
         );
     }
-    if process_damage(
-        lifes.get_mut(ship).unwrap(),
-        shields.get_mut(ship),
-        damage
-    ) {
+    if process_damage(lifes.get_mut(ship).unwrap(), shields.get_mut(ship), damage) {
         // ship is done... Explode it
-        ship_explode(
-            ship_pos,
-            insert_channel,
-            sounds_channel,
-            preloaded_sounds,
-        );
+        ship_explode(ship_pos, insert_channel, sounds_channel, preloaded_sounds);
         if is_character {
-            to_menu(
-                app_state, 
-                progress,
-                &mut macro_game.score_table
-            );
+            to_menu(app_state, progress, &mut macro_game.score_table);
         }
         entities.delete(ship).unwrap();
     }
 }
 
-
 #[derive(Default)]
 pub struct CollisionSystem {
     colliding_pairs: Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
-    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>
+    colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
 }
 
 impl<'a> System<'a> for CollisionSystem {
@@ -127,7 +112,7 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, Progress>,
         Write<'a, AppState>,
         WriteExpect<'a, MacroGame>,
-        WriteExpect<'a, GlobalParams>
+        WriteExpect<'a, GlobalParams>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -165,25 +150,22 @@ impl<'a> System<'a> for CollisionSystem {
                     collision_handle1,
                     collision_handle2,
                 ) => {
-                    self.colliding_start_events.push((collision_handle1, collision_handle2));
+                    self.colliding_start_events
+                        .push((collision_handle1, collision_handle2));
                 }
-                _ => ()
+                _ => (),
             }
         }
         for (h1, h2) in self.colliding_start_events.iter() {
-            if let Some((_h1, _h2, _, manifold)) = world
-                .collider_world_mut()
-                .contact_pair(*h1, *h2, true) {
+            if let Some((_h1, _h2, _, manifold)) =
+                world.collider_world_mut().contact_pair(*h1, *h2, true)
+            {
                 if let Some(tracked_contact) = manifold.deepest_contact() {
                     let contact_normal = tracked_contact.contact.normal;
-                    self
-                        .colliding_pairs
-                        .push((*h1, *h2, *contact_normal))   
+                    self.colliding_pairs.push((*h1, *h2, *contact_normal))
                 }
-            }        
+            }
         }
-
-
 
         for (handle1, handle2, normal) in self.colliding_pairs.iter() {
             let (body_handle1, body_handle2) = {
@@ -219,12 +201,12 @@ impl<'a> System<'a> for CollisionSystem {
                     if projectile_damage != 0 {
                         if reflections.get(projectile).is_some() {
                             reflect_bullet(
-                                projectile, 
-                                &physics_components, 
-                                &mut world, 
-                                &mut reflections, 
-                                *normal, 
-                                &mut lifetimes
+                                projectile,
+                                &physics_components,
+                                &mut world,
+                                &mut reflections,
+                                *normal,
+                                &mut lifetimes,
                             );
                         } else {
                             entities.delete(projectile).unwrap();
@@ -249,16 +231,14 @@ impl<'a> System<'a> for CollisionSystem {
                         position: Point2::new(position.x, position.y),
                         num: 3usize,
                         lifetime: Duration::from_secs(EXPLOSION_LIFETIME_SECS),
-                        with_animation: None
+                        with_animation: None,
                     };
                     insert_channel.single_write(effect);
                     if character_markers.get(ship).is_some() {
-                        sounds_channel.single_write(
-                            Sound(
-                                preloaded_sounds.collision,
-                                Point2::new(position.x, position.y)
-                            )
-                        );
+                        sounds_channel.single_write(Sound(
+                            preloaded_sounds.collision,
+                            Point2::new(position.x, position.y),
+                        ));
                     }
                     let is_character = character_markers.get(ship).is_some();
                     if is_character {
@@ -279,7 +259,7 @@ impl<'a> System<'a> for CollisionSystem {
                             Point2::new(position.x, position.y),
                             Point2::new(position.x, position.y),
                             3usize,
-                            false
+                            false,
                         );
                     }
                 }
@@ -294,13 +274,13 @@ impl<'a> System<'a> for CollisionSystem {
                         &mut sounds_channel,
                         &preloaded_sounds,
                         &preloaded_images,
-                        polygon.max_r
+                        polygon.max_r,
                     );
                     spawn_asteroids(
-                        isometries.get(asteroid).unwrap().0, 
-                        polygons.get(asteroid).unwrap(), 
+                        isometries.get(asteroid).unwrap().0,
+                        polygons.get(asteroid).unwrap(),
                         &mut insert_channel,
-                        bullet_position
+                        bullet_position,
                     );
                     entities.delete(asteroid).unwrap();
                 }
@@ -333,12 +313,19 @@ impl<'a> System<'a> for CollisionSystem {
                     projectile_pos,
                     Point2::new(position.x, position.y),
                     projectile_damage,
-                    true
+                    true,
                 );
                 // Kludge
                 if projectile_damage != 0 {
                     if reflections.get(projectile).is_some() {
-                        reflect_bullet(projectile, &physics_components, &mut world, &mut reflections, *normal, &mut lifetimes);
+                        reflect_bullet(
+                            projectile,
+                            &physics_components,
+                            &mut world,
+                            &mut reflections,
+                            *normal,
+                            &mut lifetimes,
+                        );
                     } else {
                         entities.delete(projectile).unwrap();
                     }
@@ -356,14 +343,12 @@ impl<'a> System<'a> for CollisionSystem {
                     let character_ship = ship1;
                     let other_ship = ship2;
                     // entities.delete(other_ship).unwrap();
-                    sounds_channel.single_write(Sound(
-                        preloaded_sounds.collision, 
-                        Point2::new(0f32, 0f32))
-                    );
+                    sounds_channel
+                        .single_write(Sound(preloaded_sounds.collision, Point2::new(0f32, 0f32)));
                     if process_damage(
                         lifes.get_mut(other_ship).unwrap(),
                         shields.get_mut(other_ship),
-                        damages.get(character_ship).unwrap().0
+                        damages.get(character_ship).unwrap().0,
                     ) {
                         ship_explode(
                             Point2::new(position.x, position.y),
@@ -377,7 +362,7 @@ impl<'a> System<'a> for CollisionSystem {
                     if process_damage(
                         lifes.get_mut(character_ship).unwrap(),
                         shields.get_mut(character_ship),
-                        damages.get(other_ship).unwrap().0
+                        damages.get(other_ship).unwrap().0,
                     ) {
                         to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
                         // delete character

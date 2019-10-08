@@ -1,7 +1,7 @@
-pub use rand;
 pub use common;
-use rand::prelude::*;
 use noise::{NoiseFn, Perlin, Seedable};
+pub use rand;
+use rand::prelude::*;
 use specs::prelude::*;
 use specs_derive::Component;
 
@@ -10,21 +10,21 @@ use std::io::{BufReader, Error as IOError, Read};
 use nalgebra::geometry::Orthographic3;
 
 use common::*;
-use red;
-use red::VertexAttribPointers;
-use red::glow::Context;
-use red::glow;
 use image;
+use red;
+use red::glow;
+use red::glow::Context;
+use red::VertexAttribPointers;
 
+use glyph_brush::{
+    rusttype::{point, Rect},
+    BrushAction, BrushError, DefaultSectionHasher, GlyphBrush,
+};
+use red::data::*;
+use red::shader::Texture;
+use red::{DrawParams, DrawType, Operation, Stencil, StencilTest};
 use sdl2::rwops::RWops;
 use std::path::Path;
-use glyph_brush::{
-    BrushAction, BrushError, rusttype::{Rect, point}, GlyphBrush,
-    DefaultSectionHasher
-};
-use red::shader::Texture;
-use red::data::{*};
-use red::{DrawParams, DrawType, Stencil, StencilTest, Operation};
 
 pub mod effects;
 pub use effects::*;
@@ -40,10 +40,9 @@ pub const _BACKGROUND_SIZE: f32 = 20f32;
 pub fn iso3_iso2(iso3: &Isometry3) -> Isometry2 {
     Isometry2::new(
         Vector2::new(iso3.translation.vector.x, iso3.translation.vector.y),
-        iso3.rotation.euler_angles().2
+        iso3.rotation.euler_angles().2,
     )
 }
-
 
 pub fn get_view(observer: Point3) -> Isometry3 {
     let mut target = observer.clone();
@@ -51,15 +50,14 @@ pub fn get_view(observer: Point3) -> Isometry3 {
     Isometry3::look_at_rh(&observer, &target, &Vector3::y())
 }
 
-
 pub fn perspective(width: u32, height: u32) -> Perspective3 {
     let aspect_ratio = width as f32 / height as f32;
     Perspective3::new(aspect_ratio, 3.14 / 3.0, 0.1, 1000.0)
 }
 
 fn gl_assert_ok(gl_context: &red::GL) {
-    let err = unsafe{gl_context.get_error()};
-    assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));    
+    let err = unsafe { gl_context.get_error() };
+    assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));
 }
 
 fn gl_err_to_str(err: u32) -> &'static str {
@@ -77,7 +75,6 @@ fn gl_err_to_str(err: u32) -> &'static str {
 
 #[derive(Debug, Component, Clone, Copy)]
 pub struct Image(pub specs::Entity);
-
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -118,10 +115,10 @@ impl GeometryData {
             })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape)?;
-        let index_buffer = red::buffer::IndexBuffer::new(gl , &indices)?;
-        Ok(GeometryData{
+        let index_buffer = red::buffer::IndexBuffer::new(gl, &indices)?;
+        Ok(GeometryData {
             positions: vertex_buffer,
-            index_buffer: index_buffer
+            index_buffer: index_buffer,
         })
     }
 }
@@ -132,7 +129,6 @@ pub struct Vertex {
     pub position: red::data::f32_f32,
     pub tex_coords: red::data::f32_f32,
 }
-
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]
@@ -152,7 +148,7 @@ pub struct TextData<'a> {
     pub vertex_buffer: TextVertexBuffer<TextVertex>,
     pub vertex_num: i32,
     pub glyph_texture: red::Texture,
-    pub glyph_brush: GlyphBrush<'a, GlyphVertex, DefaultSectionHasher>
+    pub glyph_brush: GlyphBrush<'a, GlyphVertex, DefaultSectionHasher>,
 }
 
 pub struct ImageData {
@@ -189,7 +185,6 @@ impl ImageData {
     }
 }
 
-
 pub fn read_file(filename: &str) -> Result<String, IOError> {
     let mut result_str = String::new();
     let mut rw = RWops::from_file(Path::new(filename), "r")
@@ -205,20 +200,34 @@ pub fn load_texture(gl: &red::GL, name: &str) -> red::shader::Texture {
     let reader = BufReader::new(texture_file);
     let image = image::load(reader, image::PNG).unwrap().to_rgba();
     let image_dimensions = image.dimensions();
-    let image =
-        red::shader::Texture::from_rgba8(gl, image_dimensions.0, image_dimensions.1, &image.into_raw());
+    let image = red::shader::Texture::from_rgba8(
+        gl,
+        image_dimensions.0,
+        image_dimensions.1,
+        &image.into_raw(),
+    );
     image
 }
 
-pub fn create_shader_program(gl: &red::GL, pref: &str, name: &str, glsl_version: &str) -> Result<red::Program, String> {
+pub fn create_shader_program(
+    gl: &red::GL,
+    pref: &str,
+    name: &str,
+    glsl_version: &str,
+) -> Result<red::Program, String> {
     let vertex = format!("{}gles/v_{}.glsl", pref, name);
     let fragment = format!("{}gles/f_{}.glsl", pref, name);
     let (vertex_shader, fragment_shader) = (
         format!("{}\n{}", glsl_version, read_file(&vertex).unwrap()),
-        format!("{}\n{}", glsl_version, read_file(&fragment).unwrap())
+        format!("{}\n{}", glsl_version, read_file(&fragment).unwrap()),
     );
     #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-    trace!("{:?} \n {:?} \n {:?}", vertex_shader, "---", fragment_shader);
+    trace!(
+        "{:?} \n {:?} \n {:?}",
+        vertex_shader,
+        "---",
+        fragment_shader
+    );
     let vertex_shader = red::Shader::from_vert_source(&gl, &vertex_shader).unwrap();
     let fragment_shader = red::Shader::from_frag_source(&gl, &fragment_shader).unwrap();
     let program = red::Program::from_shaders(&gl, &[vertex_shader, fragment_shader])?;
@@ -228,44 +237,38 @@ pub fn create_shader_program(gl: &red::GL, pref: &str, name: &str, glsl_version:
 pub enum RenderMode {
     StencilWrite,
     StencilCheck,
-    Draw
+    Draw,
 }
 
 impl Into<DrawParams> for RenderMode {
     fn into(self) -> DrawParams {
         match self {
-            RenderMode::StencilWrite => {
-                red::DrawParams{
-                    draw_type: DrawType::Standart,
-                    stencil: Some(Stencil {
-                        ref_value: 1,
-                        mask: 0xFF,
-                        test: StencilTest::AlwaysPass,
-                        pass_operation: Some(Operation::Replace)
-                    }),
-                    color_mask: (false, false, false, false),
-                    ..Default::default()
-                }
-            }
-            RenderMode::Draw => {
-                red::DrawParams{
-                    blend: Some(red::Blend),
-                    ..Default::default()
-                }
-            }
-            RenderMode::StencilCheck => {
-                red::DrawParams{
-                    draw_type: DrawType::Standart,
-                    stencil: Some(Stencil {
-                        ref_value: 1,
-                        mask: 0xFF,
-                        test: StencilTest::NotEqual,
-                        pass_operation: None
-                    }),
-                    blend: Some(red::Blend),
-                    ..Default::default()
-                }
-            }
+            RenderMode::StencilWrite => red::DrawParams {
+                draw_type: DrawType::Standart,
+                stencil: Some(Stencil {
+                    ref_value: 1,
+                    mask: 0xFF,
+                    test: StencilTest::AlwaysPass,
+                    pass_operation: Some(Operation::Replace),
+                }),
+                color_mask: (false, false, false, false),
+                ..Default::default()
+            },
+            RenderMode::Draw => red::DrawParams {
+                blend: Some(red::Blend),
+                ..Default::default()
+            },
+            RenderMode::StencilCheck => red::DrawParams {
+                draw_type: DrawType::Standart,
+                stencil: Some(Stencil {
+                    ref_value: 1,
+                    mask: 0xFF,
+                    test: StencilTest::NotEqual,
+                    pass_operation: None,
+                }),
+                blend: Some(red::Blend),
+                ..Default::default()
+            },
         }
     }
 }
@@ -295,7 +298,8 @@ impl Canvas {
     pub fn new(gl: &red::GL, pref: &str, glsl_version: &str) -> Result<Self, String> {
         let program = create_shader_program(gl, pref, "", glsl_version)?;
         let program_primitive = create_shader_program(gl, pref, "primitive", glsl_version)?;
-        let program_primitive_texture = create_shader_program(gl, pref, "primitive_texture", glsl_version)?;
+        let program_primitive_texture =
+            create_shader_program(gl, pref, "primitive_texture", glsl_version)?;
         let program_light = create_shader_program(gl, pref, "light", glsl_version)?;
         let program_instancing = create_shader_program(gl, pref, "instancing", glsl_version)?;
         let program_glyph = create_shader_program(gl, pref, "text", &glsl_version)?;
@@ -314,10 +318,9 @@ impl Canvas {
             camera_wobble: 0f32,
             direction: Vector2::new(0f32, 0f32),
             direction_offset: Vector2::new(0f32, 0f32),
-            z_far: z_far
+            z_far: z_far,
         })
     }
-
 
     /// draw lines with only one draw call
     pub fn draw_lines(
@@ -338,22 +341,20 @@ impl Canvas {
                 Point2::new(-line_width / 2.0, 0f32),
                 Point2::new(line_width / 2.0, 0f32),
                 Point2::new(-line_width / 2.0, -line_length),
-                Point2::new(line_width / 2.0, -line_length)
+                Point2::new(line_width / 2.0, -line_length),
             ];
             let up = Vector2::new(0.0, -line_length);
             let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
             let iso = Isometry3::new(
-                Vector3::new(a.x, a.y, 0f32), 
-                Vector3::new(0f32, 0f32, rotation.angle())
+                Vector3::new(a.x, a.y, 0f32),
+                Vector3::new(0f32, 0f32, rotation.angle()),
             );
             let current_indices = [0u16, 1, 2, 1, 3, 2];
             positions.extend(current_positions.iter().map(|x| iso3_iso2(&iso) * x));
             indices.extend(current_indices.iter().map(|x| cur_id + x));
             cur_id += current_indices.len() as u16;
         }
-        let geometry_data = GeometryData::new(
-            &context, &positions, &indices
-        ).unwrap();
+        let geometry_data = GeometryData::new(&context, &positions, &indices).unwrap();
         self.render_geometry(
             &context,
             &viewport,
@@ -361,7 +362,7 @@ impl Canvas {
             &geometry_data,
             &Isometry3::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0f32, 0f32, 0f32)),
             RenderMode::Draw,
-            color
+            color,
         );
     }
 
@@ -380,18 +381,16 @@ impl Canvas {
             Point2::new(-line_width / 2.0, 0f32),
             Point2::new(line_width / 2.0, 0f32),
             Point2::new(-line_width / 2.0, -line_length),
-            Point2::new(line_width / 2.0, -line_length)
+            Point2::new(line_width / 2.0, -line_length),
         ];
         let up = Vector2::new(0.0, -line_length);
         let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
         let iso = Isometry3::new(
-            Vector3::new(a.x, a.y, 0f32), 
-            Vector3::new(0f32, 0f32, rotation.angle())
+            Vector3::new(a.x, a.y, 0f32),
+            Vector3::new(0f32, 0f32, rotation.angle()),
         );
         let indices = [0u16, 1, 2, 1, 3, 2];
-        let geometry_data = GeometryData::new(
-            &context, &positions, &indices
-        ).unwrap();
+        let geometry_data = GeometryData::new(&context, &positions, &indices).unwrap();
         self.render_geometry(
             &context,
             &viewport,
@@ -399,7 +398,7 @@ impl Canvas {
             &geometry_data,
             &iso,
             RenderMode::Draw,
-            color
+            color,
         );
     }
 
@@ -410,13 +409,14 @@ impl Canvas {
         let x = self.perlin_x.get([time, time]);
         let y = self.perlin_y.get([time, time]);
         let noise: Vector3 = self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32);
-        self.observer + noise + 2f32 * Vector3::new(self.direction_offset.x, self.direction_offset.y, 0f32)
+        self.observer
+            + noise
+            + 2f32 * Vector3::new(self.direction_offset.x, self.direction_offset.y, 0f32)
     }
 
     pub fn add_wobble(&mut self, wobble: f32) {
         self.camera_wobble += wobble;
     }
-
 
     pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32, direction: Vector2) {
         self.observer.x = pos.x;
@@ -434,8 +434,8 @@ impl Canvas {
     }
 
     pub fn render_text(
-        &self, 
-        text_data: &mut TextData, 
+        &self,
+        text_data: &mut TextData,
         viewport: &red::Viewport,
         frame: &mut red::Frame,
     ) {
@@ -444,10 +444,9 @@ impl Canvas {
         let program = &self.program_glyph;
         let transform: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
 
-
         // TODO move to resource
         let max_image_dimension = {
-            let value = unsafe { frame.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE,) };
+            let value = unsafe { frame.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) };
             value as u32
         };
         let mut brush_action;
@@ -457,10 +456,12 @@ impl Canvas {
                 |rect, tex_data| unsafe {
                     // eprintln!("{:?}, {:?}", rect, tex_data);
                     // Update part of gpu texture with new glyph alpha values
-                    frame.gl.bind_texture(glow::TEXTURE_2D, Some(current_texture));
+                    frame
+                        .gl
+                        .bind_texture(glow::TEXTURE_2D, Some(current_texture));
                     frame.gl.tex_sub_image_2d_u8_slice(
-                        glow::TEXTURE_2D,-
-                        0,
+                        glow::TEXTURE_2D,
+                        -0,
                         rect.min.x as _,
                         rect.min.y as _,
                         rect.width() as _,
@@ -489,7 +490,7 @@ impl Canvas {
                     // eprintln!("Resizing glyph texture -> {}x{}", new_width, new_height);
 
                     // Recreate texture as a larger size to fit more
-                    text_data.glyph_texture = Texture::new(&frame.gl, (new_width, new_height));//GlGlyphTexture::new((new_width, new_height));
+                    text_data.glyph_texture = Texture::new(&frame.gl, (new_width, new_height)); //GlGlyphTexture::new((new_width, new_height));
 
                     text_data.glyph_brush.resize_texture(new_width, new_height);
                 }
@@ -500,27 +501,29 @@ impl Canvas {
             BrushAction::Draw(vertices) => {
                 text_data.vertex_num = vertices.len() as i32;
                 unsafe {
-                    text_data.vertex_buffer.dynamic_draw_data(
-                        std::slice::from_raw_parts(
-                            vertices.as_ptr() as *const TextVertex, 
-                            vertices.len()
-                        ),
-                    );
+                    text_data
+                        .vertex_buffer
+                        .dynamic_draw_data(std::slice::from_raw_parts(
+                            vertices.as_ptr() as *const TextVertex,
+                            vertices.len(),
+                        ));
                 }
             }
-                // vertex_max = vertex_max.max(vertex_count);
+            // vertex_max = vertex_max.max(vertex_count);
             // }
             BrushAction::ReDraw => {}
         }
         program.set_uniform("transform", transform);
-        program.set_uniform("font_tex", text_data.glyph_texture.clone()); 
+        program.set_uniform("font_tex", text_data.glyph_texture.clone());
         let text_vb: &TextVertexBuffer<TextVertex> = &text_data.vertex_buffer;
         program.set_layout(&frame.gl, &text_vb.vao, &[text_vb]);
         let vao = &text_vb.vao;
         unsafe {
             vao.bind();
             program.set_used();
-            frame.gl.draw_arrays_instanced(glow::TRIANGLE_STRIP, 0, 4, text_data.vertex_num);
+            frame
+                .gl
+                .draw_arrays_instanced(glow::TRIANGLE_STRIP, 0, 4, text_data.vertex_num);
             vao.unbind()
         }
     }
@@ -533,7 +536,7 @@ impl Canvas {
         geometry_data: &GeometryData,
         model: &Isometry3,
         render_mode: RenderMode,
-        color: Point3
+        color: Point3,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -549,10 +552,10 @@ impl Canvas {
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
         let draw_params = render_mode.into();
         frame.draw(
-            vao, 
-            Some(&geometry_data.index_buffer), 
-            &program, 
-            &draw_params
+            vao,
+            Some(&geometry_data.index_buffer),
+            &program,
+            &draw_params,
         );
     }
 
@@ -565,7 +568,7 @@ impl Canvas {
         model: &Isometry3,
         fill_color: (f32, f32, f32),
         with_projection: bool,
-        render_mode: RenderMode
+        render_mode: RenderMode,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -587,7 +590,12 @@ impl Canvas {
         program.set_uniform("fill_color", fill_color);
         program.set_layout(&gl, vao, &[&geometry_data.positions]);
         let draw_params = render_mode.into();
-        frame.draw(vao, Some(&geometry_data.index_buffer), program, &draw_params);
+        frame.draw(
+            vao,
+            Some(&geometry_data.index_buffer),
+            program,
+            &draw_params,
+        );
     }
 
     pub fn render(
@@ -599,7 +607,7 @@ impl Canvas {
         model: &Isometry3,
         scale: f32,
         with_lights: bool,
-        blend: Option<red::Blend>
+        blend: Option<red::Blend>,
     ) {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
@@ -623,29 +631,24 @@ impl Canvas {
         program.set_uniform("scale", scale);
         program.set_layout(&gl, vao, &[&image_data.positions]);
         let draw_params = if with_lights {
-            red::DrawParams{
+            red::DrawParams {
                 draw_type: DrawType::Standart,
                 stencil: Some(Stencil {
                     ref_value: 1,
                     mask: 0xFF,
                     test: StencilTest::NotEqual,
-                    pass_operation: None
+                    pass_operation: None,
                 }),
                 blend: blend,
                 ..Default::default()
             }
         } else {
-            DrawParams{
+            DrawParams {
                 blend: blend,
                 ..Default::default()
             }
         };
-        frame.draw(
-            vao, 
-            Some(&image_data.indices), 
-            &program, 
-            &draw_params
-        );
+        frame.draw(vao, Some(&image_data.indices), &program, &draw_params);
     }
 
     pub fn render_instancing(
@@ -668,19 +671,21 @@ impl Canvas {
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
         program.set_uniform("transparency", 1f32);
-        program.set_layout(&gl, vao, &[&instancing_data.vertex_buffer, &instancing_data.per_instance]);
+        program.set_layout(
+            &gl,
+            vao,
+            &[
+                &instancing_data.vertex_buffer,
+                &instancing_data.per_instance,
+            ],
+        );
         let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len.unwrap());
         let draw_params = red::DrawParams {
             stencil: None,
             draw_type: draw_type,
             ..Default::default()
         };
-        frame.draw(
-            vao, 
-            Some(&instancing_data.indices),
-            &program, 
-            &draw_params
-        );
+        frame.draw(vao, Some(&instancing_data.indices), &program, &draw_params);
     }
 
     pub fn render_primitive_texture(
@@ -723,10 +728,10 @@ impl Canvas {
 
 pub fn _orthographic_from_zero(width: u32, height: u32) -> Orthographic3<f32> {
     Orthographic3::new(0f32, width as f32, 0f32, height as f32, -0.9, 0.0)
-} 
+}
 
 // creates ortograohic projection left=bot=0 z_near=0.1 far=1.0
-pub fn orthographic(width: u32, height: u32) -> Orthographic3<f32>{
+pub fn orthographic(width: u32, height: u32) -> Orthographic3<f32> {
     Orthographic3::new(0f32, width as f32, 0f32, height as f32, -1f32, 1f32)
 }
 
@@ -777,10 +782,7 @@ pub fn unproject_with_z(
     return pos + dir * z_safe_scaler;
 }
 
-
 // text
-
-
 
 #[inline]
 pub fn to_vertex(

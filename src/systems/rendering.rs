@@ -1,42 +1,43 @@
-use gfx_h::{TextData, RenderMode};
+pub use crate::gui::{Button, Picture, Rectangle, Selector};
 use gfx_h::effects::MenuParticles;
-use std::collections::{HashMap};
-use telemetry::{TeleGraph, render_plot};
+use gfx_h::{RenderMode, TextData};
 use num_enum::TryFromPrimitive;
+use std::collections::HashMap;
 use std::convert::TryFrom;
-pub use crate::gui::{Button, Rectangle, Picture, Selector};
+use telemetry::{render_plot, TeleGraph};
 
 // use flame;
 
 use super::*;
 #[cfg(any(target_os = "android"))]
 use crate::gui::VecController;
-use glyph_brush::{Section, rusttype::Scale};
-use geometry::{shadow_geometry};
+use geometry::shadow_geometry;
+use glyph_brush::{rusttype::Scale, Section};
 use physics_system::MENU_VELOCITY;
 
 const BUTTON_SCALE: f32 = 1.2;
 
 use gfx_h::unproject_with_z;
-fn visible(
-    canvas: &Canvas,
-    iso: &Isometry3,
-    dims: (i32, i32),
-
-) -> bool{
-    let unprojected = unproject_with_z(canvas.observer(), &Point2::new(1.0, 1.0), iso.translation.vector.z, dims.0 as u32, dims.1 as u32, canvas.z_far);
+fn visible(canvas: &Canvas, iso: &Isometry3, dims: (i32, i32)) -> bool {
+    let unprojected = unproject_with_z(
+        canvas.observer(),
+        &Point2::new(1.0, 1.0),
+        iso.translation.vector.z,
+        dims.0 as u32,
+        dims.1 as u32,
+        canvas.z_far,
+    );
     let corner_rvec = Vector2::new(unprojected.x, unprojected.y);
     let object_rvec = Vector2::new(iso.translation.vector.x, iso.translation.vector.y);
     object_rvec.norm() < corner_rvec.norm()
 }
 
-
 #[derive(Clone, Copy, Debug, TryFromPrimitive)]
 #[repr(usize)]
 pub enum Widgets {
     BackMenu,
-    BlasterGun, 
-    LazerGun, 
+    BlasterGun,
+    LazerGun,
     ShotGun,
     LockedBlasterGun,
     LockedLazerGun,
@@ -77,24 +78,22 @@ pub fn render_primitives<'a>(
                 with_projection,
             } => {
                 let (model, _points, _indicies) = picture.get_gfx();
-                canvas
-                    .render_primitive_texture(
-                        &gl, 
-                        &viewport,
-                        frame, 
-                        image_datas.get(picture.image.0).unwrap(),
-                        &model, 
-                        *with_projection, 
-                        (picture.width, picture.height)
-                        );
-            },
+                canvas.render_primitive_texture(
+                    &gl,
+                    &viewport,
+                    frame,
+                    image_datas.get(picture.image.0).unwrap(),
+                    &model,
+                    *with_projection,
+                    (picture.width, picture.height),
+                );
+            }
             Primitive {
                 kind: PrimitiveKind::Rectangle(rectangle),
                 with_projection,
             } => {
                 let (model, points, indicies) = rectangle.get_gfx();
-                let geom_data =
-                    GeometryData::new(&gl, &points, &indicies).unwrap();
+                let geom_data = GeometryData::new(&gl, &points, &indicies).unwrap();
                 let fill_color = rectangle.color;
                 canvas.render_primitive(
                     &gl,
@@ -104,14 +103,14 @@ pub fn render_primitives<'a>(
                     &model,
                     (fill_color.x, fill_color.y, fill_color.z),
                     *with_projection,
-                    RenderMode::Draw
+                    RenderMode::Draw,
                 );
             }
             Primitive {
                 kind: PrimitiveKind::Text(text),
                 with_projection: _,
             } => {
-                use glyph_brush::{Layout, HorizontalAlign, VerticalAlign};
+                use glyph_brush::{HorizontalAlign, Layout, VerticalAlign};
                 text_data.glyph_brush.queue(Section {
                     text: &text.text,
                     scale,
@@ -126,23 +125,16 @@ pub fn render_primitives<'a>(
             }
         }
     }
-    canvas.render_text(
-        text_data,
-        &viewport,
-        frame
-    );
+    canvas.render_text(text_data, &viewport, frame);
 }
-
 
 pub struct RenderingSystem {
     reader: ReaderId<Primitive>,
 }
 
 impl RenderingSystem {
-    pub fn new(reader: ReaderId<Primitive>) -> Self{
-        RenderingSystem {
-            reader: reader
-        }
+    pub fn new(reader: ReaderId<Primitive>) -> Self {
+        RenderingSystem { reader: reader }
     }
 }
 
@@ -217,7 +209,7 @@ impl<'a> System<'a> for RenderingSystem {
                 multy_lazers,
                 _chains,
                 rifts,
-                geom_datas
+                geom_datas,
             ),
             mut telegraph,
             mouse,
@@ -255,11 +247,13 @@ impl<'a> System<'a> for RenderingSystem {
             canvas.update_observer(
                 Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
                 vel.0.norm() / VELOCITY_MAX,
-                Vector2::new(mouse.x01, mouse.y01).normalize()
+                Vector2::new(mouse.x01, mouse.y01).normalize(),
             );
             let char_pos = iso.0.translation.vector;
             flame::start("shadow rendering");
-            for (_entity, iso, geom, _) in (&entities, &isometries, &geometries, &asteroid_markers).join() {
+            for (_entity, iso, geom, _) in
+                (&entities, &isometries, &geometries, &asteroid_markers).join()
+            {
                 if visible(&*canvas, &iso.0, dims) {
                     let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
                     // light_poly.clip_one((*geom).clone(), pos);
@@ -269,127 +263,135 @@ impl<'a> System<'a> for RenderingSystem {
                         Point2::new(char_pos.x, char_pos.y),
                         (*geom).clone(),
                         pos,
-                        rotation
+                        rotation,
                     );
                     if let Some(shadow_triangulation) = shadow_triangulation {
-                        let geometry_data =  GeometryData::new(
-                            &gl, 
-                            &shadow_triangulation.points, 
-                            &shadow_triangulation.indicies)
+                        let geometry_data = GeometryData::new(
+                            &gl,
+                            &shadow_triangulation.points,
+                            &shadow_triangulation.indicies,
+                        )
                         .unwrap();
-                        let iso = Isometry3::new(iso.0.translation.vector, Vector3::new(0f32, 0f32, 0f32));
+                        let iso = Isometry3::new(
+                            iso.0.translation.vector,
+                            Vector3::new(0f32, 0f32, 0f32),
+                        );
                         // draw shadows
-                        canvas
-                            .render_geometry(
-                                &gl, &viewport,
-                                &mut frame,
-                                &geometry_data,
-                                &iso,
-                                RenderMode::StencilWrite,
-                                Point3::new(0f32, 0f32, 0f32)
-                            );
+                        canvas.render_geometry(
+                            &gl,
+                            &viewport,
+                            &mut frame,
+                            &geometry_data,
+                            &iso,
+                            RenderMode::StencilWrite,
+                            Point3::new(0f32, 0f32, 0f32),
+                        );
                     }
                 }
             }
             flame::end("shadow rendering");
         };
         for (_entity, iso, image, size, _stars) in
-            (&entities, &isometries, &image_ids, &sizes, &stars).join() {
+            (&entities, &isometries, &image_ids, &sizes, &stars).join()
+        {
             if visible(&*canvas, &iso.0, dims) {
                 let image_data = image_datas.get(image.0).unwrap();
-                canvas
-                    .render(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &image_data,
-                            &iso.0,
-                            size.0,
-                            false,
-                            None
-                    );
+                canvas.render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_data,
+                    &iso.0,
+                    size.0,
+                    false,
+                    None,
+                );
             }
-        };
+        }
 
         for (_entity, iso, image, size, _nebula) in
-            (&entities, &isometries, &image_ids, &sizes, &nebulas).join() {
+            (&entities, &isometries, &image_ids, &sizes, &nebulas).join()
+        {
             if visible(&*canvas, &iso.0, dims) {
                 let image_data = image_datas.get(image.0).unwrap();
-                canvas
-                    .render(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &image_data,
-                            &iso.0,
-                            size.0,
-                            false,
-                            None
-                    );
+                canvas.render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_data,
+                    &iso.0,
+                    size.0,
+                    false,
+                    None,
+                );
             }
-        };
+        }
         for (_entity, iso, image, size, _planet) in
-            (&entities, &isometries, &image_ids, &sizes, &planets).join() {
+            (&entities, &isometries, &image_ids, &sizes, &planets).join()
+        {
             if visible(&*canvas, &iso.0, dims) {
                 let image_data = image_datas.get(image.0).unwrap();
-                canvas
-                    .render(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &image_data,
-                            &iso.0,
-                            size.0,
-                            false,
-                            None
-                    );
+                canvas.render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_data,
+                    &iso.0,
+                    size.0,
+                    false,
+                    None,
+                );
             }
-        };
+        }
 
         for (_entity, iso, image, size, _fog) in
-            (&entities, &isometries, &image_ids, &sizes, &_fog_markers).join() {
+            (&entities, &isometries, &image_ids, &sizes, &_fog_markers).join()
+        {
             let image_data = image_datas.get(image.0).unwrap();
-            canvas
-                .render(
-                        &gl,
-                        &viewport,
-                        &mut frame,
-                        &image_data,
-                        &iso.0,
-                        size.0,
-                        false,
-                        None
-                );
-        };
+            canvas.render(
+                &gl,
+                &viewport,
+                &mut frame,
+                &image_data,
+                &iso.0,
+                size.0,
+                false,
+                None,
+            );
+        }
         flame::end("background rendering");
         flame::start("particles rendering");
         for (entity, particles_data) in (&entities, &mut particles_datas).join() {
             match **particles_data {
                 ParticlesData::Explosion(ref mut particles) => {
                     if particles.update() {
-                        canvas
-                            .render_instancing(
-                                &gl,
-                                &viewport,
-                                &mut frame,
-                                &particles.instancing_data,
-                                &Isometry3::new(
-                                    Vector3::new(0f32, 0f32, 0f32),
-                                    Vector3::new(0f32, 0f32, 0f32),
-                                )
-                            );
+                        canvas.render_instancing(
+                            &gl,
+                            &viewport,
+                            &mut frame,
+                            &particles.instancing_data,
+                            &Isometry3::new(
+                                Vector3::new(0f32, 0f32, 0f32),
+                                Vector3::new(0f32, 0f32, 0f32),
+                            ),
+                        );
                     } else {
                         entities.delete(entity).unwrap();
                     }
-            }
-                _ => ()
+                }
+                _ => (),
             };
         }
 
-        let (iso, vel) = if let Some((iso, vel, _char_marker)) = (&isometries, &velocities, &character_markers).join().next() {
+        let (iso, vel) = if let Some((iso, vel, _char_marker)) =
+            (&isometries, &velocities, &character_markers).join().next()
+        {
             (*iso, *vel)
         } else {
-            (Isometry::new(0f32, 0f32, 0f32), Velocity::new(MENU_VELOCITY.0, MENU_VELOCITY.1))
+            (
+                Isometry::new(0f32, 0f32, 0f32),
+                Velocity::new(MENU_VELOCITY.0, MENU_VELOCITY.1),
+            )
         };
         {
             let translation_vec = iso.0.translation.vector;
@@ -402,14 +404,13 @@ impl<'a> System<'a> for RenderingSystem {
             {
                 ParticlesData::MovementParticles(ref mut particles) => {
                     particles.update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
-                     canvas
-                        .render_instancing(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &particles.instancing_data,
-                            &pure_isometry,
-                        );
+                    canvas.render_instancing(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &particles.instancing_data,
+                        &pure_isometry,
+                    );
                 }
                 _ => panic!(),
             };
@@ -423,42 +424,33 @@ impl<'a> System<'a> for RenderingSystem {
         {
             let translation_vec = iso.0.translation.vector;
             let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
-            canvas
-                .render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_datas.get(image.0).unwrap(),
-                    &isometry,
-                    size.0,
-                    true,
-                    Some(red::Blend)
-                );
+            canvas.render(
+                &gl,
+                &viewport,
+                &mut frame,
+                &image_datas.get(image.0).unwrap(),
+                &isometry,
+                size.0,
+                true,
+                Some(red::Blend),
+            );
         }
 
-
-        let mut render_lazer = |
-            iso: &Isometry,
-            lazer: &Lazer,
-            force_rendering: bool,
-            rotation
-        | {
+        let mut render_lazer = |iso: &Isometry, lazer: &Lazer, force_rendering: bool, rotation| {
             if lazer.active || force_rendering {
                 let h = lazer.current_distance;
                 let w = 0.05f32;
                 let positions = vec![
                     Vector2::new(-w / 2.0, 0f32),
                     Vector2::new(w / 2.0, 0f32),
-                    Vector2::new(0.0, -h) // hmmmmm, don't know why minus
+                    Vector2::new(0.0, -h), // hmmmmm, don't know why minus
                 ];
                 let positions: Vec<Point2> = positions
                     .into_iter()
                     .map(|v: Vector2| Point2::from(rotation * v))
                     .collect();
                 let indices = [0u16, 1, 2];
-                let geometry_data = GeometryData::new(
-                    &gl, &positions, &indices
-                ).unwrap();
+                let geometry_data = GeometryData::new(&gl, &positions, &indices).unwrap();
                 canvas.render_geometry(
                     &gl,
                     &viewport,
@@ -466,7 +458,7 @@ impl<'a> System<'a> for RenderingSystem {
                     &geometry_data,
                     &iso.0,
                     RenderMode::StencilCheck,
-                    Point3::new(1.0, 0.0, 0.0)
+                    Point3::new(1.0, 0.0, 0.0),
                 );
             }
         };
@@ -478,7 +470,8 @@ impl<'a> System<'a> for RenderingSystem {
                 let dir = Vector2::new(dir.0, dir.1);
                 let rotation = Rotation2::rotation_between(&up, &Vector2::new(dir.x, dir.y));
                 let isometry = Isometry3::new(
-                    Vector3::new(pos.x, pos.y, pos.z), Vector3::new(0f32, 0f32, rotation.angle())
+                    Vector3::new(pos.x, pos.y, pos.z),
+                    Vector3::new(0f32, 0f32, rotation.angle()),
                 );
                 render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
             }
@@ -489,43 +482,49 @@ impl<'a> System<'a> for RenderingSystem {
                 let rotation = Rotation2::new(angle);
                 render_lazer(iso, lazer, false, rotation);
             }
-        };
+        }
         for (_entity, iso, image, size, _projectile) in
             (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
         {
-            canvas
-                .render(
+            canvas.render(
+                &gl,
+                &viewport,
+                &mut frame,
+                &image_datas.get(image.0).unwrap(),
+                &iso.0,
+                size.0,
+                true,
+                Some(red::Blend),
+            );
+        }
+        for (_entity, iso, _physics_component, image, size, _ship) in (
+            &entities,
+            &isometries,
+            &physics,
+            &image_ids,
+            &sizes,
+            &ship_markers,
+        )
+            .join()
+        {
+            // let iso2 = world
+            //     .rigid_body(physics_component.body_handle)
+            //     .unwrap()
+            //     .position();
+            // let iso = iso2_iso3(iso2);
+            if visible(&*canvas, &iso.0, dims) {
+                let image_data = &image_datas.get(image.0).unwrap();
+                canvas.render(
                     &gl,
                     &viewport,
                     &mut frame,
-                    &image_datas.get(image.0).unwrap(),
+                    &image_data,
                     &iso.0,
                     size.0,
                     true,
-                    Some(red::Blend)
-                );
-        }
-        for (_entity, iso, _physics_component, image, size, _ship) in
-                    (&entities, &isometries, &physics, &image_ids, &sizes, &ship_markers).join() {
-                // let iso2 = world
-                //     .rigid_body(physics_component.body_handle)
-                //     .unwrap()
-                //     .position();
-                // let iso = iso2_iso3(iso2);
-                if visible(&*canvas, &iso.0, dims) {
-                    let image_data = &image_datas.get(image.0).unwrap();
-                    canvas
-                        .render(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &image_data,
-                            &iso.0,
-                            size.0,
-                            true,
-                            None
-                        )
-                }
+                    None,
+                )
+            }
         }
         flame::end("other");
         flame::start("asteroids rendering");
@@ -540,57 +539,53 @@ impl<'a> System<'a> for RenderingSystem {
             .join()
         {
             if visible(&*canvas, &iso.0, dims) {
-                canvas
-                    .render_geometry(
-                        &gl, &viewport, 
-                        &mut frame, 
-                        &geom_data, 
-                        &iso.0,
-                        RenderMode::Draw,
-                        Point3::new(0.8, 0.8, 0.8)
-                    )
+                canvas.render_geometry(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &geom_data,
+                    &iso.0,
+                    RenderMode::Draw,
+                    Point3::new(0.8, 0.8, 0.8),
+                )
             }
         }
         flame::end("asteroids rendering");
         flame::start("collectables");
-        for (iso, size, image, _collectable) in (&isometries, &sizes, &image_ids, &collectables).join() {
+        for (iso, size, image, _collectable) in
+            (&isometries, &sizes, &image_ids, &collectables).join()
+        {
             let image_data = image_datas.get(image.0).unwrap();
             if visible(&*canvas, &iso.0, dims) {
-                canvas
-                    .render(
-                        &gl,
-                        &viewport,
-                            &mut frame,
-                            &image_data,
-                            &iso.0,
-                            size.0,
-                            true,
-                            None
-                    )
+                canvas.render(
+                    &gl,
+                    &viewport,
+                    &mut frame,
+                    &image_data,
+                    &iso.0,
+                    size.0,
+                    true,
+                    None,
+                )
             }
         }
-        let _render_line = |
-            a: Point2,
-            b: Point2
-        | {
+        let _render_line = |a: Point2, b: Point2| {
             let line_width = 0.05;
             let line_length = (b.coords - a.coords).norm();
             let positions = vec![
                 Point2::new(-line_width / 2.0, 0f32),
                 Point2::new(line_width / 2.0, 0f32),
                 Point2::new(-line_width / 2.0, -line_length),
-                Point2::new(line_width / 2.0, -line_length)
+                Point2::new(line_width / 2.0, -line_length),
             ];
             let up = Vector2::new(0.0, -line_length);
             let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
             let iso = Isometry3::new(
-                Vector3::new(a.x, a.y, 0f32), 
-                Vector3::new(0f32, 0f32, rotation.angle())
+                Vector3::new(a.x, a.y, 0f32),
+                Vector3::new(0f32, 0f32, rotation.angle()),
             );
             let indices = [0u16, 1, 2, 0, 2, 3];
-            let geometry_data = GeometryData::new(
-                &gl, &positions, &indices
-            ).unwrap();
+            let geometry_data = GeometryData::new(&gl, &positions, &indices).unwrap();
             canvas.render_geometry(
                 &gl,
                 &viewport,
@@ -598,7 +593,7 @@ impl<'a> System<'a> for RenderingSystem {
                 &geometry_data,
                 &iso,
                 RenderMode::Draw,
-                Point3::new(1f32, 1f32, 1f32)
+                Point3::new(1f32, 1f32, 1f32),
             );
         };
         flame::end("collectables");
@@ -608,7 +603,7 @@ impl<'a> System<'a> for RenderingSystem {
         //         let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
         //         render_line(Point2::new(min_w, min_h), Point2::new(min_w, max_h));
         //         render_line(Point2::new(min_w, max_h), Point2::new(max_w, max_h));
-        //         render_line(Point2::new(max_w, max_h), Point2::new(max_w, min_h));                
+        //         render_line(Point2::new(max_w, max_h), Point2::new(max_w, min_h));
         //         render_line(Point2::new(max_w, min_h), Point2::new(min_w, min_h));
         //     }
         // }
@@ -618,20 +613,19 @@ impl<'a> System<'a> for RenderingSystem {
                 let animation_frame = animation.next_frame();
                 if let Some(animation_frame) = animation_frame {
                     let image_data = image_datas.get(animation_frame.image.0).unwrap();
-                    canvas
-                        .render(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &image_data,
-                            &iso.0,
-                            size.0,
-                            false,
-                            Some(red::Blend)
-                        )
+                    canvas.render(
+                        &gl,
+                        &viewport,
+                        &mut frame,
+                        &image_data,
+                        &iso.0,
+                        size.0,
+                        false,
+                        Some(red::Blend),
+                    )
                 };
             }
-        };
+        }
         flame::end("animation");
         flame::start("primitives rendering");
         primitives_channel.iter_write(ui.primitives.drain(..));
@@ -653,34 +647,30 @@ impl<'a> System<'a> for RenderingSystem {
         // }
         flame::end("rendering");
         let spans = flame::spans();
-        telegraph.insert("fps".to_string(), dev_info.fps as f32/ 60.0);
+        telegraph.insert("fps".to_string(), dev_info.fps as f32 / 60.0);
         if dev_info.draw_telemetry {
             for span in spans.iter() {
                 if [
-                    "rendering".to_string(), 
-                    "dispatch".to_string(), 
+                    "rendering".to_string(),
+                    "dispatch".to_string(),
                     "insert".to_string(),
-                    "asteroids".to_string()
-                ].contains(&span.name.to_string()) {
+                    "asteroids".to_string(),
+                ]
+                .contains(&span.name.to_string())
+                {
                     telegraph.insert(span.name.to_string(), span.delta as f32 / 1E9 * 60.0);
                 }
                 if span.name == "dispatch" {
                     for subspan in span.children.iter() {
-                        telegraph.insert(subspan.name.to_string(), subspan.delta as f32 / 1E9 * 60.0);
+                        telegraph
+                            .insert(subspan.name.to_string(), subspan.delta as f32 / 1E9 * 60.0);
                     }
                 }
             }
             for name in telegraph.iter_names() {
                 if let Some(plot) = telegraph.iter(name.to_string()) {
                     render_plot(
-                        plot.0,
-                        plot.1,
-                        14.0, 
-                        10.0,
-                        &gl,
-                        &viewport,
-                        &canvas,
-                        &mut frame,
+                        plot.0, plot.1, 14.0, 10.0, &gl, &viewport, &canvas, &mut frame,
                     );
                 }
             }

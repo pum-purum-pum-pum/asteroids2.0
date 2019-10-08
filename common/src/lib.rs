@@ -1,19 +1,19 @@
 use nalgebra;
-use std::mem;
-use std::thread::{self, ThreadId};
-use std::ops::{Deref, DerefMut};
 use std::marker::PhantomData;
+use std::mem;
+use std::ops::{Deref, DerefMut};
+use std::thread::{self, ThreadId};
 
 use hibitset::BitSetLike;
-use specs_derive::{Component};
 use specs::prelude::*;
-use specs::storage::{MaskedStorage, TryDefault, UnprotectedStorage, DenseVecStorage};
+use specs::storage::{DenseVecStorage, MaskedStorage, TryDefault, UnprotectedStorage};
 use specs::world::Index as SpecsIndex;
+use specs_derive::Component;
 
-pub use nalgebra::Rotation3;
 pub use nalgebra::Rotation2;
+pub use nalgebra::Rotation3;
 pub use nalgebra::Unit;
-pub type Perspective3 =  nalgebra::Perspective3<f32>;
+pub type Perspective3 = nalgebra::Perspective3<f32>;
 pub type Point2 = nalgebra::Point2<f32>;
 pub type Point3 = nalgebra::Point3<f32>;
 pub type Point4 = nalgebra::Point4<f32>;
@@ -42,15 +42,17 @@ pub fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
 /// Allows safely implement Sync and Send for type T
 /// panics if called from another thread
 #[derive(Component)]
-pub struct ThreadPin<T> where T: 'static {
+pub struct ThreadPin<T>
+where
+    T: 'static,
+{
     owner: ThreadId,
-    inner: T
+    inner: T,
 }
 
 // impl<T> Component for ThreadPin<T> where T: 'static {
 //     type Storage = DenseVecStorage<Self>;
 // }
-
 
 impl<T> ThreadPin<T> {
     pub fn new(value: T) -> Self {
@@ -80,8 +82,11 @@ impl<T> DerefMut for ThreadPin<T> {
 /// Option ThreadPin with deref(panics if None)
 /// Allows to implement Default on ThreadPin
 #[derive(Default)]
-pub struct ThreadPinResource<T> where T: 'static {
-    inner: Option<ThreadPin<T>>
+pub struct ThreadPinResource<T>
+where
+    T: 'static,
+{
+    inner: Option<ThreadPin<T>>,
 }
 
 impl<T> Deref for ThreadPinResource<T> {

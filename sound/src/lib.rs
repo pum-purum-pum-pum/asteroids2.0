@@ -1,10 +1,10 @@
-use std::path::Path;
-use std::collections::HashMap;
-use std::time::{Instant, Duration};
 use common::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::Path;
+use std::time::{Duration, Instant};
 
-use sdl2::mixer::{InitFlag, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS, Music};
+use sdl2::mixer::{InitFlag, Music, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS};
 use sdl2::{AudioSubsystem, TimerSubsystem};
 use specs::prelude::*;
 use specs_derive::Component;
@@ -69,7 +69,7 @@ pub struct PreloadedSounds {
 
 pub struct MusicData<'a> {
     pub menu_music: Music<'a>,
-    pub battle_music: Vec<Music<'a>>
+    pub battle_music: Vec<Music<'a>>,
 }
 
 pub fn init_sound<'a>(
@@ -98,7 +98,7 @@ pub fn init_sound<'a>(
     let mut name_to_sound: HashMap<String, specs::Entity> = HashMap::new();
 
     {
-        use ron::de::{from_str};
+        use ron::de::from_str;
         let file = include_str!("../../rons/sounds.ron");
         let sounds_save: SoundsSave = match from_str(file) {
             Ok(x) => x,
@@ -111,16 +111,12 @@ pub fn init_sound<'a>(
         for sound_save in sounds_save.0.iter() {
             let name = &sound_save.name;
             let file = format!("assets/music/{}.wav", name);
-            let sound_placement = SoundPlacement::new(
-                id,
-                id + sound_save.count,
-                sound_save.gap,
-            );
+            let sound_placement = SoundPlacement::new(id, id + sound_save.count, sound_save.gap);
             id += sound_save.count;
             let path = Path::new(&file);
             let sound_chunk = ThreadPin::new(SoundData(
                 sdl2::mixer::Chunk::from_file(path)
-                    .map_err(|e| format!("Cannot load sound file: {:?}", e))?
+                    .map_err(|e| format!("Cannot load sound file: {:?}", e))?,
             ));
             let sound = world
                 .create_entity()
@@ -150,11 +146,9 @@ pub fn init_sound<'a>(
         buy: name_to_sound["buy"],
     };
     let mut name_to_music: HashMap<String, Music> = HashMap::new();
-    {   // load music
-        let names = [
-            "menu",
-            "short_bells"
-        ];
+    {
+        // load music
+        let names = ["menu", "short_bells"];
         for name in names.iter() {
             let file = format!("assets/music/{}.wav", name);
             let path = Path::new(&file);
@@ -165,7 +159,7 @@ pub fn init_sound<'a>(
     }
     let music_data = MusicData {
         menu_music: name_to_music.remove("menu").unwrap(),
-        battle_music: vec![name_to_music.remove("short_bells").unwrap()]
+        battle_music: vec![name_to_music.remove("short_bells").unwrap()],
     };
     sdl2::mixer::Channel::all().set_volume(EFFECT_MAX_VOLUME);
     sdl2::mixer::Music::set_volume(MUSIC_MAX_VOLUME);

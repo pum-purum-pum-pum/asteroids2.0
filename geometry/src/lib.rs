@@ -17,79 +17,72 @@ pub enum Geometry {
 
 #[derive(Component, Debug, Clone, Copy)]
 pub struct BlockSegment {
-    pub point1: Point2, 
-    pub point2: Point2 
+    pub point1: Point2,
+    pub point2: Point2,
 }
 
 pub struct NebulaGrid {
-    pub grid: Grid<bool>
+    pub grid: Grid<bool>,
 }
 
 impl NebulaGrid {
     pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
         let grid = Grid::new(n, rw, rh, rbw, rbh);
-        NebulaGrid {
-            grid: grid
-        }
+        NebulaGrid { grid: grid }
     }
 }
 
 pub struct PlanetGrid {
-    pub grid: Grid<bool>
+    pub grid: Grid<bool>,
 }
 
 impl PlanetGrid {
     pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
         let grid = Grid::new(n, rw, rh, rbw, rbh);
-        PlanetGrid {
-            grid: grid
-        }
+        PlanetGrid { grid: grid }
     }
 }
 
-
 pub struct StarsGrid {
-    pub grid: Grid<bool>
+    pub grid: Grid<bool>,
 }
 
 impl StarsGrid {
     pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
         let grid = Grid::new(n, rw, rh, rbw, rbh);
-        StarsGrid {
-            grid: grid
-        }
+        StarsGrid { grid: grid }
     }
 }
 
 pub struct FogGrid {
-    pub grid: Grid<bool>
+    pub grid: Grid<bool>,
 }
 
 impl FogGrid {
     pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
         let grid = Grid::new(n, rw, rh, rbw, rbh);
-        FogGrid {
-            grid: grid
-        }
+        FogGrid { grid: grid }
     }
 }
 
-
 pub struct Grid<T> {
     bricks: Vec<T>,
-    x: f32, 
+    x: f32,
     y: f32,
     rw: f32,
     rh: f32,
     rbw: f32,
     rbh: f32,
-    pub max_w: f32, 
+    pub max_w: f32,
     pub max_h: f32,
     pub n: usize,
     pub size: usize,
 }
 
-impl<T> Grid<T> where T: Default + Clone {
+impl<T> Grid<T>
+where
+    T: Default + Clone,
+{
     pub fn new(n: usize, rw: f32, rh: f32, rbw: f32, rbh: f32) -> Self {
         let size = 2 * n + 1;
         let bricks = vec![T::default(); size * size];
@@ -104,7 +97,7 @@ impl<T> Grid<T> where T: Default + Clone {
             max_w: rw + 2.0 * n as f32 * rw,
             max_h: rh + 2.0 * n as f32 * rh,
             n: n,
-            size: size
+            size: size,
         }
     }
 
@@ -135,25 +128,19 @@ impl<T> Grid<T> where T: Default + Clone {
         (self.n as i32 + ((self.rh + y - self.y) / (2.0 * self.rh)).floor() as i32) as usize
     }
 
-    pub fn get_rectangle(&self, row: usize, col: usize) -> ((f32, f32), (f32, f32)) {        
+    pub fn get_rectangle(&self, row: usize, col: usize) -> ((f32, f32), (f32, f32)) {
         let point = self.get_cell_point(row, col);
         return (
-            (
-                point.x - self.rw + self.rbw, 
-                point.x + self.rw - self.rbw
-            ), 
-            (
-                point.y - self.rh + self.rbh,
-                point.y + self.rh - self.rbh
-            )
-        )
+            (point.x - self.rw + self.rbw, point.x + self.rw - self.rbw),
+            (point.y - self.rh + self.rbh, point.y + self.rh - self.rbh),
+        );
     }
 
     pub fn get_cell_point(&self, row: usize, column: usize) -> Point2 {
         let (row, column) = (row as f32 - self.n as f32, column as f32 - self.n as f32);
         Point2::new(
-            self.x + column * 2.0 * self.rw, 
-            self.y + row * 2.0 * self.rh
+            self.x + column * 2.0 * self.rw,
+            self.y + row * 2.0 * self.rh,
         )
     }
 
@@ -167,10 +154,9 @@ impl<T> Grid<T> where T: Default + Clone {
 
     pub fn update(&mut self, point: Point2, value: T) -> Result<(), ()> {
         if (point.x - self.x).abs() < self.max_w && (point.y - self.y).abs() < self.max_h {
-            let id = self.size * self.get_row(point.y) + 
-                self.get_column(point.x);
+            let id = self.size * self.get_row(point.y) + self.get_column(point.x);
             self.bricks[id] = value;
-            return Ok(())
+            return Ok(());
         }
         Err(())
     }
@@ -247,7 +233,7 @@ pub trait TriangulateFromCenter {
                 si = 1u16
             };
             indicies.push(si);
-        }   
+        }
         Triangulation {
             points: points,
             indicies: indicies,
@@ -269,10 +255,11 @@ impl Polygon {
     pub fn into_rounded(self) -> Self {
         let mut res = vec![];
         for i in 0..self.points.len() {
-            let prev = self.points[
-                if i == 0 {self.points.len() - 1} 
-                else {(i - 1)%self.points.len()}
-            ];
+            let prev = self.points[if i == 0 {
+                self.points.len() - 1
+            } else {
+                (i - 1) % self.points.len()
+            }];
             let p = self.points[i];
             let next = self.points[(i + 1) % self.points.len()];
             let edge_vec1 = p.coords - prev.coords;
@@ -280,12 +267,17 @@ impl Polygon {
             let segment1 = Segment::new(prev, prev + edge_vec1);
             // let d = self.min_r * 0.4;
             let inside_vec = (-edge_vec1.normalize() + edge_vec2.normalize()) / 2.0;
-            let d = 1.0 * inside_vec.dot(&edge_vec1).abs().min(inside_vec.dot(&edge_vec2).abs());
+            let d = 1.0
+                * inside_vec
+                    .dot(&edge_vec1)
+                    .abs()
+                    .min(inside_vec.dot(&edge_vec2).abs());
             let inside_vec = d * inside_vec;
             let o = p + inside_vec;
             let mut h1 = Vector2::new(-edge_vec1.y, edge_vec1.x).normalize();
             let mut dbg_flag = false;
-            { // try different direction of perpendicular
+            {
+                // try different direction of perpendicular
                 let ray1 = Ray::new(o, h1);
                 let ray2 = Ray::new(o, -h1);
                 // dbg!((&ray1, &segment1));
@@ -300,7 +292,7 @@ impl Polygon {
                         h1 = -h1 * toi;
                         dbg_flag = true;
                     }
-                    _ => ()
+                    _ => (),
                 }
             };
             // match toi1 {
@@ -316,8 +308,8 @@ impl Polygon {
             } else {
                 res.push(p)
             }
-                // }
-                // None => ()
+            // }
+            // None => ()
             // }
         }
         Self::new(res)
@@ -337,7 +329,6 @@ impl Polygon {
             min_y = min_y.min(p.y);
             max_x = max_x.max(p.y);
             max_y = max_y.max(p.y);
-
         }
         let width = max_x - min_x;
         let height = max_y - min_y;
@@ -356,7 +347,7 @@ impl Polygon {
             min_r,
             max_r,
             width: width,
-            height: height
+            height: height,
         }
     }
 
@@ -371,7 +362,7 @@ impl Polygon {
 
     pub fn deconstruct(&self, bullet: Point2, sites: usize) -> Vec<Polygon> {
         if self.min_r < 0.8 {
-            return vec![]
+            return vec![];
         }
         let mut transofrmed_points = self.points.clone();
         let w_div = self.width + 0.05;
@@ -442,8 +433,9 @@ fn x_angle(vec: Vector2) -> f32 {
 }
 
 pub fn poly_to_segment(poly: Polygon, position: Point2) -> BlockSegment {
-    let points= &poly.points;
-    let rotation = Rotation2::rotation_between(&(points[0].coords + position.coords), &Vector2::x_axis());
+    let points = &poly.points;
+    let rotation =
+        Rotation2::rotation_between(&(points[0].coords + position.coords), &Vector2::x_axis());
     let mut point1 = points[0];
     let mut angle1 = x_angle(rotation * (point1.coords + position.coords));
     let mut point2 = points[0];
@@ -459,15 +451,15 @@ pub fn poly_to_segment(poly: Polygon, position: Point2) -> BlockSegment {
             angle2 = angle;
             point2 = *point;
         }
-    };
-    BlockSegment {
-        point1,
-        point2
     }
+    BlockSegment { point1, point2 }
 }
 
 pub fn shadow_geometry(
-    center: Point2, geom: Geometry, position: Point2, rotation: Rotation2<f32>
+    center: Point2,
+    geom: Geometry,
+    position: Point2,
+    rotation: Rotation2<f32>,
 ) -> Option<Triangulation> {
     let segment = match geom {
         Geometry::Circle { radius } => {
@@ -481,7 +473,10 @@ pub fn shadow_geometry(
             if let Some((dir1, dir2)) = dirs {
                 let shape_point1 = center + dir1;
                 let shape_point2 = center + dir2;
-                Some(BlockSegment{point1: shape_point1, point2: shape_point2})
+                Some(BlockSegment {
+                    point1: shape_point1,
+                    point2: shape_point2,
+                })
             } else {
                 None
             }
@@ -499,7 +494,7 @@ pub fn shadow_geometry(
             segment.point1,
             segment.point2,
             segment.point1 + SHADOW_LENGTH * dir1,
-            segment.point2 + SHADOW_LENGTH * dir2
+            segment.point2 + SHADOW_LENGTH * dir2,
         ];
         let indicies = vec![0, 2, 3, 0, 3, 1];
         Some(Triangulation {

@@ -1,5 +1,5 @@
 use super::*;
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
@@ -15,12 +15,7 @@ pub struct Explosion {
 }
 
 impl Explosion {
-    pub fn new(
-        gl: &red::GL,
-        position: Point2,
-        num: usize,
-        lifetime: Option<Duration>,
-    ) -> Self {
+    pub fn new(gl: &red::GL, position: Point2, num: usize, lifetime: Option<Duration>) -> Self {
         let scale = 0.03f32;
         let positions = vec![
             [-scale, -scale],
@@ -30,7 +25,9 @@ impl Explosion {
         ];
         let shape: Vec<GeometryVertex> = positions
             .into_iter()
-            .map(|pos| GeometryVertex { position: red::data::f32_f32::new(pos[0], pos[1]) })
+            .map(|pos| GeometryVertex {
+                position: red::data::f32_f32::new(pos[0], pos[1]),
+            })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
         let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
@@ -65,11 +62,7 @@ impl Explosion {
 
     pub fn update(&mut self) -> bool {
         let instanced = self.instancing_data.per_instance.map_array().unwrap();
-        for (particle, vel) in instanced
-            .slice
-            .iter_mut()
-            .zip(self.velocities.iter())
-        {
+        for (particle, vel) in instanced.slice.iter_mut().zip(self.velocities.iter()) {
             particle.world_position.0 += vel.x;
             particle.world_position.1 += vel.y;
         }
@@ -106,7 +99,9 @@ impl MovementParticles {
         ];
         let shape: Vec<GeometryVertex> = positions
             .into_iter()
-            .map(|pos| GeometryVertex { position: red::data::f32_f32::new(pos[0], pos[1]) })
+            .map(|pos| GeometryVertex {
+                position: red::data::f32_f32::new(pos[0], pos[1]),
+            })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
         let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
@@ -156,7 +151,6 @@ impl MovementParticles {
     }
 }
 
-
 pub struct MenuParticles {
     pub instancing_data: InstancingData,
     pub z_min: f32,
@@ -170,7 +164,7 @@ impl MenuParticles {
         y_min: f32,
         x_max: f32,
         y_max: f32,
-        z_min: f32, 
+        z_min: f32,
         z_max: f32,
         num: usize,
     ) -> Self {
@@ -183,7 +177,9 @@ impl MenuParticles {
         ];
         let shape: Vec<GeometryVertex> = positions
             .into_iter()
-            .map(|pos| GeometryVertex { position: red::data::f32_f32::new(pos[0], pos[1]) })
+            .map(|pos| GeometryVertex {
+                position: red::data::f32_f32::new(pos[0], pos[1]),
+            })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
         let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
@@ -205,7 +201,7 @@ impl MenuParticles {
                 per_instance: world_vertex_buffer,
             },
             z_min,
-            z_max
+            z_max,
         }
     }
 
@@ -221,7 +217,7 @@ impl MenuParticles {
             particle.world_position.2 = cut_low(
                 cut_hight(particle.world_position.2, self.z_min, self.z_max),
                 self.z_min,
-                self.z_max
+                self.z_max,
             );
         }
     }
