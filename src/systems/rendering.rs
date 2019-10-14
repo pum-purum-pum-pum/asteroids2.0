@@ -1,9 +1,6 @@
 pub use crate::gui::{Button, Picture, Rectangle, Selector};
-use gfx_h::effects::MenuParticles;
 use gfx_h::{RenderMode, TextData};
 use num_enum::TryFromPrimitive;
-use std::collections::HashMap;
-use std::convert::TryFrom;
 use telemetry::{render_plot, TeleGraph};
 
 // use flame;
@@ -14,8 +11,6 @@ use crate::gui::VecController;
 use geometry::shadow_geometry;
 use glyph_brush::{rusttype::Scale, Section};
 use physics_system::MENU_VELOCITY;
-
-const BUTTON_SCALE: f32 = 1.2;
 
 use gfx_h::unproject_with_z;
 fn visible(canvas: &Canvas, iso: &Isometry3, dims: (i32, i32)) -> bool {
@@ -158,7 +153,6 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Image>,
             WriteStorage<'a, Animation>,
             ReadStorage<'a, Size>,
-            ReadStorage<'a, Polygon>,
             ReadStorage<'a, Geometry>,
             ReadStorage<'a, CollectableMarker>,
             WriteStorage<'a, ThreadPin<ParticlesData>>,
@@ -202,7 +196,6 @@ impl<'a> System<'a> for RenderingSystem {
                 image_ids,
                 mut animations,
                 sizes,
-                polygons,
                 geometries,
                 collectables,
                 mut particles_datas,
@@ -528,10 +521,9 @@ impl<'a> System<'a> for RenderingSystem {
         }
         flame::end("other");
         flame::start("asteroids rendering");
-        for (_entity, iso, _image, _size, geom_data, _asteroid) in (
+        for (_entity, iso, _size, geom_data, _asteroid) in (
             &entities,
             &isometries,
-            &image_ids,
             &sizes,
             &geom_datas,
             &asteroid_markers,

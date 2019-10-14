@@ -1,8 +1,5 @@
 #[cfg(any(target_os = "android"))]
 use backtrace::Backtrace;
-use nphysics2d::world::World;
-use red::glow::RenderLoop;
-use red::{self, glow, GL};
 use ron::de::from_str;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
@@ -15,12 +12,9 @@ use std::collections::HashMap;
 use std::io::Read;
 #[cfg(any(target_os = "android"))]
 use std::panic;
-use std::time::Duration;
 // use rand::prelude::*;
-use log::info;
-use slog::o;
-
 use crate::gui::{Primitive, UI};
+use crate::setup::*;
 use crate::systems::{
     AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen, GUISystem, GamePlaySystem,
     InsertSystem, KinematicSystem, MenuRenderingSystem, RenderingSystem, ScoreTableRendering,
@@ -28,213 +22,60 @@ use crate::systems::{
 };
 use common::*;
 use components::*;
-use gfx_h::{
-    effects::MenuParticles, Canvas, GeometryData, GlyphVertex, MovementParticles, ParticlesData,
-    TextData, TextVertexBuffer,
-};
-use glyph_brush::*;
-use physics::{safe_maintain, PHYSICS_SIMULATION_TIME};
+use gfx_h::{effects::MenuParticles, Canvas, MovementParticles, ParticlesData};
+use log::info;
+use physics::safe_maintain;
 use physics_system::PhysicsSystem;
+use red::glow::RenderLoop;
 use sound::init_sound;
 use std::fs::File;
 use std::path::Path;
-use telemetry::{TeleGraph, TimeSpans};
+use telemetry::TimeSpans;
+use packer::{SerializedSpriteSheet, SpritePosition};
 
 const NEBULAS_NUM: usize = 3usize;
 
-pub fn just_read(file: &str) -> Result<String, String> {
-    let mut rw = RWops::from_file(Path::new(&file), "r")?;
-    let mut desc_str = String::new();
-    if let Ok(_) = rw.read_to_string(&mut desc_str) {
-        Ok(desc_str)
-    } else {
-        Err("failed to read file".to_string())
-    }
+pub fn read_atlas(path: &str) -> SerializedSpriteSheet {
+    let content = just_read(path).unwrap();
+    let parsed: SerializedSpriteSheet = match from_str(&content) {
+        Ok(x) => x,
+        Err(e) => {
+            println!("Failed to load atlas: {}", e);
+
+            std::process::exit(1);
+        }
+    };
+    parsed
 }
 
+
 pub fn run() -> Result<(), String> {
-    // LOGGING
-
-    use slog::Drain;
-    use std::fs::OpenOptions;
-    let log_path = "game.log";
-    let file = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(log_path)
-        .unwrap();
-
-    // create logger
-    let decorator = slog_term::PlainSyncDecorator::new(file);
-    let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let logger = slog::Logger::root(drain, o!());
-
-    // slog_stdlog uses the logger from slog_scope, so set a logger there
-    let _guard = slog_scope::set_global_logger(logger);
-
-    // register slog_stdlog as the log handler with the log crate
-    // slog_stdlog::init().unwrap();
-    info!("asteroids: logging crazyness");
-    let dejavu: &[u8] = include_bytes!("../assets/fonts/DejaVuSans.ttf");
-    let mut telegraph = TeleGraph::new(Duration::from_secs(10));
-    telegraph.set_color("rendering".to_string(), Point3::new(1.0, 0.0, 0.0));
-    telegraph.set_color("dispatch".to_string(), Point3::new(0.0, 1.0, 0.0));
-    telegraph.set_color("insert".to_string(), Point3::new(0.0, 0.0, 1.0));
-    telegraph.set_color("asteroids".to_string(), Point3::new(1.0, 0.0, 1.0));
-    telegraph.set_color("fps".to_string(), Point3::new(1.0, 1.0, 0.0));
-
+    // read_atlas("packer/out.ron");
+    // return Ok(());
+    let mut specs_world = SpecsWorld::new();
+    let _guard = setup_logging();
+    let telegraph = setup_telegraph();
     let time_spans = TimeSpans::new();
-    let glyph_brush: GlyphBrush<GlyphVertex, _> =
-        GlyphBrushBuilder::using_font_bytes(dejavu).build();
-    #[cfg(any(target_os = "android"))]
-    panic::set_hook(Box::new(|panic_info| {
-        trace!("AAA PANIC");
-        trace!("{}", panic_info);
-        let bt = Backtrace::new();
-        trace!("{:?}", bt);
-    }));
-    #[cfg(any(target_os = "android"))]
-    android_log::init("MyApp").unwrap();
-    // let (window_w, window_h) = (1024u32, 769);
-    let (window_w, window_h) = (1920u32, 1080);
-    let viewport = red::Viewport::for_window(window_w as i32, window_h as i32);
-    let mut phys_world: World<f32> = World::new();
-    phys_world.set_timestep(PHYSICS_SIMULATION_TIME);
-    {
-        // nphysics whatever parameters tuning
-        phys_world.integration_parameters_mut().erp = 0.01;
-        phys_world
-            .integration_parameters_mut()
-            .max_linear_correction = 10.0;
-    }
-    let sdl_context = sdl2::init().unwrap();
-    let video = sdl_context.video().unwrap();
-    let (_ddpi, hdpi, _vdpi) = video.display_dpi(0i32)?;
-    let gl_attr = video.gl_attr();
-    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
-    let glsl_version = "#version 330";
-    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-    let glsl_version = "#version 300 es";
-    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
-    {
-        gl_attr.set_context_profile(sdl2::video::GLProfile::GLES);
-        gl_attr.set_context_version(3, 0);
-    }
+    setup_android();
+    setup_physics(&mut specs_world);
 
-    #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten")))]
-    {
-        gl_attr.set_context_profile(sdl2::video::GLProfile::Core);
-        gl_attr.set_context_version(3, 3);
-    }
-    let window = video
-        .window("Asteroids 2.0", window_w, window_h)
-        // .fullscreen()
-        .opengl()
-        .resizable()
-        .build()
-        .unwrap();
-    let _gl_context = window.gl_create_context().unwrap();
-    let render_loop = glow::native::RenderLoop::<sdl2::video::Window>::from_sdl_window(window);
-    let context =
-        glow::native::Context::from_loader_function(|s| video.gl_get_proc_address(s) as *const _);
-    let context = GL::new(context);
-    let text_buffer = TextVertexBuffer::empty_new(&context).unwrap();
-    let glyph_texture = red::shader::Texture::new(&context, glyph_brush.texture_dimensions());
-    let text_data = ThreadPin::new(TextData {
-        vertex_buffer: text_buffer,
-        vertex_num: 0,
-        glyph_texture: glyph_texture.clone(),
-        glyph_brush,
-    });
-
-    let canvas = Canvas::new(&context, "", &glsl_version).unwrap();
+    // We need to own _gl_context to avoid RAII crazyness
+    let (context, sdl_context, render_loop, _gl_context, hdpi, canvas) =
+        setup_gfx(&mut specs_world)?;
+    setup_text(&context, &mut specs_world);
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
-    let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(20);
+    let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(30);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
     let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
-    // ------------------- SPECS SETUP
-    let mut specs_world = SpecsWorld::new();
-    let touches: Touches = [None; FINGER_NUMBER];
-    let spawned_upgrades: SpawnedUpgrades = vec![];
-    specs_world.add_resource(DevInfo::new());
-    specs_world.add_resource(Pallete::new());
-    specs_world.add_resource(UIState::default());
-    specs_world.add_resource(text_data);
-    // specs_world.add_resource(glyph_brush);
-    specs_world.add_resource(glyph_texture);
-    specs_world.add_resource(spawned_upgrades);
-    specs_world.add_resource(touches);
-    specs_world.add_resource(viewport);
-    specs_world.add_resource(phys_world);
-    specs_world.add_resource(BodiesMap::new());
-    let size = 10f32;
-    specs_world.register::<Isometry>();
-    specs_world.register::<Velocity>();
-    specs_world.register::<CharacterMarker>();
-    specs_world.register::<AsteroidMarker>();
-    specs_world.register::<Rocket>();
-    specs_world.register::<RocketGun>();
-    specs_world.register::<Projectile>();
-    specs_world.register::<Reflection>();
-    specs_world.register::<Blast>();
-    specs_world.register::<ThreadPin<ImageData>>();
-    specs_world.register::<ThreadPin<GeometryData>>();
-    specs_world.register::<Spin>();
-    specs_world.register::<AttachPosition>();
-    specs_world.register::<ShotGun>();
-    specs_world.register::<Cannon>();
-    specs_world.register::<MultyLazer>();
-    specs_world.register::<Image>();
-    specs_world.register::<Sound>();
-    specs_world.register::<Geometry>();
-    specs_world.register::<Lifetime>();
-    specs_world.register::<Size>();
-    specs_world.register::<EnemyMarker>();
-    specs_world.register::<LightMarker>();
-    specs_world.register::<ShipMarker>();
-    specs_world.register::<Coin>();
-    specs_world.register::<SideBulletCollectable>();
-    specs_world.register::<SideBulletAbility>();
-    specs_world.register::<DoubleCoinsCollectable>();
-    specs_world.register::<DoubleCoinsAbility>();
-    specs_world.register::<DoubleExpCollectable>();
-    specs_world.register::<DoubleExpAbility>();
-    specs_world.register::<Exp>();
-    specs_world.register::<Health>();
-    specs_world.register::<CollectableMarker>();
-    specs_world.register::<PhysicsComponent>();
-    specs_world.register::<Polygon>();
-    specs_world.register::<ThreadPin<sdl2::mixer::Chunk>>();
-    specs_world.register::<ThreadPin<SoundData>>();
-    specs_world.register::<Image>();
-    specs_world.register::<Lifes>();
-    specs_world.register::<Shield>();
-    specs_world.register::<NebulaMarker>();
-    specs_world.register::<StarsMarker>();
-    specs_world.register::<FogMarker>();
-    specs_world.register::<PlanetMarker>();
-    specs_world.register::<Damage>();
-    specs_world.register::<AI>();
-    specs_world.register::<ThreadPin<ParticlesData>>();
-    specs_world.register::<ShipStats>();
-    specs_world.register::<Animation>();
-    specs_world.register::<Charge>();
-    specs_world.register::<Chain>();
-    specs_world.register::<LazerConnect>();
-    specs_world.register::<SoundPlacement>();
-    specs_world.register::<Rift>();
-
+    data_setup(&mut specs_world);
     // TODO: load all this images automagicly (and with assets pack)
     let images = [
-        "back",
         "player_ship1",
         "basic",
         "basic_select",
         "heavy",
         "heavy_select",
         "super_ship",
-        "asteroid",
         "light",
         "light_sea",
         "projectile",
@@ -243,7 +84,6 @@ pub fn run() -> Result<(), String> {
         "bomb",
         "enemy_projectile",
         "player_projectile",
-        "enemy1",
         "kamikadze",
         "buckshot",
         "reflect_bullet_enemy",
@@ -291,16 +131,12 @@ pub fn run() -> Result<(), String> {
         "maneuverability",
         "transparent_sqr",
         "locked",
+        "enemy1"
     ];
     let mut name_to_animation = HashMap::new();
     {
         // load animations
-        let animations = [
-            ("explosion", 7),
-            ("explosion2", 7),
-            ("blast2", 7),
-            ("bullet_contact", 1),
-        ];
+        let animations = [("explosion", 7), ("blast2", 7), ("bullet_contact", 1)];
         for (animation_name, ticks) in animations.iter() {
             // let animation_full = &format!("assets/{}", animation_name);
             let mut frames = vec![];
@@ -392,6 +228,7 @@ pub fn run() -> Result<(), String> {
             enemy_save: &EnemyKindSave,
             name_to_image: &HashMap<String, specs::Entity>,
         ) -> EnemyKind {
+            dbg!(&enemy_save.image_name);
             EnemyKind {
                 ai_kind: enemy_save.ai_kind.clone(),
                 gun_kind: enemy_save.gun_kind.convert(name_to_image),
@@ -497,12 +334,10 @@ pub fn run() -> Result<(), String> {
         character: name_to_image["basic"],
         projectile: name_to_image["projectile"],
         enemy_projectile: name_to_image["enemy_projectile"],
-        asteroid: name_to_image["asteroid"],
         enemy: name_to_image["enemy1"],
         enemy2: name_to_image["kamikadze"],
         enemy3: name_to_image["buckshot"],
         enemy4: name_to_image["lazer"],
-        background: name_to_image["back"],
         nebulas: nebula_images,
         stars: stars_images,
         fog: name_to_image["fog"],
@@ -535,7 +370,7 @@ pub fn run() -> Result<(), String> {
         super_ship: name_to_image["super_ship"],
         locked: name_to_image["locked"],
     };
-
+    let size = 10f32;
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&context, -size, -size, size, size, 100),
     ));
@@ -551,7 +386,7 @@ pub fn run() -> Result<(), String> {
     let insert_system = InsertSystem::new(insert_channel.register_reader());
     let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
     let rendering_system2 = RenderingSystem::new(primitives_channel.register_reader());
-    let menu_rendering_system = MenuRenderingSystem::new(primitives_channel.register_reader());
+    let menu_rendering_system = MenuRenderingSystem;
     let dead_screen_system = DeadScreen::default();
     let common_respawn = CommonRespawn::default();
     let mut dead_screen_dispatcher = DispatcherBuilder::new()
@@ -591,7 +426,11 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(preloaded_particles);
     specs_world.add_resource(ThreadPin::new(timer));
     specs_world.add_resource(ThreadPin::new(MenuParticles::new_quad(
-        &context, -size, -size, size, size, -20.0, 20.0, 200,
+        &context,
+        (-size, size),
+        (-size, size),
+        (-20.0, 20.0),
+        200,
     )));
     specs_world.add_resource(GlobalParams::default());
     {

@@ -2,7 +2,6 @@ use std::mem::swap;
 
 use common::*;
 use rand::prelude::*;
-use sdl2::keyboard::Keycode;
 use std::time::{Duration, Instant};
 
 use ncollide2d::query::Ray;
@@ -114,7 +113,7 @@ pub fn is_active(character_position: Point2, point: Point2, active_area: f32) ->
         && (point.y - character_position.y).abs() < active_area
 }
 
-fn get_collision_groups(kind: &EntityType) -> CollisionGroups {
+fn get_collision_groups(kind: EntityType) -> CollisionGroups {
     match kind {
         EntityType::Player => {
             let mut player_bullet_collision_groups = CollisionGroups::new();

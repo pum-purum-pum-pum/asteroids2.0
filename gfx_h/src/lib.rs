@@ -118,7 +118,7 @@ impl GeometryData {
         let index_buffer = red::buffer::IndexBuffer::new(gl, &indices)?;
         Ok(GeometryData {
             positions: vertex_buffer,
-            index_buffer: index_buffer,
+            index_buffer,
         })
     }
 }
@@ -179,7 +179,7 @@ impl ImageData {
         Ok(ImageData {
             positions: vertex_buffer,
             indices: index_buffer,
-            texture: texture,
+            texture,
             dim_scales: dimensions,
         })
     }
@@ -200,13 +200,12 @@ pub fn load_texture(gl: &red::GL, name: &str) -> red::shader::Texture {
     let reader = BufReader::new(texture_file);
     let image = image::load(reader, image::PNG).unwrap().to_rgba();
     let image_dimensions = image.dimensions();
-    let image = red::shader::Texture::from_rgba8(
+    red::shader::Texture::from_rgba8(
         gl,
         image_dimensions.0,
         image_dimensions.1,
         &image.into_raw(),
-    );
-    image
+    )
 }
 
 pub fn create_shader_program(
@@ -305,20 +304,20 @@ impl Canvas {
         let program_glyph = create_shader_program(gl, pref, "text", &glsl_version)?;
         let z_far = Z_FAR;
         Ok(Canvas {
-            program: program,
-            program_primitive: program_primitive,
-            program_primitive_texture: program_primitive_texture,
-            program_light: program_light,
-            program_instancing: program_instancing,
+            program,
+            program_primitive,
+            program_primitive_texture,
+            program_light,
+            program_instancing,
             observer: Point3::new(0f32, 0f32, z_far),
-            program_glyph: program_glyph,
+            program_glyph,
             perlin_x: Perlin::new().set_seed(0),
             perlin_y: Perlin::new().set_seed(1),
             perlin_time: 0.1f32,
             camera_wobble: 0f32,
             direction: Vector2::new(0f32, 0f32),
             direction_offset: Vector2::new(0f32, 0f32),
-            z_far: z_far,
+            z_far,
         })
     }
 
@@ -639,12 +638,12 @@ impl Canvas {
                     test: StencilTest::NotEqual,
                     pass_operation: None,
                 }),
-                blend: blend,
+                blend,
                 ..Default::default()
             }
         } else {
             DrawParams {
-                blend: blend,
+                blend,
                 ..Default::default()
             }
         };
@@ -682,7 +681,7 @@ impl Canvas {
         let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len.unwrap());
         let draw_params = red::DrawParams {
             stencil: None,
-            draw_type: draw_type,
+            draw_type,
             ..Default::default()
         };
         frame.draw(vao, Some(&instancing_data.indices), &program, &draw_params);
@@ -779,7 +778,7 @@ pub fn unproject_with_z(
 ) -> Point3 {
     let (pos, dir) = unproject(observer, window_coord, width, height, z_far);
     let z_safe_scaler = (-pos.z + z_coord) / dir.z;
-    return pos + dir * z_safe_scaler;
+    pos + dir * z_safe_scaler
 }
 
 // text

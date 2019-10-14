@@ -1,5 +1,6 @@
 mod gui;
 mod run;
+mod setup;
 mod systems;
 #[cfg(test)]
 mod test;

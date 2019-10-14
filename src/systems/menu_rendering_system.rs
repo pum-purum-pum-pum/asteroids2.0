@@ -4,15 +4,7 @@ use gfx_h::{Image, MenuParticles};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
-pub struct MenuRenderingSystem {
-    reader: ReaderId<Primitive>,
-}
-
-impl MenuRenderingSystem {
-    pub fn new(reader: ReaderId<Primitive>) -> Self {
-        MenuRenderingSystem { reader: reader }
-    }
-}
+pub struct MenuRenderingSystem;
 
 impl<'a> System<'a> for MenuRenderingSystem {
     type SystemData = (

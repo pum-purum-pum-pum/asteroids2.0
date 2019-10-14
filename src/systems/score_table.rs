@@ -57,7 +57,7 @@ impl<'a> System<'a> for ScoreTableRendering {
             });
         }
 
-        let mut back_to_menu = Button::new(
+        let back_to_menu = Button::new(
             Point2::new(w / 2.0, 1.5 * button_h),
             button_w,
             button_h,

@@ -88,8 +88,8 @@ impl Component for PhysicsComponent {
 impl PhysicsComponent {
     pub fn new(body_handle: BodyHandle, collider_handle: ColliderHandle) -> Self {
         PhysicsComponent {
-            body_handle: body_handle,
-            collider_handle: collider_handle,
+            body_handle,
+            collider_handle,
         }
     }
     pub fn safe_insert<'a>(

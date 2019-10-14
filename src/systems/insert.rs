@@ -1,6 +1,5 @@
 use super::*;
 use log::info;
-use std::collections::HashMap;
 
 pub struct InsertSystem {
     reader: ReaderId<InsertEvent>,
@@ -168,7 +167,6 @@ impl<'a> System<'a> for InsertSystem {
                     );
                     lazy_update.insert(asteroid, polygon);
                     lazy_update.insert(asteroid, AsteroidMarker::default());
-                    lazy_update.insert(asteroid, Image(preloaded_images.asteroid));
                     lazy_update.insert(asteroid, Spin(*spin));
                     lazy_update.insert(asteroid, Size(1f32));
                     lazy_update.insert(asteroid, ThreadPin::new(geom_data));
@@ -371,7 +369,7 @@ impl<'a> System<'a> for InsertSystem {
                     }
                     // let bullet = bullet
                     //     .build();
-                    let bullet_collision_groups = get_collision_groups(kind);
+                    let bullet_collision_groups = get_collision_groups(*kind);
                     let ball = ncollide2d::shape::Ball::new(*size);
                     let bullet_physics_component = PhysicsComponent::safe_insert(
                         &mut physics,
@@ -409,7 +407,7 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(entity, Rocket(Instant::now()));
                     lazy_update.insert(entity, Projectile { owner: *owner });
                     lazy_update.insert(entity, Size(r));
-                    let bullet_collision_groups = get_collision_groups(kind);
+                    let bullet_collision_groups = get_collision_groups(*kind);
                     let ball = ncollide2d::shape::Ball::new(r);
                     let bullet_physics_component = PhysicsComponent::safe_insert(
                         &mut physics,

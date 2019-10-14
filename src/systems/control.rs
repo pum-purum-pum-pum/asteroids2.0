@@ -1,4 +1,4 @@
-use sdl2::keyboard::{Keycode, Scancode};
+use sdl2::keyboard::Keycode;
 use std::collections::HashSet;
 
 pub use super::*;
@@ -145,16 +145,15 @@ impl<'a> System<'a> for ControlSystem {
                 let dir = isometry * (rotation * Vector2::new(0f32, -1f32));
                 let ray = Ray::new(pos, dir);
                 let collision_groups = if is_character {
-                    get_collision_groups(&EntityType::Player)
+                    get_collision_groups(EntityType::Player)
                 } else {
-                    get_collision_groups(&EntityType::Enemy)
+                    get_collision_groups(EntityType::Enemy)
                 };
                 let (min_d, closest_body) = get_min_dist(world, ray, collision_groups);
                 if min_d < lazer.distance {
                     lazer.current_distance = min_d;
                     if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) {
                         if let Some(_) = lifes.get(*target_entity) {
-                            let mut explosion_size = 1;
                             if process_damage(
                                 lifes.get_mut(*target_entity).unwrap(),
                                 shields.get_mut(*target_entity),
@@ -195,7 +194,7 @@ impl<'a> System<'a> for ControlSystem {
                                         &preloaded_sounds,
                                     );
                                 }
-                                explosion_size = 20;
+                                let explosion_size = 20;
                                 insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                                 if character_markers.get(*target_entity).is_some() {
                                     to_menu(

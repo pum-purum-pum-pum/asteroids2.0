@@ -77,7 +77,7 @@ impl<'a> System<'a> for AISystem {
             let dir = Vector2::new(diff.x, diff.y).normalize();
             let pos = Point2::new(position.x, position.y);
             let ray = Ray::new(pos, dir);
-            let enemy_collision_groups = get_collision_groups(&EntityType::Enemy);
+            let enemy_collision_groups = get_collision_groups(EntityType::Enemy);
             let nearby = get_min_dist(&mut world, ray, enemy_collision_groups);
             let mut character_noticed = false;
             if let Some(body) = nearby.1 {

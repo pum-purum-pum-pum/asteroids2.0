@@ -28,9 +28,9 @@ pub struct SoundPlacement {
 impl SoundPlacement {
     pub fn new(start: usize, end: usize, gap: Duration) -> Self {
         SoundPlacement {
-            start: start,
-            end: end,
-            gap: gap,
+            start,
+            end,
+            gap,
             last_upd: Instant::now(),
         }
     }

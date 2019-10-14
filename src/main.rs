@@ -1,11 +1,11 @@
 mod gui;
 mod run;
+mod setup;
 mod systems;
 #[cfg(test)]
 mod test;
-extern crate cfg_if;
 
-#[macro_use]
+extern crate cfg_if;
 extern crate slog;
 extern crate slog_async;
 extern crate slog_scope;
@@ -26,7 +26,7 @@ pub use specs;
 pub use specs_derive;
 pub use voronois;
 
-// int SDL_main(int argc, char *argv[])
+/// int SDL_main(int argc, char *argv[])
 #[no_mangle]
 pub extern "C" fn SDL_main(_argc: libc::c_int, _argv: *const *const libc::c_char) -> libc::c_int {
     main().unwrap();

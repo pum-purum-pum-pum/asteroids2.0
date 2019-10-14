@@ -22,10 +22,10 @@ impl Animation {
     pub fn new(frames: Vec<AnimationFrame>, iterations: usize, current_frame: usize) -> Self {
         assert!(frames.len() > 0);
         Animation {
-            frames: frames,
-            iterations: iterations,
+            frames,
+            iterations,
             current_iteration: 0,
-            current_frame: current_frame,
+            current_frame,
             frame_ticks: 0,
         }
     }

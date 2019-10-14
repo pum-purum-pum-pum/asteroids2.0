@@ -50,12 +50,12 @@ impl Explosion {
         let per_instance = WorldVertexBuffer::new(gl, &quad_positions).unwrap();
         Explosion {
             instancing_data: InstancingData {
-                vertex_buffer: vertex_buffer,
+                vertex_buffer,
                 indices: index_buffer,
-                per_instance: per_instance,
+                per_instance,
             },
-            velocities: velocities,
-            lifetime: lifetime,
+            velocities,
+            lifetime,
             start_time: Instant::now(),
         }
     }
@@ -119,7 +119,7 @@ impl MovementParticles {
         let world_vertex_buffer = WorldVertexBuffer::new(gl, &quad_positions).unwrap();
         MovementParticles {
             instancing_data: InstancingData {
-                vertex_buffer: vertex_buffer,
+                vertex_buffer,
                 indices: index_buffer,
                 per_instance: world_vertex_buffer,
             },
@@ -160,14 +160,14 @@ pub struct MenuParticles {
 impl MenuParticles {
     pub fn new_quad(
         gl: &red::GL,
-        x_min: f32,
-        y_min: f32,
-        x_max: f32,
-        y_max: f32,
-        z_min: f32,
-        z_max: f32,
+        x_range: (f32, f32),
+        y_range: (f32, f32),
+        z_range: (f32, f32),
         num: usize,
     ) -> Self {
+        let (x_min, x_max) = x_range;
+        let (y_min, y_max) = y_range;
+        let (z_min, z_max) = z_range;
         let scale = 0.03f32;
         let positions = vec![
             [-scale, -scale],
@@ -196,7 +196,7 @@ impl MenuParticles {
         let world_vertex_buffer = WorldVertexBuffer::new(gl, &quad_positions).unwrap();
         Self {
             instancing_data: InstancingData {
-                vertex_buffer: vertex_buffer,
+                vertex_buffer,
                 indices: index_buffer,
                 per_instance: world_vertex_buffer,
             },

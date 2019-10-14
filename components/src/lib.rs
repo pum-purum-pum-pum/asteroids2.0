@@ -23,7 +23,6 @@ pub const BULLET_SPEED_INIT: f32 = 0.5;
 pub const THRUST_FORCE_INIT: f32 = 0.01;
 pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 
-// pub type SDLDisplay = ThreadPin<SDL2Facade>;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
@@ -520,20 +519,16 @@ impl Progress {
     }
 }
 
-// pub type Images = Collector<ImageData, Image>;
-
 /// contains preloaded images ids
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
     pub character: specs::Entity,
     pub projectile: specs::Entity,
     pub enemy_projectile: specs::Entity,
-    pub asteroid: specs::Entity,
     pub enemy: specs::Entity,
     pub enemy2: specs::Entity,
     pub enemy3: specs::Entity,
     pub enemy4: specs::Entity,
-    pub background: specs::Entity,
     pub nebulas: Vec<specs::Entity>,
     pub planets: Vec<specs::Entity>,
     pub stars: Vec<specs::Entity>,

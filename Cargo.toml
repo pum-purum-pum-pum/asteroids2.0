@@ -52,6 +52,7 @@ glyph_brush = "0.5.3"
 ron = "0.5.1"
 serde = "1.0.97"
 voronois = {path="voronois"}
+packer = {path = "packer"}
 
 [dependencies.sdl2]
 version = "0.32.2"
@@ -63,7 +64,7 @@ opt-level = 0
 debug = true
 
 [workspace]
-exclude = ["physics_system"]
+exclude = ["physics_system", "packer"]
 members = [
 	"gfx_h", 
 	"common", 
@@ -73,6 +74,7 @@ members = [
 	"components", 
 	"sound", 
 	"physics",
+	"packer"
 ]
 
 [profile.dev.overrides.gfx_h]
