@@ -25,6 +25,7 @@ use red::shader::Texture;
 use red::{DrawParams, DrawType, Operation, Stencil, StencilTest};
 use sdl2::rwops::RWops;
 use std::path::Path;
+use packer::SpritePosition;
 
 pub mod effects;
 pub use effects::*;
@@ -595,6 +596,59 @@ impl Canvas {
             program,
             &draw_params,
         );
+    }
+
+    pub fn render_atlas(
+        &self,
+        gl: &red::GL,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        image_data: &SpritePosition,
+        model: &Isometry3,
+        scale: f32,
+        with_lights: bool,
+        blend: Option<red::Blend>,
+    ) {
+        let model: [[f32; 4]; 4] = model.to_homogeneous().into();
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let texture = &image_data.texture;
+        // let draw_params = if with_lights {
+        //     &self.stencil_check_params
+        // } else {
+        //     &self.default_params
+        // };
+        let scales = image_data.dim_scales;
+        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+        let vao = &image_data.positions.vao;
+        let program = &self.program;
+        program.set_uniform("model", model);
+        program.set_uniform("view", view);
+        program.set_uniform("perspective", perspective);
+        program.set_uniform("dim_scales", (scales.x, scales.y));
+        program.set_uniform("tex", texture.clone());
+        program.set_uniform("scale", scale);
+        program.set_layout(&gl, vao, &[&image_data.positions]);
+        let draw_params = if with_lights {
+            red::DrawParams {
+                draw_type: DrawType::Standart,
+                stencil: Some(Stencil {
+                    ref_value: 1,
+                    mask: 0xFF,
+                    test: StencilTest::NotEqual,
+                    pass_operation: None,
+                }),
+                blend,
+                ..Default::default()
+            }
+        } else {
+            DrawParams {
+                blend,
+                ..Default::default()
+            }
+        };
+        frame.draw(vao, Some(&image_data.indices), &program, &draw_params);
     }
 
     pub fn render(

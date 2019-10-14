@@ -1,18 +1,18 @@
-name: Rust
+# name: Rust
 
-on: [push]
+# on: [push]
 
-jobs:
-  build:
+# jobs:
+#   build:
 
-    runs-on: ubuntu-latest
+#     runs-on: ubuntu-latest
 
-    steps:
-    - uses: actions/checkout@v1
-      with:
-        submodules: true
-        token: 2a83f2b0ee39612408c069dff052d7458fd1daae
-    - name: Build
-      run: cargo build --verbose
-#     - name: Run tests
-#       run: cargo test --verbose
+#     steps:
+#     - uses: actions/checkout@v1
+#       with:
+#         submodules: true
+#         token: 2a83f2b0ee39612408c069dff052d7458fd1daae
+#     - name: Build
+#       run: cargo build --verbose
+# #     - name: Run tests
+# #       run: cargo test --verbose
