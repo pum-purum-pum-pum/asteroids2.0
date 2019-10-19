@@ -42,7 +42,7 @@ impl<'a> System<'a> for DeadScreen {
                 position: Point2::new(0f32, 0f32),
                 width: w,
                 height: h,
-                image: Image(preloaded_images.transparent_sqr),
+                image: preloaded_images.transparent_sqr,
             }),
             with_projection: false,
         });
@@ -61,7 +61,7 @@ impl<'a> System<'a> for DeadScreen {
             to_menu_h,
             None,
             false,
-            Some(Image(preloaded_images.upg_bar)),
+            Some(preloaded_images.upg_bar),
             "To menu".to_string(),
             Widgets::Upgrade as usize,
             None,

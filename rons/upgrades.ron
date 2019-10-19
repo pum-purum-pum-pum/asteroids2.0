@@ -22,7 +22,7 @@
     ),
     (
         upgrade_type: BulletReflection,
-        image: "bullet_reflection",
+        image: "reflection_upgrade",
         name: "Bullet reflection",
         description: "Adds reflection, or increase speed of reflected bullet",
         assigned: [ToGun(ShotGun)]
@@ -30,42 +30,42 @@
 
     (
         upgrade_type: ShipSpeed,
-        image: "ship_speed",
+        image: "speed_upgrade",
         name: "Ship speed",
         description: "+ X% ship speed",
         assigned: [General]
     ),
     (
         upgrade_type: ShipRotationSpeed,
-        image: "ship_rotation",
+        image: "rotate_upgrade",
         name: "Ship rotation speed",
         description: "Improves rotation speed by X%",
         assigned: [General]
     ),
     (
         upgrade_type: ShieldRegen,
-        image: "shield_regen",
+        image: "shield_regen_upgrade",
         name: "Shield reneration",
         description: "+ 60 hp per sec",
         assigned: [General]
     ),
     (
         upgrade_type: ShieldSize,
-        image: "shield_size",
+        image: "shield_upgrade",
         name: "Shield size",
         description: "More shield",
         assigned: [General]
     ),
     (
         upgrade_type: HealthSize,
-        image: "health_size",
+        image: "hull_upgrade",
         name: "Health size",
         description: "More health",
         assigned: [General]
     ),
     (
         upgrade_type: Maneuverability,
-        image: "maneuverability",
+        image: "maneuver_ability_upgrade",
         name: "Maneuverability",
         description: "Change direction of the ship faster",
         assigned: [General]

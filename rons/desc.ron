@@ -55,7 +55,7 @@
             reflection: None,
             bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 1, nanos: 200_000_000),
-            bullet_image: "player_projectile"
+            bullet_image: "enemy_bullet"
         )),
         MultyLazer((
             angle: 0.25,
@@ -80,7 +80,7 @@
             bullet_size: 0.2,
             bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 0, nanos: 500_000_000),
-            bullet_image: "player_projectile"
+            bullet_image: "bullet"
         )),
     ],
     enemies: [
@@ -96,7 +96,7 @@
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -108,7 +108,7 @@
                 damage: 100
             ),
             size: 0.3,
-            image_name: "chain_standart_rift",
+            image_name: "chains",
             snake: Some(10),
             //rift: Some((distance: 8, lazers: []))
         ),
@@ -124,7 +124,7 @@
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.13,
@@ -180,7 +180,7 @@
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -192,7 +192,7 @@
                 damage: 100
             ),
             size: 0.4,
-            image_name: "kamikadze",
+            image_name: "kamikadzer",
         ),
 
         (
@@ -207,7 +207,7 @@
                 bullet_size: 0.4,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -219,7 +219,7 @@
                 damage: 10
             ),
             size: 0.4,
-            image_name: "enemy1",
+            image_name: "sidewinder",
         ),
 
         (
@@ -245,7 +245,7 @@
                 damage: 10
             ),
             size: 0.7,
-            image_name: "lazer",
+            image_name: "lazer_enemy",
         ),
 
         (
@@ -260,7 +260,7 @@
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -272,7 +272,7 @@
                 damage: 100
             ),
             size: 0.3,
-            image_name: "chain_standart",
+            image_name: "chains",
             snake: Some(20)
         ),
 
@@ -289,7 +289,7 @@
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_shotgun_projectile"
+                bullet_image: "enemy_bullet2"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -301,7 +301,7 @@
                 damage: 100
             ),
             size: 0.3,
-            image_name: "chain_lazer",
+            image_name: "chains_dark",
             snake: Some(20)
         ),
 
@@ -317,7 +317,7 @@
                 bullet_size: 0.4,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 2, nanos: 200_000_000),
-                bullet_image: "enemy_shotgun_projectile"
+                bullet_image: "enemy_bullet2"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -329,7 +329,7 @@
                 damage: 10
             ),
             size: 0.4,
-            image_name: "buckshot",
+            image_name: "shotgun_enemy",
         ),
 
         (
@@ -411,7 +411,7 @@
                 bullet_size: 0.2,
                 bullet_lifetime: (secs: 2, nanos: 200_000_000),
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.1,
@@ -461,7 +461,7 @@
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
-                bullet_image: "enemy_projectile"
+                bullet_image: "enemy_bullet"
             )),
             ship_stats: (
                 thrust_force: 0.1,

@@ -6,7 +6,7 @@ use common::*;
 pub use geometry::{BlockSegment, FogGrid, Geometry, NebulaGrid, PlanetGrid, Polygon, StarsGrid};
 pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{ortho_unproject, unproject_with_z, Canvas as SDLCanvas};
-pub use gfx_h::{Image, ImageData};
+pub use gfx_h::{AtlasImage, Image, ImageData};
 pub use physics::{BodiesMap, PhysicsComponent};
 pub use sound::{SoundData, SoundPlacement};
 
@@ -162,7 +162,7 @@ pub struct EnemyKind {
     pub gun_kind: GunKind,
     pub ship_stats: ShipStats,
     pub size: f32,
-    pub image: Image,
+    pub image: AtlasImage,
     pub snake: Option<usize>,
     pub rift: Option<Rift>,
 }
@@ -178,7 +178,7 @@ pub enum InsertEvent {
     Character {
         gun_kind: GunKind,
         ship_stats: ShipStats,
-        image: Image,
+        image: AtlasImage,
     },
     Asteroid {
         iso: Point3,
@@ -193,7 +193,7 @@ pub enum InsertEvent {
         gun_kind: GunKind,
         kind: AI,
         ship_stats: ShipStats,
-        image: Image,
+        image: AtlasImage,
         size: f32,
         snake: Option<usize>,
         rift: Option<Rift>,
@@ -206,7 +206,7 @@ pub enum InsertEvent {
         damage: usize,
         owner: specs::Entity,
         lifetime: Duration,
-        bullet_image: Image,
+        bullet_image: AtlasImage,
         blast: Option<Blast>,
         reflection: Option<Reflection>,
     },
@@ -215,7 +215,7 @@ pub enum InsertEvent {
         iso: Point3,
         damage: usize,
         owner: specs::Entity,
-        rocket_image: Image,
+        rocket_image: AtlasImage,
     },
     Coin {
         value: usize,
@@ -281,7 +281,7 @@ pub enum InsertEvent {
 #[derive(Debug, Clone)]
 pub struct UpgradeCard {
     pub upgrade_type: UpgradeType,
-    pub image: Image,
+    pub image: AtlasImage,
     pub name: String,
     pub description: String,
 }
@@ -348,14 +348,14 @@ pub struct ShipKindSave {
 #[derive(Debug, Clone, Component)]
 pub struct ShipKind {
     pub ship_stats: ShipStats,
-    pub image: Image,
+    pub image: AtlasImage,
 }
 
 impl ShipKindSave {
-    pub fn load(self, name_to_image: &HashMap<String, specs::Entity>) -> ShipKind {
+    pub fn load(self, name_to_image: &HashMap<String, AtlasImage>) -> ShipKind {
         ShipKind {
             ship_stats: self.ship_stats,
-            image: Image(name_to_image[&self.image]),
+            image: name_to_image[&self.image],
         }
     }
 }
@@ -522,44 +522,36 @@ impl Progress {
 /// contains preloaded images ids
 /// use it when you need to insert entity in system
 pub struct PreloadedImages {
-    pub character: specs::Entity,
-    pub projectile: specs::Entity,
-    pub enemy_projectile: specs::Entity,
-    pub enemy: specs::Entity,
-    pub enemy2: specs::Entity,
-    pub enemy3: specs::Entity,
-    pub enemy4: specs::Entity,
-    pub nebulas: Vec<specs::Entity>,
-    pub planets: Vec<specs::Entity>,
-    pub stars: Vec<specs::Entity>,
-    pub fog: specs::Entity,
-    pub ship_speed_upgrade: specs::Entity,
-    pub bullet_speed_upgrade: specs::Entity,
-    pub attack_speed_upgrade: specs::Entity,
-    pub light_white: specs::Entity,
-    pub light_sea: specs::Entity,
-    pub direction: specs::Entity,
-    pub circle: specs::Entity,
-    pub lazer: specs::Entity,
-    pub blaster: specs::Entity,
-    pub shotgun: specs::Entity,
-    pub play: specs::Entity,
-    pub coin: specs::Entity,
-    pub exp: specs::Entity,
-    pub health: specs::Entity,
-    pub double_coin: specs::Entity,
-    pub double_exp: specs::Entity,
-    pub side_bullet_ability: specs::Entity,
-    pub bar: specs::Entity,
-    pub upg_bar: specs::Entity,
-    pub transparent_sqr: specs::Entity,
-    pub basic_ship: specs::Entity,
-    pub heavy_ship: specs::Entity,
-    pub super_ship: specs::Entity,
+    pub nebulas: Vec<AtlasImage>,
+    pub planets: Vec<AtlasImage>,
+    pub stars: Vec<AtlasImage>,
+    pub fog: AtlasImage,
+    pub ship_speed_upgrade: AtlasImage,
+    pub bullet_speed_upgrade: AtlasImage,
+    pub attack_speed_upgrade: AtlasImage,
+    pub light_white: AtlasImage,
+    pub direction: AtlasImage,
+    pub circle: AtlasImage,
+    pub lazer: AtlasImage,
+    pub blaster: AtlasImage,
+    pub shotgun: AtlasImage,
+    pub play: AtlasImage,
+    pub coin: AtlasImage,
+    pub exp: AtlasImage,
+    pub health: AtlasImage,
+    pub double_coin: AtlasImage,
+    pub double_exp: AtlasImage,
+    pub side_bullet_ability: AtlasImage,
+    pub bar: AtlasImage,
+    pub upg_bar: AtlasImage,
+    pub transparent_sqr: AtlasImage,
+    pub basic_ship: AtlasImage,
+    pub heavy_ship: AtlasImage,
+    pub super_ship: AtlasImage,
     pub explosion: Animation,
     pub blast: Animation,
     pub bullet_contact: Animation,
-    pub locked: specs::Entity,
+    pub locked: AtlasImage,
 }
 
 pub struct PreloadedParticles {
@@ -809,7 +801,7 @@ pub struct UpgradeCardRaw {
 pub fn get_avaliable_cards(
     cards: &[UpgradeCardRaw],
     gun: &GunKind,
-    name_to_image: &HashMap<String, specs::Entity>,
+    name_to_image: &HashMap<String, AtlasImage>,
 ) -> Vec<UpgradeCard> {
     let gun_marker: GunKindMarker = gun.into();
     let avaliable_cards: Vec<UpgradeCard> = cards
@@ -818,11 +810,14 @@ pub fn get_avaliable_cards(
             raw_card.assigned.contains(&Assigned::General)
                 || raw_card.assigned.contains(&Assigned::ToGun(gun_marker))
         })
-        .map(|upgrade| UpgradeCard {
-            upgrade_type: upgrade.upgrade_type,
-            image: Image(name_to_image[&upgrade.image]),
-            name: upgrade.name.clone(),
-            description: upgrade.description.clone(),
+        .map(|upgrade| {
+            dbg!(&upgrade.name);
+            UpgradeCard {
+                upgrade_type: upgrade.upgrade_type,
+                image: name_to_image[&upgrade.image],
+                name: upgrade.name.clone(),
+                description: upgrade.description.clone(),
+            }
         })
         .collect();
     avaliable_cards
@@ -852,7 +847,7 @@ pub enum GunKindSave {
 }
 
 impl GunKindSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> GunKind {
+    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> GunKind {
         match self {
             GunKindSave::ShotGun(shotgun_save) => {
                 GunKind::ShotGun(shotgun_save.convert(name_to_image))
@@ -1004,7 +999,7 @@ pub struct ShotGun {
     pub reflection: Option<Reflection>,
     pub bullet_lifetime: Duration,
     pub bullet_reflection_lifetime: Duration,
-    pub bullet_image: Image,
+    pub bullet_image: AtlasImage,
 }
 
 #[derive(Component, Debug, Clone, Serialize, Deserialize)]
@@ -1023,7 +1018,7 @@ pub struct ShotGunSave {
 }
 
 impl ShotGunSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> ShotGun {
+    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> ShotGun {
         ShotGun::new(
             self.recharge_time,
             self.bullets_damage,
@@ -1035,7 +1030,7 @@ impl ShotGunSave {
             self.reflection,
             self.bullet_reflection_lifetime,
             self.bullet_lifetime,
-            Image(name_to_image[&self.bullet_image]),
+            name_to_image[&self.bullet_image],
         )
     }
 }
@@ -1052,7 +1047,7 @@ impl ShotGun {
         reflection: Option<Reflection>,
         bullet_reflection_lifetime: Duration,
         bullet_lifetime: Duration,
-        bullet_image: Image,
+        bullet_image: AtlasImage,
     ) -> Self {
         Self {
             recharge_start: Instant::now(),
@@ -1162,7 +1157,7 @@ pub struct Cannon {
     pub bullet_speed: f32,
     pub bullet_blast: Blast,
     pub bullet_lifetime: Duration,
-    pub bullet_image: Image,
+    pub bullet_image: AtlasImage,
 }
 
 #[derive(Component, Debug, Clone, Copy)]
@@ -1171,7 +1166,7 @@ pub struct RocketGun {
     pub recharge_time: Duration,
     pub bullets_damage: usize,
     pub bullet_speed: f32,
-    pub bullet_image: Image,
+    pub bullet_image: AtlasImage,
 }
 
 impl RocketGun {
@@ -1179,14 +1174,14 @@ impl RocketGun {
         recharge_time: Duration,
         bullets_damage: usize,
         bullet_speed: f32,
-        bullet_image: Image,
+        bullet_image: AtlasImage,
     ) -> Self {
         Self {
             recharge_start: Instant::now(),
             recharge_time: recharge_time,
             bullets_damage: bullets_damage,
-            bullet_speed: bullet_speed,
-            bullet_image: bullet_image,
+            bullet_speed,
+            bullet_image,
         }
     }
 }
@@ -1201,12 +1196,12 @@ pub struct RocketGunSave {
 }
 
 impl RocketGunSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> RocketGun {
+    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> RocketGun {
         RocketGun::new(
             self.recharge_time,
             self.bullets_damage,
             self.bullet_speed,
-            Image(name_to_image[&self.bullet_image]),
+            name_to_image[&self.bullet_image],
         )
     }
 }
@@ -1223,7 +1218,7 @@ pub struct CannonSave {
 }
 
 impl CannonSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, specs::Entity>) -> Cannon {
+    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> Cannon {
         Cannon::new(
             self.recharge_time,
             self.bullets_damage,
@@ -1231,7 +1226,7 @@ impl CannonSave {
             self.bullet_speed,
             self.bullet_blast,
             self.bullet_lifetime,
-            Image(name_to_image[&self.bullet_image]),
+            name_to_image[&self.bullet_image],
         )
     }
 }
@@ -1244,7 +1239,7 @@ impl Cannon {
         bullet_speed: f32,
         bullet_blast: Blast,
         bullet_lifetime: Duration,
-        bullet_image: Image,
+        bullet_image: AtlasImage,
     ) -> Self {
         Self {
             recharge_start: Instant::now(),
@@ -1254,7 +1249,7 @@ impl Cannon {
             bullet_speed: bullet_speed,
             bullet_blast: bullet_blast,
             bullet_lifetime: bullet_lifetime,
-            bullet_image: bullet_image,
+            bullet_image,
         }
     }
 }

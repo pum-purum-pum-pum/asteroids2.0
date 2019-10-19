@@ -80,7 +80,7 @@ const COLLECTABLE_SIDE_BULLET: u64 = 5;
 const SIDE_BULLET_LIFETIME_SEC: u64 = 6;
 const DOUBLE_COINS_LIFETIME_SEC: u64 = 5;
 const COLLECTABLE_DOUBLE_COINS_SEC: u64 = 5;
-const DESTUCTION_SITES: usize = 5;
+const DESTUCTION_SITES: usize = 20;
 
 pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut rng = thread_rng();

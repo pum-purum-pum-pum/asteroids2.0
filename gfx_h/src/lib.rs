@@ -20,12 +20,13 @@ use glyph_brush::{
     rusttype::{point, Rect},
     BrushAction, BrushError, DefaultSectionHasher, GlyphBrush,
 };
+use packer::SerializedSpriteSheet;
 use red::data::*;
 use red::shader::Texture;
 use red::{DrawParams, DrawType, Operation, Stencil, StencilTest};
 use sdl2::rwops::RWops;
+use std::fmt;
 use std::path::Path;
-use packer::SpritePosition;
 
 pub mod effects;
 pub use effects::*;
@@ -150,6 +151,95 @@ pub struct TextData<'a> {
     pub vertex_num: i32,
     pub glyph_texture: red::Texture,
     pub glyph_brush: GlyphBrush<'a, GlyphVertex, DefaultSectionHasher>,
+}
+
+pub struct ImageModel {
+    positions: VertexBuffer<Vertex>,
+    indices: red::buffer::IndexBuffer,
+}
+
+#[derive(Debug, Component, Clone, Copy)]
+pub struct AtlasImage {
+    offset: (f32, f32),
+    fraction_wh: (f32, f32),
+    dim_scales: (f32, f32),
+}
+
+pub fn load_atlas_image(image_name: &str, atlas: &SerializedSpriteSheet) -> Option<AtlasImage> {
+    if let Some(sprite) = atlas.sprites.get(image_name) {
+        let offset = (
+            sprite.x / atlas.texture_width,
+            sprite.y / atlas.texture_height,
+        );
+        let fraction_wh = (
+            sprite.width / atlas.texture_width,
+            sprite.height / atlas.texture_height,
+        );
+        let dimensions = (sprite.width, sprite.height);
+        let dimensions = (1.0, dimensions.1 as f32 / dimensions.0 as f32);
+
+        Some(AtlasImage {
+            dim_scales: dimensions,
+            fraction_wh,
+            offset,
+        })
+    } else {
+        None
+    }
+}
+
+impl AtlasImage {
+    pub fn new(image_name: &str, atlas: &SerializedSpriteSheet) -> Self {
+        let sprite = atlas.sprites[image_name].clone();
+        let offset = (
+            sprite.x / atlas.texture_width,
+            sprite.y / atlas.texture_height,
+        );
+        let fraction_wh = (
+            sprite.width / atlas.texture_width,
+            sprite.height / atlas.texture_height,
+        );
+        let dimensions = (sprite.width, sprite.height);
+        let dimensions = (1.0, dimensions.1 as f32 / dimensions.0 as f32);
+
+        Self {
+            dim_scales: dimensions,
+            fraction_wh,
+            offset,
+        }
+    }
+}
+
+// impl fmt::Debug for AtlasImage {
+//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+//         // write!(f, "Point {{ x: {}, y: {} }}", self.x, self.y)
+//         write!(
+//             f,
+//             "AtlasImage {{offset: {:?}, fraction_wh: {:?}, dim_scales: {:?}}}",
+//             self.offset, self.fraction_wh, self.dim_scales
+//         )
+//     }
+// }
+
+impl ImageModel {
+    pub fn new(gl: &red::GL) -> Result<Self, String> {
+        let positions = vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
+        let textures = vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
+        let shape: Vec<Vertex> = positions
+            .into_iter()
+            .zip(textures)
+            .map(|(pos, tex)| Vertex {
+                position: pos.into(),
+                tex_coords: tex.into(),
+            })
+            .collect();
+        let vertex_buffer = VertexBuffer::new(gl, &shape)?;
+        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0])?;
+        Ok(ImageModel {
+            positions: vertex_buffer,
+            indices: index_buffer,
+        })
+    }
 }
 
 pub struct ImageData {
@@ -281,6 +371,7 @@ pub struct Canvas {
     program_primitive: red::Program,
     program_primitive_texture: red::Program,
     pub program_glyph: red::Program,
+    program_atlas: red::Program,
     observer: Point3,
     perlin_x: Perlin,
     perlin_y: Perlin,
@@ -289,13 +380,15 @@ pub struct Canvas {
     direction: Vector2,
     direction_offset: Vector2,
     pub z_far: f32,
+    atlas: red::shader::Texture,
+    image_model: ImageModel,
     // default_params: glium::DrawParameters<'a>,
     // stencil_check_params: glium::DrawParameters<'a>,
     // stencil_write_params: glium::DrawParameters<'a>,
 }
 
 impl Canvas {
-    pub fn new(gl: &red::GL, pref: &str, glsl_version: &str) -> Result<Self, String> {
+    pub fn new(gl: &red::GL, pref: &str, atlas: &str, glsl_version: &str) -> Result<Self, String> {
         let program = create_shader_program(gl, pref, "", glsl_version)?;
         let program_primitive = create_shader_program(gl, pref, "primitive", glsl_version)?;
         let program_primitive_texture =
@@ -303,13 +396,17 @@ impl Canvas {
         let program_light = create_shader_program(gl, pref, "light", glsl_version)?;
         let program_instancing = create_shader_program(gl, pref, "instancing", glsl_version)?;
         let program_glyph = create_shader_program(gl, pref, "text", &glsl_version)?;
+        let program_atlas = create_shader_program(gl, pref, "atlas", &glsl_version)?;
         let z_far = Z_FAR;
+        let atlas = load_texture(gl, atlas);
+        let image_model = ImageModel::new(gl).expect("failed image model");
         Ok(Canvas {
             program,
             program_primitive,
             program_primitive_texture,
             program_light,
             program_instancing,
+            program_atlas,
             observer: Point3::new(0f32, 0f32, z_far),
             program_glyph,
             perlin_x: Perlin::new().set_seed(0),
@@ -319,6 +416,8 @@ impl Canvas {
             direction: Vector2::new(0f32, 0f32),
             direction_offset: Vector2::new(0f32, 0f32),
             z_far,
+            atlas,
+            image_model,
         })
     }
 
@@ -603,7 +702,7 @@ impl Canvas {
         gl: &red::GL,
         viewport: &red::Viewport,
         frame: &mut red::Frame,
-        image_data: &SpritePosition,
+        atlas_image: &AtlasImage,
         model: &Isometry3,
         scale: f32,
         with_lights: bool,
@@ -612,24 +711,24 @@ impl Canvas {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
-        let texture = &image_data.texture;
         // let draw_params = if with_lights {
         //     &self.stencil_check_params
         // } else {
         //     &self.default_params
         // };
-        let scales = image_data.dim_scales;
         let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
         let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
-        let vao = &image_data.positions.vao;
-        let program = &self.program;
+        let vao = &self.image_model.positions.vao;
+        let program = &self.program_atlas;
         program.set_uniform("model", model);
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
-        program.set_uniform("dim_scales", (scales.x, scales.y));
-        program.set_uniform("tex", texture.clone());
+        program.set_uniform("dim_scales", atlas_image.dim_scales);
+        program.set_uniform("tex", self.atlas.clone()); // this is just shallow copy if idx
         program.set_uniform("scale", scale);
-        program.set_layout(&gl, vao, &[&image_data.positions]);
+        program.set_uniform("offset", atlas_image.offset);
+        program.set_uniform("fraction_wh", atlas_image.fraction_wh);
+        program.set_layout(&gl, vao, &[&self.image_model.positions]);
         let draw_params = if with_lights {
             red::DrawParams {
                 draw_type: DrawType::Standart,
@@ -648,7 +747,7 @@ impl Canvas {
                 ..Default::default()
             }
         };
-        frame.draw(vao, Some(&image_data.indices), &program, &draw_params);
+        frame.draw(vao, Some(&self.image_model.indices), &program, &draw_params);
     }
 
     pub fn render(
@@ -746,7 +845,7 @@ impl Canvas {
         gl: &red::GL,
         viewport: &red::Viewport,
         frame: &mut red::Frame,
-        image_data: &ImageData,
+        atlas_image: &AtlasImage,
         model: &Isometry3,
         with_projection: bool,
         dim_scales: (f32, f32),
@@ -754,7 +853,7 @@ impl Canvas {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
-        let vao = &image_data.positions.vao;
+        let vao = &self.image_model.positions.vao;
         let program = &self.program_primitive_texture;
         let (projection, view) = if with_projection {
             let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
@@ -769,13 +868,13 @@ impl Canvas {
         program.set_uniform("model", model);
         program.set_uniform("view", view);
         program.set_uniform("projection", projection);
-        program.set_uniform("tex", image_data.texture.clone());
+        program.set_uniform("tex", self.atlas.clone());
         program.set_uniform("dim_scales", dim_scales);
         // program.set_uniform("size", size);
-        program.set_layout(&gl, vao, &[&image_data.positions]);
+        program.set_layout(&gl, vao, &[&self.image_model.positions]);
 
         let draw_params = DrawParams::default();
-        frame.draw(vao, Some(&image_data.indices), &program, &draw_params);
+        frame.draw(vao, Some(&self.image_model.indices), &program, &draw_params);
     }
 }
 

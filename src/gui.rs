@@ -11,12 +11,12 @@ cfg_if! {
             position: Point2, // screen position, center
             radius: f32,
             stick_radius: f32,
-            _circle_image: Image,
+            _circle_image: AtlasImage,
             controller_geometry: Primitive,
         }
 
         impl VecController {
-            pub fn new(position: Point2, radius: f32, stick_radius: f32, circle_image: Image) -> Self {
+            pub fn new(position: Point2, radius: f32, stick_radius: f32, circle_image: AtlasImage) -> Self {
                 let controller_geometry = Primitive {
                     kind: PrimitiveKind::Rectangle(Rectangle{
                         position: position - Vector2::new(radius, radius),
@@ -149,7 +149,7 @@ pub struct Button {
     height: f32,
     color: Option<Point3>,
     with_projection: bool,
-    pub image: Option<Image>,
+    pub image: Option<AtlasImage>,
     text: String,
     id: usize,
     hover_sound: Option<Sound>,
@@ -168,7 +168,7 @@ pub struct Picture {
     pub position: Point2,
     pub width: f32,
     pub height: f32,
-    pub image: Image,
+    pub image: AtlasImage,
 }
 
 impl Picture {
@@ -203,7 +203,7 @@ impl Button {
         height: f32,
         color: Option<Point3>,
         with_projection: bool,
-        image: Option<Image>,
+        image: Option<AtlasImage>,
         text: String,
         id: usize,
         hover_sound: Option<Sound>,

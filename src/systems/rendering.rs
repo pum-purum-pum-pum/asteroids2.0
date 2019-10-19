@@ -1,5 +1,5 @@
 pub use crate::gui::{Button, Picture, Rectangle, Selector};
-use gfx_h::{RenderMode, TextData};
+use gfx_h::{unproject_with_z, RenderMode, TextData};
 use num_enum::TryFromPrimitive;
 use telemetry::{render_plot, TeleGraph};
 
@@ -12,7 +12,6 @@ use geometry::shadow_geometry;
 use glyph_brush::{rusttype::Scale, Section};
 use physics_system::MENU_VELOCITY;
 
-use gfx_h::unproject_with_z;
 fn visible(canvas: &Canvas, iso: &Isometry3, dims: (i32, i32)) -> bool {
     let unprojected = unproject_with_z(
         canvas.observer(),
@@ -77,7 +76,7 @@ pub fn render_primitives<'a>(
                     &gl,
                     &viewport,
                     frame,
-                    image_datas.get(picture.image.0).unwrap(),
+                    &picture.image,
                     &model,
                     *with_projection,
                     (picture.width, picture.height),
@@ -150,6 +149,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, FogMarker>,
             ReadStorage<'a, Projectile>,
             ReadStorage<'a, ThreadPin<ImageData>>,
+            ReadStorage<'a, AtlasImage>,
             ReadStorage<'a, Image>,
             WriteStorage<'a, Animation>,
             ReadStorage<'a, Size>,
@@ -193,6 +193,7 @@ impl<'a> System<'a> for RenderingSystem {
                 _fog_markers,
                 projectiles,
                 image_datas,
+                atlas_images,
                 image_ids,
                 mut animations,
                 sizes,
@@ -284,73 +285,47 @@ impl<'a> System<'a> for RenderingSystem {
             }
             flame::end("shadow rendering");
         };
-        for (_entity, iso, image, size, _stars) in
-            (&entities, &isometries, &image_ids, &sizes, &stars).join()
+        for (entity, iso, atlas_image, size) in
+            (&entities, &isometries, &atlas_images, &sizes).join()
         {
-            if visible(&*canvas, &iso.0, dims) {
-                let image_data = image_datas.get(image.0).unwrap();
-                canvas.render(
+            if planets.get(entity).is_some()
+                || stars.get(entity).is_some()
+                || nebulas.get(entity).is_some()
+                || _fog_markers.get(entity).is_some()
+            {
+                canvas.render_atlas(
                     &gl,
                     &viewport,
                     &mut frame,
-                    &image_data,
+                    &atlas_image,
                     &iso.0,
                     size.0,
                     false,
                     None,
-                );
+                )
             }
         }
-
-        for (_entity, iso, image, size, _nebula) in
-            (&entities, &isometries, &image_ids, &sizes, &nebulas).join()
+        for (iso, atlas_image, size, (), (), (), ()) in (
+            &isometries,
+            &atlas_images,
+            &sizes,
+            !&stars,
+            !&planets,
+            !&nebulas,
+            !&_fog_markers,
+        )
+            .join()
         {
-            if visible(&*canvas, &iso.0, dims) {
-                let image_data = image_datas.get(image.0).unwrap();
-                canvas.render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_data,
-                    &iso.0,
-                    size.0,
-                    false,
-                    None,
-                );
-            }
-        }
-        for (_entity, iso, image, size, _planet) in
-            (&entities, &isometries, &image_ids, &sizes, &planets).join()
-        {
-            if visible(&*canvas, &iso.0, dims) {
-                let image_data = image_datas.get(image.0).unwrap();
-                canvas.render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_data,
-                    &iso.0,
-                    size.0,
-                    false,
-                    None,
-                );
-            }
-        }
-
-        for (_entity, iso, image, size, _fog) in
-            (&entities, &isometries, &image_ids, &sizes, &_fog_markers).join()
-        {
-            let image_data = image_datas.get(image.0).unwrap();
-            canvas.render(
+            canvas.render_atlas(
                 &gl,
                 &viewport,
                 &mut frame,
-                &image_data,
+                &atlas_image,
                 &iso.0,
                 size.0,
-                false,
+                true,
                 None,
-            );
+            )
         }
         flame::end("background rendering");
         flame::start("particles rendering");
@@ -412,23 +387,6 @@ impl<'a> System<'a> for RenderingSystem {
         flame::end("particles rendering");
 
         flame::start("other");
-        for (_entity, iso, image, size, _light) in
-            (&entities, &isometries, &image_ids, &sizes, &light_markers).join()
-        {
-            let translation_vec = iso.0.translation.vector;
-            let isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
-            canvas.render(
-                &gl,
-                &viewport,
-                &mut frame,
-                &image_datas.get(image.0).unwrap(),
-                &isometry,
-                size.0,
-                true,
-                Some(red::Blend),
-            );
-        }
-
         let mut render_lazer = |iso: &Isometry, lazer: &Lazer, force_rendering: bool, rotation| {
             if lazer.active || force_rendering {
                 let h = lazer.current_distance;
@@ -476,49 +434,6 @@ impl<'a> System<'a> for RenderingSystem {
                 render_lazer(iso, lazer, false, rotation);
             }
         }
-        for (_entity, iso, image, size, _projectile) in
-            (&entities, &isometries, &image_ids, &sizes, &projectiles).join()
-        {
-            canvas.render(
-                &gl,
-                &viewport,
-                &mut frame,
-                &image_datas.get(image.0).unwrap(),
-                &iso.0,
-                size.0,
-                true,
-                Some(red::Blend),
-            );
-        }
-        for (_entity, iso, _physics_component, image, size, _ship) in (
-            &entities,
-            &isometries,
-            &physics,
-            &image_ids,
-            &sizes,
-            &ship_markers,
-        )
-            .join()
-        {
-            // let iso2 = world
-            //     .rigid_body(physics_component.body_handle)
-            //     .unwrap()
-            //     .position();
-            // let iso = iso2_iso3(iso2);
-            if visible(&*canvas, &iso.0, dims) {
-                let image_data = &image_datas.get(image.0).unwrap();
-                canvas.render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_data,
-                    &iso.0,
-                    size.0,
-                    true,
-                    None,
-                )
-            }
-        }
         flame::end("other");
         flame::start("asteroids rendering");
         for (_entity, iso, _size, geom_data, _asteroid) in (
@@ -544,23 +459,6 @@ impl<'a> System<'a> for RenderingSystem {
         }
         flame::end("asteroids rendering");
         flame::start("collectables");
-        for (iso, size, image, _collectable) in
-            (&isometries, &sizes, &image_ids, &collectables).join()
-        {
-            let image_data = image_datas.get(image.0).unwrap();
-            if visible(&*canvas, &iso.0, dims) {
-                canvas.render(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &image_data,
-                    &iso.0,
-                    size.0,
-                    true,
-                    None,
-                )
-            }
-        }
         let _render_line = |a: Point2, b: Point2| {
             let line_width = 0.05;
             let line_length = (b.coords - a.coords).norm();
@@ -589,31 +487,20 @@ impl<'a> System<'a> for RenderingSystem {
             );
         };
         flame::end("collectables");
-        // debug grid drawing
-        // for i in 0..nebula_grid.grid.size {
-        //     for j in 0..nebula_grid.grid.size {
-        //         let ((min_w, max_w), (min_h, max_h)) = nebula_grid.grid.get_rectangle(i, j);
-        //         render_line(Point2::new(min_w, min_h), Point2::new(min_w, max_h));
-        //         render_line(Point2::new(min_w, max_h), Point2::new(max_w, max_h));
-        //         render_line(Point2::new(max_w, max_h), Point2::new(max_w, min_h));
-        //         render_line(Point2::new(max_w, min_h), Point2::new(min_w, min_h));
-        //     }
-        // }
         flame::start("animation");
         for (iso, size, animation) in (&isometries, &sizes, &mut animations).join() {
             if visible(&*canvas, &iso.0, dims) {
                 let animation_frame = animation.next_frame();
                 if let Some(animation_frame) = animation_frame {
-                    let image_data = image_datas.get(animation_frame.image.0).unwrap();
-                    canvas.render(
+                    canvas.render_atlas(
                         &gl,
                         &viewport,
                         &mut frame,
-                        &image_data,
+                        &animation_frame.image,
                         &iso.0,
-                        size.0,
+                        1f32,
                         false,
-                        Some(red::Blend),
+                        None,
                     )
                 };
             }

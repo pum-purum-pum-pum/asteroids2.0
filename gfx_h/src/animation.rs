@@ -1,11 +1,12 @@
 use specs::prelude::*;
 use specs_derive::Component;
 
-use crate::Image;
+// use crate::Image;
+use crate::AtlasImage;
 
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationFrame {
-    pub image: Image,
+    pub image: AtlasImage,
     pub ticks: usize,
 }
 

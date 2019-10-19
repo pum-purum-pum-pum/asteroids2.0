@@ -22,8 +22,11 @@ use crate::systems::{
 };
 use common::*;
 use components::*;
-use gfx_h::{effects::MenuParticles, Canvas, MovementParticles, ParticlesData};
+use gfx_h::{
+    effects::MenuParticles, load_atlas_image, AtlasImage, Canvas, MovementParticles, ParticlesData,
+};
 use log::info;
+use packer::{SerializedSpriteSheet, SpritePosition};
 use physics::safe_maintain;
 use physics_system::PhysicsSystem;
 use red::glow::RenderLoop;
@@ -31,9 +34,8 @@ use sound::init_sound;
 use std::fs::File;
 use std::path::Path;
 use telemetry::TimeSpans;
-use packer::{SerializedSpriteSheet, SpritePosition};
 
-const NEBULAS_NUM: usize = 3usize;
+const NEBULAS_NUM: usize = 2usize;
 
 pub fn read_atlas(path: &str) -> SerializedSpriteSheet {
     let content = just_read(path).unwrap();
@@ -48,11 +50,23 @@ pub fn read_atlas(path: &str) -> SerializedSpriteSheet {
     parsed
 }
 
+pub fn setup_images(
+    specs_world: &mut SpecsWorld,
+    gl: &red::GL,
+    atlas: &SerializedSpriteSheet,
+) -> HashMap<String, AtlasImage> {
+    // dbg!(&atlas.sprites["chains_dark"]);
+    let mut name_to_image = HashMap::new();
+    for (name, sprite) in atlas.sprites.iter() {
+        let image = load_atlas_image(&name, &atlas).unwrap();
+        name_to_image.insert(name.clone(), image);
+    }
+    name_to_image
+}
 
 pub fn run() -> Result<(), String> {
-    // read_atlas("packer/out.ron");
-    // return Ok(());
     let mut specs_world = SpecsWorld::new();
+    data_setup(&mut specs_world);
     let _guard = setup_logging();
     let telegraph = setup_telegraph();
     let time_spans = TimeSpans::new();
@@ -63,11 +77,12 @@ pub fn run() -> Result<(), String> {
     let (context, sdl_context, render_loop, _gl_context, hdpi, canvas) =
         setup_gfx(&mut specs_world)?;
     setup_text(&context, &mut specs_world);
+    let atlas = read_atlas("assets/out.ron");
+    let name_to_atlas = setup_images(&mut specs_world, &context, &atlas);
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(30);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
     let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
-    data_setup(&mut specs_world);
     // TODO: load all this images automagicly (and with assets pack)
     let images = [
         "player_ship1",
@@ -131,25 +146,24 @@ pub fn run() -> Result<(), String> {
         "maneuverability",
         "transparent_sqr",
         "locked",
-        "enemy1"
+        "enemy1",
     ];
     let mut name_to_animation = HashMap::new();
     {
         // load animations
-        let animations = [("explosion", 7), ("blast2", 7), ("bullet_contact", 1)];
+        let animations = [
+            ("explosion_anim", 7),
+            ("blast2_anim", 7),
+            ("bullet_contact_anim", 1),
+        ]; // (name, ticks)
         for (animation_name, ticks) in animations.iter() {
             // let animation_full = &format!("assets/{}", animation_name);
             let mut frames = vec![];
             for i in 1..100 {
-                let animation_file = format!("assets/{}/{}.png", animation_name, i);
-                if let Ok(_rw) = RWops::from_file(Path::new(&animation_file), "r") {
-                    // TODO: Rewrite -- Hacky, what if it's different error?...
-                    let animation_file_relative = format!("{}/{}", animation_name, i);
-                    let image_data =
-                        ThreadPin::new(ImageData::new(&context, &animation_file_relative).unwrap());
-                    let image = specs_world.create_entity().with(image_data).build();
+                let animation_name = format!("{}_{}", animation_name, i);
+                if let Some(image) = load_atlas_image(&animation_name, &atlas) {
                     let animation_frame = AnimationFrame {
-                        image: Image(image),
+                        image,
                         ticks: *ticks,
                     };
                     frames.push(animation_frame);
@@ -169,22 +183,17 @@ pub fn run() -> Result<(), String> {
     }
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
-        let nebula_image_data =
-            ThreadPin::new(ImageData::new(&context, &format!("nebula{}", i)).unwrap());
-        let nebula_image = specs_world.create_entity().with(nebula_image_data).build();
+        let nebula_image = name_to_atlas[&format!("nebula{}", i)];
         nebula_images.push(nebula_image);
     }
     let mut stars_images = vec![];
-    for i in 1..=5 {
-        let stars_image_data =
-            ThreadPin::new(ImageData::new(&context, &format!("stars{}", i)).unwrap());
-        let stars_image = specs_world.create_entity().with(stars_image_data).build();
+    for i in 1..=4 {
+        let stars_image = name_to_atlas[&format!("stars{}", i)];
         stars_images.push(stars_image);
     }
     let mut planet_images = vec![];
-    for planet_name in vec!["planet1", "jupyterish", "halfmoon"].iter() {
-        let planet_image_data = ThreadPin::new(ImageData::new(&context, &planet_name).unwrap());
-        let planet_image = specs_world.create_entity().with(planet_image_data).build();
+    for planet_name in vec!["planet", "jupyterish", "halfmoon"].iter() {
+        let planet_image = name_to_atlas[&planet_name.to_string()];
         planet_images.push(planet_image);
     }
 
@@ -201,7 +210,7 @@ pub fn run() -> Result<(), String> {
 
         fn process_description(
             description_save: DescriptionSave,
-            name_to_image: &HashMap<String, specs::Entity>,
+            name_to_atlas: &HashMap<String, AtlasImage>,
         ) -> Description {
             Description {
                 gun_costs: description_save.gun_costs,
@@ -209,32 +218,32 @@ pub fn run() -> Result<(), String> {
                 player_ships: description_save
                     .player_ships
                     .iter()
-                    .map(|x| x.clone().load(name_to_image))
+                    .map(|x| x.clone().load(name_to_atlas))
                     .collect(),
                 player_guns: description_save
                     .player_guns
                     .iter()
-                    .map(|gun| gun.convert(name_to_image))
+                    .map(|gun| gun.convert(name_to_atlas))
                     .collect(),
                 enemies: description_save
                     .enemies
                     .iter()
-                    .map(|enemy| load_enemy(enemy, name_to_image))
+                    .map(|enemy| load_enemy(enemy, name_to_atlas))
                     .collect(),
             }
         }
 
         fn load_enemy(
             enemy_save: &EnemyKindSave,
-            name_to_image: &HashMap<String, specs::Entity>,
+            name_to_atlas: &HashMap<String, AtlasImage>,
         ) -> EnemyKind {
             dbg!(&enemy_save.image_name);
             EnemyKind {
                 ai_kind: enemy_save.ai_kind.clone(),
-                gun_kind: enemy_save.gun_kind.convert(name_to_image),
+                gun_kind: enemy_save.gun_kind.convert(name_to_atlas),
                 ship_stats: enemy_save.ship_stats,
                 size: enemy_save.size,
-                image: Image(name_to_image[&enemy_save.image_name]),
+                image: name_to_atlas[&enemy_save.image_name],
                 snake: enemy_save.snake,
                 rift: enemy_save.rift.clone(),
             }
@@ -267,7 +276,7 @@ pub fn run() -> Result<(), String> {
         for (id, enemy) in desc.enemies.iter().enumerate() {
             enemy_name_to_id.insert(enemy.image_name.clone(), id);
         }
-        let desc = process_description(desc, &name_to_image);
+        let desc = process_description(desc, &name_to_atlas);
         specs_world.add_resource(desc);
         let file = include_str!("../rons/upgrades.ron");
         let upgrades_all: Vec<UpgradeCardRaw> = match from_str(file) {
@@ -280,11 +289,14 @@ pub fn run() -> Result<(), String> {
         };
         let upgrades: Vec<UpgradeCard> = upgrades_all
             .iter()
-            .map(|upgrade| UpgradeCard {
-                upgrade_type: upgrade.upgrade_type,
-                image: Image(name_to_image[&upgrade.image]),
-                name: upgrade.name.clone(),
-                description: upgrade.description.clone(),
+            .map(|upgrade| {
+                dbg!(&upgrade.image);
+                UpgradeCard {
+                    upgrade_type: upgrade.upgrade_type,
+                    image: name_to_atlas[&upgrade.image],
+                    name: upgrade.name.clone(),
+                    description: upgrade.description.clone(),
+                }
             })
             .collect();
         let avaliable_upgrades = upgrades;
@@ -293,7 +305,10 @@ pub fn run() -> Result<(), String> {
             let distribution: Vec<(usize, f32)> = wave
                 .distribution
                 .iter()
-                .map(|p| (enemy_name_to_id[&p.0], p.1))
+                .map(|p| {
+                    dbg!(&p.0);
+                    (enemy_name_to_id[&p.0], p.1)
+                })
                 .collect();
             let const_distribution: Vec<(usize, usize)> = wave
                 .const_distribution
@@ -331,44 +346,36 @@ pub fn run() -> Result<(), String> {
     }
 
     let preloaded_images = PreloadedImages {
-        character: name_to_image["basic"],
-        projectile: name_to_image["projectile"],
-        enemy_projectile: name_to_image["enemy_projectile"],
-        enemy: name_to_image["enemy1"],
-        enemy2: name_to_image["kamikadze"],
-        enemy3: name_to_image["buckshot"],
-        enemy4: name_to_image["lazer"],
         nebulas: nebula_images,
         stars: stars_images,
-        fog: name_to_image["fog"],
+        fog: name_to_atlas["fog"],
         planets: planet_images,
-        ship_speed_upgrade: name_to_image["ship_speed"],
-        bullet_speed_upgrade: name_to_image["bullet_speed"],
-        attack_speed_upgrade: name_to_image["fire_rate"],
-        light_white: name_to_image["light"],
-        light_sea: name_to_image["light_sea"],
-        direction: name_to_image["direction"],
-        circle: name_to_image["circle"],
-        lazer: name_to_image["lazer_gun"],
-        play: name_to_image["play"],
-        blaster: name_to_image["blaster_gun"],
-        shotgun: name_to_image["shotgun"],
-        coin: name_to_image["coin"],
-        health: name_to_image["health"],
-        side_bullet_ability: name_to_image["side_bullets_ability"],
-        exp: name_to_image["exp"],
-        bar: name_to_image["bar"],
-        upg_bar: name_to_image["upg_bar"],
-        transparent_sqr: name_to_image["transparent_sqr"],
-        explosion: name_to_animation["explosion"].clone(),
-        blast: name_to_animation["blast2"].clone(),
-        bullet_contact: name_to_animation["bullet_contact"].clone(),
-        double_coin: name_to_image["double_coin"],
-        double_exp: name_to_image["double_exp"],
-        basic_ship: name_to_image["basic"],
-        heavy_ship: name_to_image["heavy"],
-        super_ship: name_to_image["super_ship"],
-        locked: name_to_image["locked"],
+        ship_speed_upgrade: name_to_atlas["speed_upgrade"],
+        bullet_speed_upgrade: name_to_atlas["bullet_speed"],
+        attack_speed_upgrade: name_to_atlas["fire_rate"],
+        light_white: name_to_atlas["light"],
+        direction: name_to_atlas["direction"],
+        circle: name_to_atlas["circle"],
+        lazer: name_to_atlas["lazer_gun"],
+        play: name_to_atlas["play"],
+        blaster: name_to_atlas["blaster_gun"],
+        shotgun: name_to_atlas["shotgun"],
+        coin: name_to_atlas["coin"],
+        health: name_to_atlas["health"],
+        side_bullet_ability: name_to_atlas["side_bullets_ability"],
+        exp: name_to_atlas["exp"],
+        bar: name_to_atlas["bar"],
+        upg_bar: name_to_atlas["upg_bar"],
+        transparent_sqr: name_to_atlas["transparent_sqr"],
+        explosion: name_to_animation["explosion_anim"].clone(),
+        blast: name_to_animation["blast2_anim"].clone(),
+        bullet_contact: name_to_animation["bullet_contact_anim"].clone(),
+        double_coin: name_to_atlas["double_coin_ability"],
+        double_exp: name_to_atlas["double_exp_ability"],
+        basic_ship: name_to_atlas["basic"],
+        heavy_ship: name_to_atlas["heavy"],
+        super_ship: name_to_atlas["basic"],
+        locked: name_to_atlas["locked"],
     };
     let size = 10f32;
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
@@ -419,6 +426,7 @@ pub fn run() -> Result<(), String> {
 
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
     specs_world.add_resource(name_to_image);
+    specs_world.add_resource(name_to_atlas);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
     specs_world.add_resource(LoopSound::default());

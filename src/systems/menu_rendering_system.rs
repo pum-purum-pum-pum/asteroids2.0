@@ -23,6 +23,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         Read<'a, Vec<UpgradeCardRaw>>,
         Write<'a, Vec<UpgradeCard>>,
         Read<'a, HashMap<String, specs::Entity>>,
+        Read<'a, HashMap<String, AtlasImage>>,
         WriteExpect<'a, MacroGame>,
         Write<'a, EventChannel<Sound>>,
         ReadExpect<'a, PreloadedSounds>,
@@ -46,6 +47,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             upgrade_cards_raw,
             mut avaliable_upgrades,
             name_to_image,
+            name_to_atlas,
             mut macro_game,
             mut sounds_channel,
             preloaded_sounds,
@@ -63,7 +65,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 position: Point2::new(0f32, 0f32),
                 width: w,
                 height: h,
-                image: Image(preloaded_images.transparent_sqr),
+                image: preloaded_images.transparent_sqr,
             }),
             with_projection: false,
         });
@@ -103,7 +105,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     button_h,
                     None,
                     false,
-                    Some(Image(button_images[i])),
+                    Some(button_images[i]),
                     buttons_names[i].to_string(),
                     guns[i] as usize,
                     Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
@@ -117,7 +119,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     button_h,
                     None,
                     false,
-                    Some(Image(preloaded_images.locked)),
+                    Some(preloaded_images.locked),
                     format!("{} $", description.gun_costs[i]),
                     locked_guns_ids[i] as usize,
                     Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
@@ -198,7 +200,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
                     button_h,
                     None,
                     false,
-                    Some(Image(preloaded_images.locked)),
+                    Some(preloaded_images.locked),
                     format!("{} $", description.ship_costs[i]),
                     locked_ships_ids[i] as usize,
                     Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
@@ -252,7 +254,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             button_h / 5.0,
             None,
             false,
-            Some(Image(preloaded_images.upg_bar)),
+            Some(preloaded_images.upg_bar),
             "Score Table".to_string(),
             Widgets::ScoreTable as usize,
             Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
@@ -281,7 +283,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
             button_h / 4.0,
             None,
             false,
-            Some(Image(preloaded_images.upg_bar)),
+            Some(preloaded_images.upg_bar),
             "Play".to_string(),
             Widgets::Play as usize,
             Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
@@ -294,10 +296,10 @@ impl<'a> System<'a> for MenuRenderingSystem {
                 insert_channel.single_write(InsertEvent::Character {
                     gun_kind: gun.clone(),
                     ship_stats: description.player_ships[ship].ship_stats,
-                    image: Image(ship_images[ship]),
+                    image: ship_images[ship],
                 });
                 *avaliable_upgrades =
-                    get_avaliable_cards(&upgrade_cards_raw, &gun.clone(), &name_to_image);
+                    get_avaliable_cards(&upgrade_cards_raw, &gun.clone(), &name_to_atlas);
             }
         }
         primitives_channel.iter_write(ui.primitives.drain(..));

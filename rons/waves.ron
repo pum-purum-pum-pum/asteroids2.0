@@ -2,7 +2,7 @@
 	[
 		(
 			distribution: [
-				("kamikadze", 0.5),
+				("kamikadzer", 0.5),
 				("bomberman", 0.5),
 			],
 			ships_number: 6,
@@ -14,10 +14,10 @@
 		),
 		(
 			distribution: [
-				("kamikadze", 0.3),
+				("kamikadzer", 0.3),
 				("charging", 0.2),
 				("bomberman", 0.4),
-				("enemy1", 0.1),
+				("sidewinder", 0.1),
 			],
 			ships_number: 7,
 			const_distribution : [],
@@ -26,8 +26,8 @@
 		(
 			distribution: [
 				("charging", 0.3),
-				("enemy1", 0.3),
-				("lazer", 0.1),
+				("sidewinder", 0.3),
+				("lazer_enemy", 0.1),
 				("bomber", 0.15),
 				("bomberman", 0.15),		
 
@@ -38,11 +38,11 @@
 		),
 		(
 			distribution: [
-				("kamikadze", 0.1),
-				("enemy1", 0.2),
-				("lazer", 0.2),
+				("kamikadzer", 0.1),
+				("sidewinder", 0.2),
+				("lazer_enemy", 0.2),
 				("bomberman", 0.2),			
-				("buckshot", 0.3),
+				("shotgun_enemy", 0.3),
 			],
 			ships_number: 8,
 			const_distribution : [],
@@ -51,10 +51,10 @@
 		(
 			distribution: [
 				("charging", 0.1),
-				("enemy1", 0.2),
-				("lazer", 0.2),
+				("sidewinder", 0.2),
+				("lazer_enemy", 0.2),
 				("bomber", 0.2),
-				("buckshot", 0.3),
+				("shotgun_enemy", 0.3),
 			],
 			ships_number: 8,
 			const_distribution : [],
@@ -62,13 +62,13 @@
 		),
 		(
 			distribution: [
-				("kamikadze", 0.1),
+				("kamikadzer", 0.1),
 				("charging", 0.1),
 				("bomber", 0.1),
 				("bomberman", 0.1),
-				("enemy1", 0.2),
-				("lazer", 0.1),
-				("buckshot", 0.3),
+				("sidewinder", 0.2),
+				("lazer_enemy", 0.1),
+				("shotgun_enemy", 0.3),
 			],
 			ships_number: 15,
 			const_distribution : [
@@ -78,7 +78,7 @@
 		),
 		(
 			distribution: [
-				("kamikadze", 0.1),
+				("kamikadzer", 0.1),
 				("charging", 0.1),
 				("bomber", 0.1),
 				("bomberman", 0.1),
@@ -86,14 +86,14 @@
 			ships_number: 6,
 			const_distribution : [
 				("rift", 5),
-				("chain_standart", 1),
+				("chains", 1),
 				// ("reflect_bullet_enemy", 1)
 			],
 			iterations: 1
 		),
 		(
 			distribution: [
-				("kamikadze", 0.1),
+				("kamikadzer", 0.1),
 				("charging", 0.1),
 				("bomber", 0.1),
 				("bomberman", 0.1),
@@ -101,7 +101,7 @@
 			ships_number: 6,
 			const_distribution : [
 				("rift", 3),
-				("chain_lazer", 2),
+				("chains_dark", 2),
 				("reflect_bullet_enemy", 2)
 				// ("reflect_bullet_enemy", 1)
 			],
@@ -111,14 +111,14 @@
 			distribution: [
 				("charging", 0.1),
 				("reflect_bullet_enemy", 0.1),
-				("enemy1", 0.1),
-				("buckshot", 0.1),
+				("sidewinder", 0.1),
+				("shotgun_enemy", 0.1),
 
 			],
 			ships_number: 6,
 			const_distribution : [
 				("rift", 2),
-				("chain_lazer", 2),
+				("chains_dark", 2),
 				// ("reflect_bullet_enemy", 1)
 			],
 			iterations: 1
@@ -129,27 +129,27 @@
 			ships_number: 6,
 			const_distribution : [
 				("rift", 10),
-				("chain_standart", 1),
-				("chain_lazer", 1),
+				("chains", 1),
+				("chains_dark", 1),
 				// ("reflect_bullet_enemy", 1)
 			],
 			iterations: 1
 		),
 		(
 			distribution: [
-				("kamikadze", 0.1),
+				("kamikadzer", 0.1),
 				("charging", 0.1),
 				("bomber", 0.1),
 				("bomberman", 0.1),
-				("enemy1", 0.1),
-				("lazer", 0.1),
-				("buckshot", 0.1),
+				("sidewinder", 0.1),
+				("lazer_enemy", 0.1),
+				("shotgun_enemy", 0.1),
 				("lazer_boss", 0.1),
 				("rotship", 0.1),
 				("random_ship", 0.1),
 				("fish", 0.1),
-				("chain_standart", 0.1),
-				("chain_lazer", 0.1),
+				("chains", 0.1),
+				("chains_dark", 0.1),
 				("rift", 0.1),
 			],
 			ships_number: 15,
@@ -164,7 +164,7 @@
 			],
 			ships_number: 15,
 			const_distribution : [
-				("chain_lazer", 1),
+				("chains_dark", 1),
 			],
 			iterations: 1
 		),
@@ -174,16 +174,16 @@
 			ships_number: 6,
 			const_distribution : [
 
-				//("enemy1", 4),
-				("buckshot", 4),
+				//("sidewinder", 4),
+				("shotgun_enemy", 4),
 				("bomberman", 2),
 				("bomber", 2)
 				//("rift", 3),
-				//("kamikadze", 2),
-				//("chain_standart", 1),
-				//("chain_lazer", 1),
+				//("kamikadzer", 2),
+				//("chains", 1),
+				//("chains_dark", 1),
 				//("lazer_boss", 1),
-				//("chain_lazer", 1),
+				//("chains_dark", 1),
 			],
 			iterations: 1
 		),	]

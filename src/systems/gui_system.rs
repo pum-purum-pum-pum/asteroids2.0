@@ -186,28 +186,28 @@ impl<'a> System<'a> for GUISystem {
         let double_exp_cnt = double_exp_abilities.count();
         let icon_size = w / 20.0;
         struct Ability {
-            pub icon: Image,
+            pub icon: AtlasImage,
             pub text: String,
         };
         let mut abilities = vec![];
 
         if double_coins_cnt > 0 {
             let ability = Ability {
-                icon: Image(preloaded_images.double_coin),
+                icon: preloaded_images.double_coin,
                 text: format!("x{}", double_coins_cnt).to_string(),
             };
             abilities.push(ability);
         }
         if double_exp_cnt > 0 {
             let ability = Ability {
-                icon: Image(preloaded_images.double_exp),
+                icon: preloaded_images.double_exp,
                 text: format!("x{}", double_exp_cnt).to_string(),
             };
             abilities.push(ability);
         }
         if side_bullets_cnt > 0 {
             let ability = Ability {
-                icon: Image(preloaded_images.side_bullet_ability),
+                icon: preloaded_images.side_bullet_ability,
                 text: format!("+{}", side_bullets_cnt).to_string(),
             };
             abilities.push(ability);
@@ -254,7 +254,7 @@ impl<'a> System<'a> for GUISystem {
                 position: experience_position + Vector2::new(-border / 2.0, -border / 2.0),
                 width: experiencebar_w + border,
                 height: experiencebar_h + border,
-                image: Image(preloaded_images.bar),
+                image: preloaded_images.bar,
             }),
             with_projection: false,
         });
@@ -264,7 +264,7 @@ impl<'a> System<'a> for GUISystem {
                 width: (progress.experience as f32 / progress.current_max_experience() as f32)
                     * experiencebar_w,
                 height: experiencebar_h,
-                image: Image(preloaded_images.bar),
+                image: preloaded_images.bar,
             }),
             with_projection: false,
         });
@@ -283,7 +283,7 @@ impl<'a> System<'a> for GUISystem {
                     ),
                     width: upgrade_bar_w,
                     height: upgrade_bar_h,
-                    image: Image(preloaded_images.upg_bar),
+                    image: preloaded_images.upg_bar,
                 }),
                 with_projection: false,
             });
@@ -304,7 +304,7 @@ impl<'a> System<'a> for GUISystem {
                         ),
                         width: health_back_w,
                         height: health_back_h,
-                        image: Image(preloaded_images.bar),
+                        image: preloaded_images.bar,
                     }),
                     with_projection: false,
                 });
@@ -318,7 +318,7 @@ impl<'a> System<'a> for GUISystem {
                         ),
                         width: health_back_w,
                         height: health_back_h,
-                        image: Image(preloaded_images.bar),
+                        image: preloaded_images.bar,
                     }),
                     with_projection: false,
                 });
