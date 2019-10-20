@@ -6,7 +6,7 @@ use common::*;
 pub use geometry::{BlockSegment, FogGrid, Geometry, NebulaGrid, PlanetGrid, Polygon, StarsGrid};
 pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{ortho_unproject, unproject_with_z, Canvas as SDLCanvas};
-pub use gfx_h::{AtlasImage, Image, ImageData};
+pub use gfx_h::{AtlasImage, ImageData};
 pub use physics::{BodiesMap, PhysicsComponent};
 pub use sound::{SoundData, SoundPlacement};
 

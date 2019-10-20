@@ -83,71 +83,6 @@ pub fn run() -> Result<(), String> {
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(30);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
     let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
-    // TODO: load all this images automagicly (and with assets pack)
-    let images = [
-        "player_ship1",
-        "basic",
-        "basic_select",
-        "heavy",
-        "heavy_select",
-        "super_ship",
-        "light",
-        "light_sea",
-        "projectile",
-        "reflect_bullet",
-        "enemy_shotgun_projectile",
-        "bomb",
-        "enemy_projectile",
-        "player_projectile",
-        "kamikadze",
-        "buckshot",
-        "reflect_bullet_enemy",
-        "lazer",
-        "play",
-        "bullet_speed",
-        "ship_speed",
-        "fire_rate",
-        "bullet_damage",
-        "bullet_reflection",
-        "direction",
-        "circle",
-        "circle2",
-        "chain_standart",
-        "chain_standart_rift",
-        "chain_lazer",
-        "ship_rotation",
-        "shield_regen",
-        "health_regen",
-        "health_size",
-        "shield_size",
-        "lazer_gun",
-        "blaster_gun",
-        "shotgun",
-        "coin",
-        "side_bullets_ability",
-        "rift",
-        "double_coin",
-        "double_exp",
-        "health",
-        "exp",
-        "lazer_boss",
-        "rotship",
-        "random_ship",
-        "bomber",
-        "bomberman",
-        "charging",
-        "bar",
-        "upg_bar",
-        "fog",
-        "rocket",
-        "fish",
-        "player",
-        "enemy_projectile_old",
-        "maneuverability",
-        "transparent_sqr",
-        "locked",
-        "enemy1",
-    ];
     let mut name_to_animation = HashMap::new();
     {
         // load animations
@@ -175,12 +110,6 @@ pub fn run() -> Result<(), String> {
             name_to_animation.insert(animation_name.to_string(), animation);
         }
     };
-    let mut name_to_image = HashMap::new();
-    for image_name in images.iter() {
-        let image_data = ThreadPin::new(ImageData::new(&context, image_name).unwrap());
-        let image = specs_world.create_entity().with(image_data).build();
-        name_to_image.insert(image_name.to_string(), image);
-    }
     let mut nebula_images = vec![];
     for i in 1..=NEBULAS_NUM {
         let nebula_image = name_to_atlas[&format!("nebula{}", i)];
@@ -425,7 +354,6 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(FogGrid::new(2, 50f32, 50f32, 5f32, 5f32));
 
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
-    specs_world.add_resource(name_to_image);
     specs_world.add_resource(name_to_atlas);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());

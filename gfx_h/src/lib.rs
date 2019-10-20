@@ -75,8 +75,8 @@ fn gl_err_to_str(err: u32) -> &'static str {
     }
 }
 
-#[derive(Debug, Component, Clone, Copy)]
-pub struct Image(pub specs::Entity);
+// #[derive(Debug, Component, Clone, Copy)]
+// pub struct Image(pub specs::Entity);
 
 #[derive(Copy, Clone, Debug)]
 #[repr(C, packed)]

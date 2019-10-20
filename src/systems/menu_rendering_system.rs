@@ -1,6 +1,6 @@
 use super::rendering::*;
 use super::*;
-use gfx_h::{Image, MenuParticles};
+use gfx_h::{MenuParticles};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 
@@ -22,7 +22,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
         ReadExpect<'a, Description>,
         Read<'a, Vec<UpgradeCardRaw>>,
         Write<'a, Vec<UpgradeCard>>,
-        Read<'a, HashMap<String, specs::Entity>>,
         Read<'a, HashMap<String, AtlasImage>>,
         WriteExpect<'a, MacroGame>,
         Write<'a, EventChannel<Sound>>,
@@ -46,7 +45,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
             description,
             upgrade_cards_raw,
             mut avaliable_upgrades,
-            name_to_image,
             name_to_atlas,
             mut macro_game,
             mut sounds_channel,
