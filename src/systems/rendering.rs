@@ -251,9 +251,15 @@ impl<'a> System<'a> for RenderingSystem {
                     // light_poly.clip_one((*geom).clone(), pos);
                     let rotation = iso.0.rotation.euler_angles().2;
                     let rotation = Rotation2::new(rotation);
+                    // sooht angles of polygon
+                    let geom = if let Geometry::Polygon(polygon) = geom {
+                        Geometry::Polygon(polygon.clone().into_rounded(2))
+                    } else {
+                        geom.clone()
+                    };
                     let shadow_triangulation = shadow_geometry(
                         Point2::new(char_pos.x, char_pos.y),
-                        (*geom).clone(),
+                        geom,
                         pos,
                         rotation,
                     );

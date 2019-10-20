@@ -229,7 +229,7 @@ impl<'a> System<'a> for InsertSystem {
                         break;
                         // panic!();
                     };
-                    let triangulation = polygon.clone().into_rounded().triangulate();
+                    let triangulation = polygon.clone().into_rounded(5).triangulate();
                     let geom_data =
                         GeometryData::new(&gl, &triangulation.points, &triangulation.indicies)
                             .unwrap();

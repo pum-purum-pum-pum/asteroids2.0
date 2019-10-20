@@ -252,7 +252,7 @@ pub struct Polygon {
 }
 
 impl Polygon {
-    pub fn into_rounded(self) -> Self {
+    pub fn into_rounded(self, smooth_points: usize) -> Self {
         let mut res = vec![];
         for i in 0..self.points.len() {
             let prev = self.points[if i == 0 {
@@ -265,7 +265,6 @@ impl Polygon {
             let edge_vec1 = p.coords - prev.coords;
             let edge_vec2 = next.coords - p.coords;
             let segment1 = Segment::new(prev, prev + edge_vec1);
-            // let d = self.min_r * 0.4;
             let inside_vec = (-edge_vec1.normalize() + edge_vec2.normalize()) / 2.0;
             let d = 1.0
                 * inside_vec
@@ -295,22 +294,20 @@ impl Polygon {
                     _ => (),
                 }
             };
-            // match toi1 {
-            //     Some(toi1) => {
             if dbg_flag {
                 let angle = edge_vec1.angle(&edge_vec2);
-                let points_num = 5;
-                let rotation = Rotation2::new(-angle / (points_num as f32));
-                for _ in 0..=points_num {
+                // if smooth_points == 1 {
+                //     res.push(o + Rotation2::new(-angle / 2.0) * h1);
+                //     continue;
+                // }
+                let rotation = Rotation2::new(-angle / (smooth_points as f32));
+                for _ in 0..=smooth_points {
                     res.push(o + h1);
                     h1 = rotation * h1;
                 }
             } else {
                 res.push(p)
             }
-            // }
-            // None => ()
-            // }
         }
         Self::new(res)
     }

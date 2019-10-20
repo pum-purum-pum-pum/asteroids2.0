@@ -62,7 +62,7 @@ const SCREEN_AREA: f32 = 10f32;
 const PLAYER_AREA: f32 = 20f32;
 const ACTIVE_AREA: f32 = 40f32;
 // the same for NEBULAS
-const ASTEROIDS_MIN_NUMBER: usize = 50;
+const ASTEROIDS_MIN_NUMBER: usize = 100;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;

@@ -23,10 +23,9 @@ use crate::systems::{
 use common::*;
 use components::*;
 use gfx_h::{
-    effects::MenuParticles, load_atlas_image, AtlasImage, Canvas, MovementParticles, ParticlesData,
+    effects::MenuParticles, AtlasImage, Canvas, MovementParticles, ParticlesData,
 };
 use log::info;
-use packer::{SerializedSpriteSheet, SpritePosition};
 use physics::safe_maintain;
 use physics_system::PhysicsSystem;
 use red::glow::RenderLoop;
@@ -34,35 +33,6 @@ use sound::init_sound;
 use std::fs::File;
 use std::path::Path;
 use telemetry::TimeSpans;
-
-const NEBULAS_NUM: usize = 2usize;
-
-pub fn read_atlas(path: &str) -> SerializedSpriteSheet {
-    let content = just_read(path).unwrap();
-    let parsed: SerializedSpriteSheet = match from_str(&content) {
-        Ok(x) => x,
-        Err(e) => {
-            println!("Failed to load atlas: {}", e);
-
-            std::process::exit(1);
-        }
-    };
-    parsed
-}
-
-pub fn setup_images(
-    specs_world: &mut SpecsWorld,
-    gl: &red::GL,
-    atlas: &SerializedSpriteSheet,
-) -> HashMap<String, AtlasImage> {
-    // dbg!(&atlas.sprites["chains_dark"]);
-    let mut name_to_image = HashMap::new();
-    for (name, sprite) in atlas.sprites.iter() {
-        let image = load_atlas_image(&name, &atlas).unwrap();
-        name_to_image.insert(name.clone(), image);
-    }
-    name_to_image
-}
 
 pub fn run() -> Result<(), String> {
     let mut specs_world = SpecsWorld::new();
@@ -78,234 +48,14 @@ pub fn run() -> Result<(), String> {
         setup_gfx(&mut specs_world)?;
     setup_text(&context, &mut specs_world);
     let atlas = read_atlas("assets/out.ron");
-    let name_to_atlas = setup_images(&mut specs_world, &context, &atlas);
+    let name_to_atlas = setup_images(&atlas);
     let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(30);
     let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
     let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
-    let mut name_to_animation = HashMap::new();
-    {
-        // load animations
-        let animations = [
-            ("explosion_anim", 7),
-            ("blast2_anim", 7),
-            ("bullet_contact_anim", 1),
-        ]; // (name, ticks)
-        for (animation_name, ticks) in animations.iter() {
-            // let animation_full = &format!("assets/{}", animation_name);
-            let mut frames = vec![];
-            for i in 1..100 {
-                let animation_name = format!("{}_{}", animation_name, i);
-                if let Some(image) = load_atlas_image(&animation_name, &atlas) {
-                    let animation_frame = AnimationFrame {
-                        image,
-                        ticks: *ticks,
-                    };
-                    frames.push(animation_frame);
-                } else {
-                    break;
-                };
-            }
-            let animation = Animation::new(frames, 1, 0);
-            name_to_animation.insert(animation_name.to_string(), animation);
-        }
-    };
-    let mut nebula_images = vec![];
-    for i in 1..=NEBULAS_NUM {
-        let nebula_image = name_to_atlas[&format!("nebula{}", i)];
-        nebula_images.push(nebula_image);
-    }
-    let mut stars_images = vec![];
-    for i in 1..=4 {
-        let stars_image = name_to_atlas[&format!("stars{}", i)];
-        stars_images.push(stars_image);
-    }
-    let mut planet_images = vec![];
-    for planet_name in vec!["planet", "jupyterish", "halfmoon"].iter() {
-        let planet_image = name_to_atlas[&planet_name.to_string()];
-        planet_images.push(planet_image);
-    }
-
-    {
-        // load .ron files with tweaks
-        #[derive(Debug, Serialize, Deserialize)]
-        pub struct DescriptionSave {
-            ship_costs: Vec<usize>,
-            gun_costs: Vec<usize>,
-            player_ships: Vec<ShipKindSave>,
-            player_guns: Vec<GunKindSave>,
-            enemies: Vec<EnemyKindSave>,
-        }
-
-        fn process_description(
-            description_save: DescriptionSave,
-            name_to_atlas: &HashMap<String, AtlasImage>,
-        ) -> Description {
-            Description {
-                gun_costs: description_save.gun_costs,
-                ship_costs: description_save.ship_costs,
-                player_ships: description_save
-                    .player_ships
-                    .iter()
-                    .map(|x| x.clone().load(name_to_atlas))
-                    .collect(),
-                player_guns: description_save
-                    .player_guns
-                    .iter()
-                    .map(|gun| gun.convert(name_to_atlas))
-                    .collect(),
-                enemies: description_save
-                    .enemies
-                    .iter()
-                    .map(|enemy| load_enemy(enemy, name_to_atlas))
-                    .collect(),
-            }
-        }
-
-        fn load_enemy(
-            enemy_save: &EnemyKindSave,
-            name_to_atlas: &HashMap<String, AtlasImage>,
-        ) -> EnemyKind {
-            dbg!(&enemy_save.image_name);
-            EnemyKind {
-                ai_kind: enemy_save.ai_kind.clone(),
-                gun_kind: enemy_save.gun_kind.convert(name_to_atlas),
-                ship_stats: enemy_save.ship_stats,
-                size: enemy_save.size,
-                image: name_to_atlas[&enemy_save.image_name],
-                snake: enemy_save.snake,
-                rift: enemy_save.rift.clone(),
-            }
-        }
-        #[derive(Debug, Serialize, Deserialize)]
-        pub struct EnemyKindSave {
-            pub ai_kind: AI,
-            pub gun_kind: GunKindSave,
-            pub ship_stats: ShipStats,
-            pub size: f32,
-            pub image_name: String,
-            pub snake: Option<usize>,
-            #[serde(default)]
-            pub rift: Option<Rift>,
-        };
-        #[cfg(not(target_os = "android"))]
-        let file = just_read("rons/desc.ron").unwrap();
-        let file = &file;
-        #[cfg(target_os = "android")]
-        let file = include_str!("../rons/desc.ron");
-        let desc: DescriptionSave = match from_str(file) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to load config: {}", e);
-
-                std::process::exit(1);
-            }
-        };
-        let mut enemy_name_to_id = HashMap::new();
-        for (id, enemy) in desc.enemies.iter().enumerate() {
-            enemy_name_to_id.insert(enemy.image_name.clone(), id);
-        }
-        let desc = process_description(desc, &name_to_atlas);
-        specs_world.add_resource(desc);
-        let file = include_str!("../rons/upgrades.ron");
-        let upgrades_all: Vec<UpgradeCardRaw> = match from_str(file) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to load config: {}", e);
-
-                std::process::exit(1);
-            }
-        };
-        let upgrades: Vec<UpgradeCard> = upgrades_all
-            .iter()
-            .map(|upgrade| {
-                dbg!(&upgrade.image);
-                UpgradeCard {
-                    upgrade_type: upgrade.upgrade_type,
-                    image: name_to_atlas[&upgrade.image],
-                    name: upgrade.name.clone(),
-                    description: upgrade.description.clone(),
-                }
-            })
-            .collect();
-        let avaliable_upgrades = upgrades;
-        specs_world.add_resource(avaliable_upgrades);
-        pub fn wave_load(wave: &WaveSave, enemy_name_to_id: &HashMap<String, usize>) -> Wave {
-            let distribution: Vec<(usize, f32)> = wave
-                .distribution
-                .iter()
-                .map(|p| {
-                    dbg!(&p.0);
-                    (enemy_name_to_id[&p.0], p.1)
-                })
-                .collect();
-            let const_distribution: Vec<(usize, usize)> = wave
-                .const_distribution
-                .iter()
-                .map(|p| (enemy_name_to_id[&p.0], p.1))
-                .collect();
-            Wave {
-                distribution: distribution,
-                ships_number: wave.ships_number,
-                const_distribution: const_distribution,
-                iterations: wave.iterations,
-            }
-        }
-        #[cfg(target_os = "android")]
-        let file = include_str!("../rons/waves.ron");
-        #[cfg(not(target_os = "android"))]
-        let file = &just_read("rons/waves.ron").unwrap();
-        let waves: WavesSave = match from_str(file) {
-            Ok(x) => x,
-            Err(e) => {
-                println!("Failed to load config: {}", e);
-                std::process::exit(1);
-            }
-        };
-        let waves: Waves = Waves(
-            waves
-                .0
-                .iter()
-                .map(|p| wave_load(p, &enemy_name_to_id))
-                .collect(),
-        );
-        specs_world.add_resource(waves);
-        specs_world.add_resource(upgrades_all);
-        specs_world.add_resource(CurrentWave::default());
-    }
-
-    let preloaded_images = PreloadedImages {
-        nebulas: nebula_images,
-        stars: stars_images,
-        fog: name_to_atlas["fog"],
-        planets: planet_images,
-        ship_speed_upgrade: name_to_atlas["speed_upgrade"],
-        bullet_speed_upgrade: name_to_atlas["bullet_speed"],
-        attack_speed_upgrade: name_to_atlas["fire_rate"],
-        light_white: name_to_atlas["light"],
-        direction: name_to_atlas["direction"],
-        circle: name_to_atlas["circle"],
-        lazer: name_to_atlas["lazer_gun"],
-        play: name_to_atlas["play"],
-        blaster: name_to_atlas["blaster_gun"],
-        shotgun: name_to_atlas["shotgun"],
-        coin: name_to_atlas["coin"],
-        health: name_to_atlas["health"],
-        side_bullet_ability: name_to_atlas["side_bullets_ability"],
-        exp: name_to_atlas["exp"],
-        bar: name_to_atlas["bar"],
-        upg_bar: name_to_atlas["upg_bar"],
-        transparent_sqr: name_to_atlas["transparent_sqr"],
-        explosion: name_to_animation["explosion_anim"].clone(),
-        blast: name_to_animation["blast2_anim"].clone(),
-        bullet_contact: name_to_animation["bullet_contact_anim"].clone(),
-        double_coin: name_to_atlas["double_coin_ability"],
-        double_exp: name_to_atlas["double_exp_ability"],
-        basic_ship: name_to_atlas["basic"],
-        heavy_ship: name_to_atlas["heavy"],
-        super_ship: name_to_atlas["basic"],
-        locked: name_to_atlas["locked"],
-    };
+    let name_to_animation = load_animations(&atlas);
+    load_description(&mut specs_world, &name_to_atlas);
+    let preloaded_images = preloaded_images(&name_to_atlas, &name_to_animation);
     let size = 10f32;
     let movement_particles = ThreadPin::new(ParticlesData::MovementParticles(
         MovementParticles::new_quad(&context, -size, -size, size, size, 100),
@@ -369,29 +119,6 @@ pub fn run() -> Result<(), String> {
         200,
     )));
     specs_world.add_resource(GlobalParams::default());
-    {
-        let file = "rons/macro_game.ron";
-        let macro_game = if let Ok(mut rw) = RWops::from_file(Path::new(&file), "r") {
-            let mut macro_game_str = String::new();
-            let macro_game = if let Ok(_) = rw.read_to_string(&mut macro_game_str) {
-                let macro_game: MacroGame = match from_str(&macro_game_str) {
-                    Ok(x) => x,
-                    Err(e) => {
-                        println!("Failed to load config: {}", e);
-
-                        std::process::exit(1);
-                    }
-                };
-                macro_game
-            } else {
-                MacroGame::default()
-            };
-            macro_game
-        } else {
-            MacroGame::default()
-        };
-        specs_world.add_resource(macro_game);
-    }
     let mut sound_dispatcher = DispatcherBuilder::new()
         .with_thread_local(sound_system)
         .build();
