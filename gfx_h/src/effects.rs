@@ -1,5 +1,61 @@
+// we just allocate new objects instead of GPU streaming or preallocating.
+// It's suboptimal but works ok for now.
 use super::*;
 use std::time::{Duration, Instant};
+
+pub struct SpriteBatch {
+    pub instancing_data: ImageInstancingData,
+    pub len: usize,
+}
+
+impl SpriteBatch {
+    pub fn new(
+        gl: &red::GL,
+        images: &[AtlasImage],
+        isometries: &[Isometry3],
+    ) -> Self {
+        let image_model = ImageModel::new(gl).expect("failed image model");
+        let regions: Vec<AtlasRegion> = images
+            .iter()
+            .map(|image| AtlasRegion {
+                offset: red::data::f32_f32 {
+                    d0: image.offset.0,
+                    d1: image.offset.1,
+                },
+                fraction_wh: red::data::f32_f32::new(
+                    image.fraction_wh.0,
+                    image.fraction_wh.1,
+                ),
+            })
+            .collect();
+        let isometries: Vec<WorldIsometry> = isometries
+            .iter()
+            .map(|iso| {
+                let pos = iso.translation.vector;
+                let angle = iso.rotation.euler_angles().2;
+                WorldIsometry {
+                    world_position: red::data::f32_f32_f32::new(
+                        pos.x, pos.y, pos.z,
+                    ),
+                    angle: red::data::f32_::new(angle),
+                }
+            })
+            .collect();
+        let regions = AtlasRegionBuffer::new(gl, &regions)
+            .expect("failed to create regions buffer");
+        let isometries = WorldIsometryBuffer::new(gl, &isometries)
+            .expect("failed to create isometries buffer");
+        let instancing_data = ImageInstancingData {
+            image_model,
+            regions,
+            isometries,
+        };
+        SpriteBatch {
+            instancing_data,
+            len: images.len(),
+        }
+    }
+}
 
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
@@ -15,7 +71,12 @@ pub struct Explosion {
 }
 
 impl Explosion {
-    pub fn new(gl: &red::GL, position: Point2, num: usize, lifetime: Option<Duration>) -> Self {
+    pub fn new(
+        gl: &red::GL,
+        position: Point2,
+        num: usize,
+        lifetime: Option<Duration>,
+    ) -> Self {
         let scale = 0.03f32;
         let positions = vec![
             [-scale, -scale],
@@ -30,7 +91,8 @@ impl Explosion {
             })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
-        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
+        let index_buffer =
+            red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
         let mut rng = thread_rng();
         let mut quad_positions = vec![];
         let mut velocities = vec![];
@@ -62,7 +124,9 @@ impl Explosion {
 
     pub fn update(&mut self) -> bool {
         let instanced = self.instancing_data.per_instance.map_array().unwrap();
-        for (particle, vel) in instanced.slice.iter_mut().zip(self.velocities.iter()) {
+        for (particle, vel) in
+            instanced.slice.iter_mut().zip(self.velocities.iter())
+        {
             particle.world_position.0 += vel.x;
             particle.world_position.1 += vel.y;
         }
@@ -104,7 +168,8 @@ impl MovementParticles {
             })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
-        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
+        let index_buffer =
+            red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
         let mut rng = thread_rng();
         let mut quad_positions = vec![];
         for _ in 0..num {
@@ -116,7 +181,8 @@ impl MovementParticles {
                 world_position: red::data::f32_f32_f32::new(x, y, z),
             });
         }
-        let world_vertex_buffer = WorldVertexBuffer::new(gl, &quad_positions).unwrap();
+        let world_vertex_buffer =
+            WorldVertexBuffer::new(gl, &quad_positions).unwrap();
         MovementParticles {
             instancing_data: InstancingData {
                 vertex_buffer,
@@ -136,7 +202,8 @@ impl MovementParticles {
             particle.world_position.0 += vel.x;
             particle.world_position.1 += vel.y;
             let cut_low = |x, min, max| if x < min { max - min + x } else { x };
-            let cut_hight = |x, min, max| if x > max { min + x - max } else { x };
+            let cut_hight =
+                |x, min, max| if x > max { min + x - max } else { x };
             particle.world_position.0 = cut_low(
                 cut_hight(particle.world_position.0, self.x_min, self.x_max),
                 self.x_min,
@@ -150,6 +217,8 @@ impl MovementParticles {
         }
     }
 }
+
+pub struct TraceImage {}
 
 pub struct MenuParticles {
     pub instancing_data: InstancingData,
@@ -182,7 +251,8 @@ impl MenuParticles {
             })
             .collect();
         let vertex_buffer = GeometryVertexBuffer::new(gl, &shape).unwrap();
-        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
+        let index_buffer =
+            red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0]).unwrap();
         let mut rng = thread_rng();
         let mut quad_positions = vec![];
         for _ in 0..num {
@@ -193,7 +263,8 @@ impl MenuParticles {
                 world_position: red::data::f32_f32_f32::new(x, y, z),
             });
         }
-        let world_vertex_buffer = WorldVertexBuffer::new(gl, &quad_positions).unwrap();
+        let world_vertex_buffer =
+            WorldVertexBuffer::new(gl, &quad_positions).unwrap();
         Self {
             instancing_data: InstancingData {
                 vertex_buffer,
@@ -213,7 +284,8 @@ impl MenuParticles {
             // particle.world_position.1 += vel.y;
 
             let cut_low = |x, min, max| if x < min { max - min + x } else { x };
-            let cut_hight = |x, min, max| if x > max { min + x - max } else { x };
+            let cut_hight =
+                |x, min, max| if x > max { min + x - max } else { x };
             particle.world_position.2 = cut_low(
                 cut_hight(particle.world_position.2, self.z_min, self.z_max),
                 self.z_min,

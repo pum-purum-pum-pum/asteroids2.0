@@ -78,7 +78,6 @@ impl<'a> System<'a> for ScoreTableRendering {
             &mouse,
             &mut self.reader,
             &mut frame,
-            &image_datas,
             &gl,
             &mut canvas,
             &viewport,

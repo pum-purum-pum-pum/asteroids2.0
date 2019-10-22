@@ -30,9 +30,13 @@ fn main() -> Result<(), String> {
         .build()
         .unwrap();
     let _gl_context = window.gl_create_context().unwrap();
-    let render_loop = glow::native::RenderLoop::<sdl2::video::Window>::from_sdl_window(window);
-    let context =
-        glow::native::Context::from_loader_function(|s| video.gl_get_proc_address(s) as *const _);
+    let render_loop =
+        glow::native::RenderLoop::<sdl2::video::Window>::from_sdl_window(
+            window,
+        );
+    let context = glow::native::Context::from_loader_function(|s| {
+        video.gl_get_proc_address(s) as *const _
+    });
     let context = GL::new(context);
     let glsl_version = "#version 330";
     let canvas = Canvas::new(&context, "", &glsl_version).unwrap();
@@ -54,7 +58,8 @@ fn main() -> Result<(), String> {
         for name in telegraph.iter_names() {
             if let Some(plot) = telegraph.iter(name.to_string()) {
                 render_plot(
-                    plot.0, plot.1, w, h, &context, &viewport, &canvas, &mut frame,
+                    plot.0, plot.1, w, h, &context, &viewport, &canvas,
+                    &mut frame,
                 );
             }
         }

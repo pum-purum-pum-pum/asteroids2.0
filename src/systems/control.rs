@@ -87,12 +87,13 @@ impl<'a> System<'a> for ControlSystem {
             mut dev_info,
         ) = data;
         info!("asteroids: started control system");
-        let (ship_stats, _) =
-            if let Some(value) = (&mut ships_stats, &character_markers).join().next() {
-                value
-            } else {
-                return;
-            };
+        let (ship_stats, _) = if let Some(value) =
+            (&mut ships_stats, &character_markers).join().next()
+        {
+            value
+        } else {
+            return;
+        };
         #[cfg(not(target_os = "android"))]
         {
             let mut character = None;
@@ -109,7 +110,10 @@ impl<'a> System<'a> for ControlSystem {
                 let player_torque = DT
                     * calculate_player_ship_spin_for_aim(
                         Vector2::new(mouse_state.x, mouse_state.y)
-                            - Vector2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                            - Vector2::new(
+                                iso.0.translation.vector.x,
+                                iso.0.translation.vector.y,
+                            ),
                         iso.rotation(),
                         spin.0,
                     );
@@ -129,96 +133,122 @@ impl<'a> System<'a> for ControlSystem {
                     multy_lazer.set_all(false);
                 }
             }
-            let mut process_lazer = |isometry: &Isometry3,
-                                     lazer: &mut Lazer,
-                                     world: &mut Write<World<f32>>,
-                                     bodies_map: &Write<BodiesMap>,
-                                     is_character: bool,
-                                     rotation| {
-                // let body = world
-                //     .rigid_body(physics_component.body_handle)
-                //     .unwrap();
-                // let isometry = body.position();
-                let isometry = iso3_iso2(isometry);
-                let position = isometry.translation.vector;
-                let pos = Point2::new(position.x, position.y);
-                let dir = isometry * (rotation * Vector2::new(0f32, -1f32));
-                let ray = Ray::new(pos, dir);
-                let collision_groups = if is_character {
-                    get_collision_groups(EntityType::Player)
-                } else {
-                    get_collision_groups(EntityType::Enemy)
-                };
-                let (min_d, closest_body) = get_min_dist(world, ray, collision_groups);
-                if min_d < lazer.distance {
-                    lazer.current_distance = min_d;
-                    if let Some(target_entity) = bodies_map.get(&closest_body.unwrap()) {
-                        if let Some(_) = lifes.get(*target_entity) {
-                            if process_damage(
-                                lifes.get_mut(*target_entity).unwrap(),
-                                shields.get_mut(*target_entity),
-                                lazer.damage,
-                            ) {
-                                let explosion_isometry = isometries.get(*target_entity).unwrap().0;
-                                let explosion_position = explosion_isometry.translation.vector;
-                                let explosion_position =
-                                    Point2::new(explosion_position.x, explosion_position.y);
-                                if asteroid_markers.get(*target_entity).is_some() {
-                                    let asteroid = *target_entity;
-                                    let polygon = polygons.get(asteroid).unwrap();
-                                    asteroid_explode(
-                                        explosion_position,
-                                        &mut insert_channel,
-                                        &mut sounds_channel,
-                                        &preloaded_sounds,
-                                        &preloaded_images,
-                                        polygon.max_r,
-                                    );
-                                    spawn_asteroids(
-                                        explosion_isometry,
-                                        polygons.get(asteroid).unwrap(),
-                                        &mut insert_channel,
-                                        None,
-                                    );
-                                } else {
-                                    let target_position = isometries
+            let mut process_lazer =
+                |isometry: &Isometry3,
+                 lazer: &mut Lazer,
+                 world: &mut Write<World<f32>>,
+                 bodies_map: &Write<BodiesMap>,
+                 is_character: bool,
+                 rotation| {
+                    // let body = world
+                    //     .rigid_body(physics_component.body_handle)
+                    //     .unwrap();
+                    // let isometry = body.position();
+                    let isometry = iso3_iso2(isometry);
+                    let position = isometry.translation.vector;
+                    let pos = Point2::new(position.x, position.y);
+                    let dir = isometry * (rotation * Vector2::new(0f32, -1f32));
+                    let ray = Ray::new(pos, dir);
+                    let collision_groups = if is_character {
+                        get_collision_groups(EntityType::Player)
+                    } else {
+                        get_collision_groups(EntityType::Enemy)
+                    };
+                    let (min_d, closest_body) =
+                        get_min_dist(world, ray, collision_groups);
+                    if min_d < lazer.distance {
+                        lazer.current_distance = min_d;
+                        if let Some(target_entity) =
+                            bodies_map.get(&closest_body.unwrap())
+                        {
+                            if let Some(_) = lifes.get(*target_entity) {
+                                if process_damage(
+                                    lifes.get_mut(*target_entity).unwrap(),
+                                    shields.get_mut(*target_entity),
+                                    lazer.damage,
+                                ) {
+                                    let explosion_isometry = isometries
                                         .get(*target_entity)
                                         .unwrap()
-                                        .0
-                                        .translation
-                                        .vector;
-                                    ship_explode(
-                                        Point2::new(target_position.x, target_position.y),
-                                        &mut insert_channel,
-                                        &mut sounds_channel,
-                                        &preloaded_sounds,
+                                        .0;
+                                    let explosion_position =
+                                        explosion_isometry.translation.vector;
+                                    let explosion_position = Point2::new(
+                                        explosion_position.x,
+                                        explosion_position.y,
                                     );
-                                }
-                                let explosion_size = 20;
-                                insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
-                                if character_markers.get(*target_entity).is_some() {
-                                    to_menu(
-                                        &mut app_state,
-                                        &mut progress,
-                                        &mut macro_game.score_table,
+                                    if asteroid_markers
+                                        .get(*target_entity)
+                                        .is_some()
+                                    {
+                                        let asteroid = *target_entity;
+                                        let polygon =
+                                            polygons.get(asteroid).unwrap();
+                                        asteroid_explode(
+                                            explosion_position,
+                                            &mut insert_channel,
+                                            &mut sounds_channel,
+                                            &preloaded_sounds,
+                                            &preloaded_images,
+                                            polygon.max_r,
+                                        );
+                                        spawn_asteroids(
+                                            explosion_isometry,
+                                            polygons.get(asteroid).unwrap(),
+                                            &mut insert_channel,
+                                            None,
+                                        );
+                                    } else {
+                                        let target_position = isometries
+                                            .get(*target_entity)
+                                            .unwrap()
+                                            .0
+                                            .translation
+                                            .vector;
+                                        ship_explode(
+                                            Point2::new(
+                                                target_position.x,
+                                                target_position.y,
+                                            ),
+                                            &mut insert_channel,
+                                            &mut sounds_channel,
+                                            &preloaded_sounds,
+                                        );
+                                    }
+                                    let explosion_size = 20;
+                                    insert_channel.single_write(
+                                        InsertEvent::Wobble(EXPLOSION_WOBBLE),
                                     );
+                                    if character_markers
+                                        .get(*target_entity)
+                                        .is_some()
+                                    {
+                                        to_menu(
+                                            &mut app_state,
+                                            &mut progress,
+                                            &mut macro_game.score_table,
+                                        );
+                                    }
+                                    let effect_position =
+                                        position + dir * min_d;
+                                    let effect = InsertEvent::Explosion {
+                                        position: Point2::new(
+                                            effect_position.x,
+                                            effect_position.y,
+                                        ),
+                                        num: explosion_size,
+                                        lifetime: Duration::from_millis(800),
+                                        with_animation: None,
+                                    };
+                                    insert_channel.single_write(effect);
+                                    entities.delete(*target_entity).unwrap();
                                 }
-                                let effect_position = position + dir * min_d;
-                                let effect = InsertEvent::Explosion {
-                                    position: Point2::new(effect_position.x, effect_position.y),
-                                    num: explosion_size,
-                                    lifetime: Duration::from_millis(800),
-                                    with_animation: None,
-                                };
-                                insert_channel.single_write(effect);
-                                entities.delete(*target_entity).unwrap();
                             }
                         }
+                    } else {
+                        lazer.current_distance = lazer.distance
                     }
-                } else {
-                    lazer.current_distance = lazer.distance
-                }
-            };
+                };
             info!("asteroids: started process rifts");
             let mut upgdate_rifts = vec![];
             let zero_rotation = Rotation2::new(0.0);
@@ -304,7 +334,10 @@ impl<'a> System<'a> for ControlSystem {
                             character,
                         );
                         info!("asteroids: bullets {:?} processed", bullets);
-                        sounds_channel.single_write(Sound(preloaded_sounds.shot, gun_position));
+                        sounds_channel.single_write(Sound(
+                            preloaded_sounds.shot,
+                            gun_position,
+                        ));
                         insert_channel.iter_write(bullets.into_iter());
                     }
                 }
@@ -315,10 +348,18 @@ impl<'a> System<'a> for ControlSystem {
             for key in keys_channel.read(&mut self.reader) {
                 self.new_keys.insert(*key);
                 let mut thrust = match key {
-                    Keycode::W => ship_stats.thrust_force * Vector3::new(0.0, -1.0, 0.0),
-                    Keycode::S => ship_stats.thrust_force * Vector3::new(0.0, 1.0, 0.0),
-                    Keycode::A => ship_stats.thrust_force * Vector3::new(-1.0, 0.0, 0.0),
-                    Keycode::D => ship_stats.thrust_force * Vector3::new(1.0, 0.0, 0.0),
+                    Keycode::W => {
+                        ship_stats.thrust_force * Vector3::new(0.0, -1.0, 0.0)
+                    }
+                    Keycode::S => {
+                        ship_stats.thrust_force * Vector3::new(0.0, 1.0, 0.0)
+                    }
+                    Keycode::A => {
+                        ship_stats.thrust_force * Vector3::new(-1.0, 0.0, 0.0)
+                    }
+                    Keycode::D => {
+                        ship_stats.thrust_force * Vector3::new(1.0, 0.0, 0.0)
+                    }
                     _ => Vector3::new(0f32, 0f32, 0f32),
                 };
                 match key {
@@ -332,17 +373,21 @@ impl<'a> System<'a> for ControlSystem {
                 };
                 let maneuverability = ship_stats.maneuverability.unwrap();
                 let depth = 30.0 * thrust.norm();
-                let scalar = thrust.normalize().dot(&*character_velocity.as_vector());
+                let scalar =
+                    thrust.normalize().dot(&*character_velocity.as_vector());
                 if scalar < depth {
                     let x = scalar - depth;
-                    thrust *= maneuverability * (1.0 + x.abs() * x.abs().sqrt());
+                    thrust *=
+                        maneuverability * (1.0 + x.abs() * x.abs().sqrt());
                 }
                 *character_velocity.as_vector_mut() += thrust;
             }
             let new_pressed = &self.new_keys - &self.prev_keys;
             for key in new_pressed.iter() {
                 match key {
-                    Keycode::Space => *app_state = AppState::Play(PlayState::Upgrade),
+                    Keycode::Space => {
+                        *app_state = AppState::Play(PlayState::Upgrade)
+                    }
                     Keycode::T => {
                         dev_info.draw_telemetry = !dev_info.draw_telemetry;
                     }
@@ -353,7 +398,8 @@ impl<'a> System<'a> for ControlSystem {
             if mouse_state.right {
                 let rotation = isometries.get(character).unwrap().0.rotation;
                 let _vel = velocities.get_mut(character).unwrap();
-                let thrust = ship_stats.thrust_force * (rotation * Vector3::new(0.0, 1.0, 0.0));
+                let thrust = ship_stats.thrust_force
+                    * (rotation * Vector3::new(0.0, 1.0, 0.0));
                 *character_velocity.as_vector_mut() += thrust;
             }
             let character_body = world

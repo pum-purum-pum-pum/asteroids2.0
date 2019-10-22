@@ -6,7 +6,9 @@ use std::thread::{self, ThreadId};
 
 use hibitset::BitSetLike;
 use specs::prelude::*;
-use specs::storage::{DenseVecStorage, MaskedStorage, TryDefault, UnprotectedStorage};
+use specs::storage::{
+    DenseVecStorage, MaskedStorage, TryDefault, UnprotectedStorage,
+};
 use specs::world::Index as SpecsIndex;
 use specs_derive::Component;
 
@@ -34,7 +36,11 @@ unsafe impl<T> Sync for ThreadPin<T> {}
 
 pub fn iso2_iso3(iso2: &Isometry2) -> Isometry3 {
     Isometry3::new(
-        Vector3::new(iso2.translation.vector.x, iso2.translation.vector.y, 0f32),
+        Vector3::new(
+            iso2.translation.vector.x,
+            iso2.translation.vector.y,
+            0f32,
+        ),
         Vector3::new(0f32, 0f32, iso2.rotation.angle()),
     )
 }
@@ -145,7 +151,9 @@ impl<C, T> Retained<C> for RetainedStorage<C, T> {
     }
 }
 
-impl<C: Clone, T: UnprotectedStorage<C>> UnprotectedStorage<C> for RetainedStorage<C, T> {
+impl<C: Clone, T: UnprotectedStorage<C>> UnprotectedStorage<C>
+    for RetainedStorage<C, T>
+{
     unsafe fn clean<B>(&mut self, has: B)
     where
         B: BitSetLike,

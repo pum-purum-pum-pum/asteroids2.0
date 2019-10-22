@@ -20,7 +20,11 @@ pub struct Animation {
 }
 
 impl Animation {
-    pub fn new(frames: Vec<AnimationFrame>, iterations: usize, current_frame: usize) -> Self {
+    pub fn new(
+        frames: Vec<AnimationFrame>,
+        iterations: usize,
+        current_frame: usize,
+    ) -> Self {
         assert!(frames.len() > 0);
         Animation {
             frames,

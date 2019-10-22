@@ -54,7 +54,8 @@ where
     pub fn iter(&self) -> impl Iterator<Item = (f32, T)> + '_ {
         self.queue.iter().map(move |x| {
             (
-                ((Instant::now() - x.0).as_millis() as f32) / (self.duration.as_millis() as f32),
+                ((Instant::now() - x.0).as_millis() as f32)
+                    / (self.duration.as_millis() as f32),
                 x.1,
             )
         })
@@ -98,7 +99,10 @@ impl TeleGraph {
         this_plot.insert(value);
     }
 
-    pub fn iter(&self, name: String) -> Option<(PlotData, impl Iterator<Item = (f32, f32)> + '_)> {
+    pub fn iter(
+        &self,
+        name: String,
+    ) -> Option<(PlotData, impl Iterator<Item = (f32, f32)> + '_)> {
         if let Some(plot) = self.plot.get(&name) {
             Some((plot.plot_data.clone(), plot.iter()))
         } else {
@@ -123,8 +127,16 @@ pub fn render_plot<T>(
 ) where
     T: Iterator<Item = (f32, f32)>,
 {
-    let render_lines = move |lines: &[(Point2, Point2)], frame: &mut red::Frame| {
-        canvas.draw_lines(&lines, &context, frame, &viewport, plot_data.color, 0.1f32);
+    let render_lines = move |lines: &[(Point2, Point2)],
+                             frame: &mut red::Frame| {
+        canvas.draw_lines(
+            &lines,
+            &context,
+            frame,
+            &viewport,
+            plot_data.color,
+            0.1f32,
+        );
     };
     let mut prev = None;
     let mut lines_to_draw = vec![];

@@ -48,10 +48,11 @@ impl<'a> System<'a> for UpgradeGUI {
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
-        let (character, ship_stats, _) = (&entities, &mut ships_stats, &character_markers)
-            .join()
-            .next()
-            .unwrap();
+        let (character, ship_stats, _) =
+            (&entities, &mut ships_stats, &character_markers)
+                .join()
+                .next()
+                .unwrap();
         // upgrade UI
         let mut current_upgrade = None;
         let upgrade_button_w = (w / 4f32).min(h / 2f32);
@@ -76,7 +77,8 @@ impl<'a> System<'a> for UpgradeGUI {
             for (i, upg_id) in upgrades.iter().enumerate() {
                 let upg = &avaliable_upgrades[*upg_id];
                 let current_point = Point2::new(
-                    w / 2.0 - upgrade_button_w - shift + i as f32 * (upgrade_button_w + shift),
+                    w / 2.0 - upgrade_button_w - shift
+                        + i as f32 * (upgrade_button_w + shift),
                     shift,
                 );
                 let upgrade_button = Button::new(
@@ -88,8 +90,14 @@ impl<'a> System<'a> for UpgradeGUI {
                     Some(upg.image),
                     "".to_string(),
                     widget_ids[i] as usize,
-                    Some(Sound(preloaded_sounds.hover, Point2::new(0f32, 0f32))),
-                    Some(Sound(preloaded_sounds.click, Point2::new(0f32, 0f32))),
+                    Some(Sound(
+                        preloaded_sounds.hover,
+                        Point2::new(0f32, 0f32),
+                    )),
+                    Some(Sound(
+                        preloaded_sounds.click,
+                        Point2::new(0f32, 0f32),
+                    )),
                 );
                 ui.primitives.push(Primitive {
                     kind: PrimitiveKind::Text(Text {
@@ -108,8 +116,11 @@ impl<'a> System<'a> for UpgradeGUI {
                 id: Widgets::WeaponSelector as usize,
                 mask: None,
             };
-            if let Some(selected_id) = upgrade_selector.place_and_check(&mut ui, &*mouse) {
-                match Widgets::try_from(selected_id).expect("unknown widget id") {
+            if let Some(selected_id) =
+                upgrade_selector.place_and_check(&mut ui, &*mouse)
+            {
+                match Widgets::try_from(selected_id).expect("unknown widget id")
+                {
                     Widgets::Upgrade1 => {
                         ui_state.choosed_upgrade = Some(upgrades[0]);
                     }
@@ -121,7 +132,10 @@ impl<'a> System<'a> for UpgradeGUI {
             }
         }
         let select_upgrade = Button::new(
-            Point2::new(w / 2.0 - choose_button_w - shift, h - 1.0 * choose_button_h),
+            Point2::new(
+                w / 2.0 - choose_button_w - shift,
+                h - 1.0 * choose_button_h,
+            ),
             choose_button_w,
             choose_button_h,
             None,
@@ -137,13 +151,17 @@ impl<'a> System<'a> for UpgradeGUI {
             if let Some(upgrade) = ui_state.choosed_upgrade {
                 ui.primitives.push(Primitive {
                     kind: PrimitiveKind::Text(Text {
-                        position: Point2::new(w / 2.0, upgrade_button_h + 4.0 * shift),
+                        position: Point2::new(
+                            w / 2.0,
+                            upgrade_button_h + 4.0 * shift,
+                        ),
                         text: avaliable_upgrades[upgrade].description.clone(),
                     }),
                     with_projection: false,
                 });
                 if select_upgrade.place_and_check(&mut ui, &*mouse) {
-                    current_upgrade = Some(avaliable_upgrades[upgrade].upgrade_type);
+                    current_upgrade =
+                        Some(avaliable_upgrades[upgrade].upgrade_type);
                     ui_state.choosed_upgrade = None;
                     spawned_upgrades.pop();
                 }
@@ -171,7 +189,8 @@ impl<'a> System<'a> for UpgradeGUI {
                     if let Some(gun) = shotguns.get_mut(character) {
                         let recharge_time_millis =
                             (gun.recharge_time.as_millis() as f32 * 0.9) as u64;
-                        gun.recharge_time = Duration::from_millis(recharge_time_millis);
+                        gun.recharge_time =
+                            Duration::from_millis(recharge_time_millis);
                     }
                 }
                 UpgradeType::BulletSpeed => {
@@ -194,7 +213,9 @@ impl<'a> System<'a> for UpgradeGUI {
                     }
                 }
                 UpgradeType::LazerLength => {
-                    if let Some(multy_lazer) = multiple_lazers.get_mut(character) {
+                    if let Some(multy_lazer) =
+                        multiple_lazers.get_mut(character)
+                    {
                         multy_lazer.upgrade_length(0.3);
                     }
                 }

@@ -85,7 +85,8 @@ const DESTUCTION_SITES: usize = 20;
 pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut rng = thread_rng();
     let rotation = rng.gen_range(-1E-1, 1E-1);
-    let linear_velocity = Vector2::new(rng.gen_range(-1E-1, 1E-1), rng.gen_range(-1E-1, 1E-1));
+    let linear_velocity =
+        Vector2::new(rng.gen_range(-1E-1, 1E-1), rng.gen_range(-1E-1, 1E-1));
     Velocity2::new(linear_velocity, rotation)
 }
 
@@ -101,14 +102,23 @@ pub fn spawn_position(char_pos: Point2, forbidden: f32, active: f32) -> Point2 {
     }
 }
 
-pub fn spawn_in_rectangle(min_w: f32, max_w: f32, min_h: f32, max_h: f32) -> Point2 {
+pub fn spawn_in_rectangle(
+    min_w: f32,
+    max_w: f32,
+    min_h: f32,
+    max_h: f32,
+) -> Point2 {
     let mut rng = thread_rng();
     let x = rng.gen_range(min_w, max_w);
     let y = rng.gen_range(min_h, max_h);
     Point2::new(x, y)
 }
 
-pub fn is_active(character_position: Point2, point: Point2, active_area: f32) -> bool {
+pub fn is_active(
+    character_position: Point2,
+    point: Point2,
+    active_area: f32,
+) -> bool {
     (point.x - character_position.x).abs() < active_area
         && (point.y - character_position.y).abs() < active_area
 }
@@ -117,22 +127,26 @@ fn get_collision_groups(kind: EntityType) -> CollisionGroups {
     match kind {
         EntityType::Player => {
             let mut player_bullet_collision_groups = CollisionGroups::new();
-            player_bullet_collision_groups.set_membership(&[CollisionId::PlayerBullet as usize]);
+            player_bullet_collision_groups
+                .set_membership(&[CollisionId::PlayerBullet as usize]);
             player_bullet_collision_groups.set_whitelist(&[
                 CollisionId::Asteroid as usize,
                 CollisionId::EnemyShip as usize,
             ]);
-            player_bullet_collision_groups.set_blacklist(&[CollisionId::PlayerShip as usize]);
+            player_bullet_collision_groups
+                .set_blacklist(&[CollisionId::PlayerShip as usize]);
             player_bullet_collision_groups
         }
         EntityType::Enemy => {
             let mut enemy_bullet_collision_groups = CollisionGroups::new();
-            enemy_bullet_collision_groups.set_membership(&[CollisionId::EnemyBullet as usize]);
+            enemy_bullet_collision_groups
+                .set_membership(&[CollisionId::EnemyBullet as usize]);
             enemy_bullet_collision_groups.set_whitelist(&[
                 CollisionId::Asteroid as usize,
                 CollisionId::PlayerShip as usize,
             ]);
-            enemy_bullet_collision_groups.set_blacklist(&[CollisionId::EnemyShip as usize]);
+            enemy_bullet_collision_groups
+                .set_blacklist(&[CollisionId::EnemyShip as usize]);
             enemy_bullet_collision_groups
         }
     }
@@ -158,7 +172,11 @@ pub fn spawn_asteroids<'a>(
     if new_polygons.len() > 1 {
         for poly in new_polygons.iter() {
             let insert_event = InsertEvent::Asteroid {
-                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                iso: Point3::new(
+                    position.x,
+                    position.y,
+                    isometry.rotation.euler_angles().2,
+                ),
                 velocity: initial_asteroid_velocity(),
                 polygon: poly.clone(),
                 spin: rng.gen_range(-1E-2, 1E-2),
@@ -249,7 +267,8 @@ fn ship_explode(
 
     insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
     insert_channel.single_write(effect);
-    sounds_channel.single_write(Sound(preloaded_sounds.ship_explosion, ship_pos));
+    sounds_channel
+        .single_write(Sound(preloaded_sounds.ship_explosion, ship_pos));
 }
 
 fn bullet_contact(
@@ -283,7 +302,10 @@ fn asteroid_explode(
     _preloaded_images: &ReadExpect<PreloadedImages>,
     size: f32,
 ) {
-    sounds_channel.single_write(Sound(preloaded_sounds.asteroid_explosion, explode_position));
+    sounds_channel.single_write(Sound(
+        preloaded_sounds.asteroid_explosion,
+        explode_position,
+    ));
     let effect = InsertEvent::Explosion {
         position: Point2::new(explode_position.x, explode_position.y),
         num: 30usize,
@@ -340,7 +362,10 @@ fn get_min_dist(
         .collider_world()
         .interferences_with_ray(&ray, &collision_gropus)
     {
-        if !b.query_type().is_proximity_query() && inter.toi < mintoi && inter.toi > EPS {
+        if !b.query_type().is_proximity_query()
+            && inter.toi < mintoi
+            && inter.toi > EPS
+        {
             mintoi = inter.toi;
             closest_body = Some(b.body());
         }

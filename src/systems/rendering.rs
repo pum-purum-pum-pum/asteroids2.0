@@ -1,4 +1,5 @@
 pub use crate::gui::{Button, Picture, Rectangle, Selector};
+use gfx_h::effects::SpriteBatch;
 use gfx_h::{unproject_with_z, RenderMode, TextData};
 use num_enum::TryFromPrimitive;
 use telemetry::{render_plot, TeleGraph};
@@ -8,7 +9,7 @@ use telemetry::{render_plot, TeleGraph};
 use super::*;
 #[cfg(any(target_os = "android"))]
 use crate::gui::VecController;
-use geometry::shadow_geometry;
+use geometry::{shadow_geometry, Triangulation};
 use glyph_brush::{rusttype::Scale, Section};
 use physics_system::MENU_VELOCITY;
 
@@ -22,7 +23,8 @@ fn visible(canvas: &Canvas, iso: &Isometry3, dims: (i32, i32)) -> bool {
         canvas.z_far,
     );
     let corner_rvec = Vector2::new(unprojected.x, unprojected.y);
-    let object_rvec = Vector2::new(iso.translation.vector.x, iso.translation.vector.y);
+    let object_rvec =
+        Vector2::new(iso.translation.vector.x, iso.translation.vector.y);
     object_rvec.norm() < corner_rvec.norm()
 }
 
@@ -55,7 +57,6 @@ pub fn render_primitives<'a>(
     mouse: &Read<'a, Mouse>,
     reader: &mut ReaderId<Primitive>,
     frame: &mut red::Frame,
-    image_datas: &ReadStorage<'a, ThreadPin<ImageData>>,
     gl: &ReadExpect<'a, ThreadPin<red::GL>>,
     canvas: &mut WriteExpect<'a, Canvas>,
     viewport: &ReadExpect<'a, red::Viewport>,
@@ -64,7 +65,9 @@ pub fn render_primitives<'a>(
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
-    let scale = Scale::uniform(((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round());
+    let scale = Scale::uniform(
+        ((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round(),
+    );
     for primitive in primitives_channel.read(reader) {
         match primitive {
             Primitive {
@@ -87,7 +90,8 @@ pub fn render_primitives<'a>(
                 with_projection,
             } => {
                 let (model, points, indicies) = rectangle.get_gfx();
-                let geom_data = GeometryData::new(&gl, &points, &indicies).unwrap();
+                let geom_data =
+                    GeometryData::new(&gl, &points, &indicies).unwrap();
                 let fill_color = rectangle.color;
                 canvas.render_primitive(
                     &gl,
@@ -234,20 +238,28 @@ impl<'a> System<'a> for RenderingSystem {
         flame::end("stencil");
         telegraph.update();
         flame::end("clear");
-        flame::start("background rendering");
-        if let Some((iso, vel, _)) = (&isometries, &velocities, &character_markers).join().next() {
+        if let Some((iso, vel, _)) =
+            (&isometries, &velocities, &character_markers).join().next()
+        {
             canvas.update_observer(
-                Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y),
+                Point2::new(
+                    iso.0.translation.vector.x,
+                    iso.0.translation.vector.y,
+                ),
                 vel.0.norm() / VELOCITY_MAX,
                 Vector2::new(mouse.x01, mouse.y01).normalize(),
             );
             let char_pos = iso.0.translation.vector;
             flame::start("shadow rendering");
+            let mut final_triangulation = Triangulation::new();
             for (_entity, iso, geom, _) in
                 (&entities, &isometries, &geometries, &asteroid_markers).join()
             {
                 if visible(&*canvas, &iso.0, dims) {
-                    let pos = Point2::new(iso.0.translation.vector.x, iso.0.translation.vector.y);
+                    let pos = Point2::new(
+                        iso.0.translation.vector.x,
+                        iso.0.translation.vector.y,
+                    );
                     // light_poly.clip_one((*geom).clone(), pos);
                     let rotation = iso.0.rotation.euler_angles().2;
                     let rotation = Rotation2::new(rotation);
@@ -263,32 +275,39 @@ impl<'a> System<'a> for RenderingSystem {
                         pos,
                         rotation,
                     );
-                    if let Some(shadow_triangulation) = shadow_triangulation {
-                        let geometry_data = GeometryData::new(
-                            &gl,
-                            &shadow_triangulation.points,
-                            &shadow_triangulation.indicies,
-                        )
-                        .unwrap();
-                        let iso = Isometry3::new(
-                            iso.0.translation.vector,
-                            Vector3::new(0f32, 0f32, 0f32),
-                        );
-                        // draw shadows
-                        canvas.render_geometry(
-                            &gl,
-                            &viewport,
-                            &mut frame,
-                            &geometry_data,
-                            &iso,
-                            RenderMode::StencilWrite,
-                            Point3::new(0f32, 0f32, 0f32),
-                        );
+                    if let Some(mut shadow_triangulation) = shadow_triangulation
+                    {
+                        shadow_triangulation.translate(pos.coords);
+                        final_triangulation.extend(shadow_triangulation);
                     }
                 }
             }
+            let geometry_data = GeometryData::new(
+                &gl,
+                &final_triangulation.points,
+                &final_triangulation.indicies,
+            )
+            .unwrap();
+            let iso = Isometry3::new(
+                Vector3::new(0f32, 0f32, 0f32),
+                Vector3::new(0f32, 0f32, 0f32),
+            );
+            // draw shadows
+            canvas.render_geometry(
+                &gl,
+                &viewport,
+                &mut frame,
+                &geometry_data,
+                &iso,
+                RenderMode::StencilWrite,
+                Point3::new(0f32, 0f32, 0f32),
+            );
+
             flame::end("shadow rendering");
         };
+        flame::start("background rendering");
+        let mut images_batch = vec![];
+        let mut isometries_batch = vec![];
         for (entity, iso, atlas_image, size) in
             (&entities, &isometries, &atlas_images, &sizes).join()
         {
@@ -306,9 +325,16 @@ impl<'a> System<'a> for RenderingSystem {
                     size.0,
                     false,
                     None,
-                )
+                );
+                images_batch.push(*atlas_image);
+                isometries_batch.push(iso.0);
             }
         }
+        let sprite_batch =
+            SpriteBatch::new(&gl, &images_batch, &isometries_batch);
+        canvas.render_sprite_batch(&gl, &viewport, &mut frame, &sprite_batch);
+        flame::end("background rendering");
+        flame::start("foreground rendering");
         for (iso, atlas_image, size, (), (), (), ()) in (
             &isometries,
             &atlas_images,
@@ -331,9 +357,10 @@ impl<'a> System<'a> for RenderingSystem {
                 None,
             )
         }
-        flame::end("background rendering");
+        flame::end("foreground rendering");
         flame::start("particles rendering");
-        for (entity, particles_data) in (&entities, &mut particles_datas).join() {
+        for (entity, particles_data) in (&entities, &mut particles_datas).join()
+        {
             match **particles_data {
                 ParticlesData::Explosion(ref mut particles) => {
                     if particles.update() {
@@ -367,7 +394,8 @@ impl<'a> System<'a> for RenderingSystem {
         };
         {
             let translation_vec = iso.0.translation.vector;
-            let mut isometry = Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
+            let mut isometry =
+                Isometry3::new(translation_vec, Vector3::new(0f32, 0f32, 0f32));
             let pure_isometry = isometry.clone();
             isometry.translation.vector.z = canvas.get_z_shift();
             match **particles_datas
@@ -391,55 +419,97 @@ impl<'a> System<'a> for RenderingSystem {
         flame::end("particles rendering");
 
         flame::start("other");
-        let mut render_lazer = |iso: &Isometry, lazer: &Lazer, force_rendering: bool, rotation| {
-            if lazer.active || force_rendering {
-                let h = lazer.current_distance;
-                let w = 0.05f32;
-                let positions = vec![
-                    Vector2::new(-w / 2.0, 0f32),
-                    Vector2::new(w / 2.0, 0f32),
-                    Vector2::new(0.0, -h), // hmmmmm, don't know why minus
-                ];
-                let positions: Vec<Point2> = positions
-                    .into_iter()
-                    .map(|v: Vector2| Point2::from(rotation * v))
-                    .collect();
-                let indices = [0u16, 1, 2];
-                let geometry_data = GeometryData::new(&gl, &positions, &indices).unwrap();
-                canvas.render_geometry(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &geometry_data,
-                    &iso.0,
-                    RenderMode::StencilCheck,
-                    Point3::new(1.0, 0.0, 0.0),
-                );
-            }
-        };
+        let mut render_lazer =
+            |iso: &Isometry, lazer: &Lazer, force_rendering: bool, rotation| {
+                if lazer.active || force_rendering {
+                    let h = lazer.current_distance;
+                    let w = 0.05f32;
+                    let positions = vec![
+                        Vector2::new(-w / 2.0, 0f32),
+                        Vector2::new(w / 2.0, 0f32),
+                        Vector2::new(0.0, -h), // hmmmmm, don't know why minus
+                    ];
+                    let positions: Vec<Point2> = positions
+                        .into_iter()
+                        .map(|v: Vector2| Point2::from(rotation * v))
+                        .collect();
+                    let indices = [0u16, 1, 2];
+                    // let geometry_data = GeometryData::new(&gl, &positions, &indices).unwrap();
+                    let iso2 = iso3_iso2(&iso.0);
+                    let mut triangulation = Triangulation {
+                        points: positions,
+                        indicies: indices.to_vec(),
+                    };
+                    triangulation.apply(iso2);
+                    return triangulation;
+                    // canvas.render_geometry(
+                    //     &gl,
+                    //     &viewport,
+                    //     &mut frame,
+                    //     &geometry_data,
+                    //     &iso.0,
+                    //     RenderMode::StencilCheck,
+                    //     Point3::new(1.0, 0.0, 0.0),
+                    // );
+                }
+                Triangulation::new()
+            };
         let zero_rotation = Rotation2::new(0.0);
+        let mut lazer_geometries = Triangulation::new();
         for (rift, isometry) in (&rifts, &isometries).join() {
             for (lazer, dir) in rift.lazers.iter() {
                 let pos = isometry.0.translation.vector;
                 let up = Vector2::new(0.0, -1.0);
                 let dir = Vector2::new(dir.0, dir.1);
-                let rotation = Rotation2::rotation_between(&up, &Vector2::new(dir.x, dir.y));
+                let rotation = Rotation2::rotation_between(
+                    &up,
+                    &Vector2::new(dir.x, dir.y),
+                );
                 let isometry = Isometry3::new(
                     Vector3::new(pos.x, pos.y, pos.z),
                     Vector3::new(0f32, 0f32, rotation.angle()),
                 );
-                render_lazer(&Isometry(isometry), &lazer, false, zero_rotation);
+                let lazer_geom = render_lazer(
+                    &Isometry(isometry),
+                    &lazer,
+                    false,
+                    zero_rotation,
+                );
+                lazer_geometries.extend(lazer_geom);
             }
         }
+        let iso0 = Isometry3::new(
+            Vector3::new(0f32, 0f32, 0f32),
+            Vector3::new(0f32, 0f32, 0f32),
+        );
+        // let mut lazers = Triangulation::new();
         for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
             for (angle, lazer) in multy_lazer.iter() {
                 // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
                 let rotation = Rotation2::new(angle);
-                render_lazer(iso, lazer, false, rotation);
+                lazer_geometries
+                    .extend(render_lazer(iso, lazer, false, rotation));
             }
         }
+        // render lazers with only one draw call
+        let geometry_data = GeometryData::new(
+            &gl,
+            &lazer_geometries.points,
+            &lazer_geometries.indicies,
+        )
+        .unwrap();
+        canvas.render_geometry(
+            &gl,
+            &viewport,
+            &mut frame,
+            &geometry_data,
+            &iso0,
+            RenderMode::StencilCheck,
+            Point3::new(1.0, 0.0, 0.0),
+        );
         flame::end("other");
         flame::start("asteroids rendering");
+        // let mut asteroids_triangulation = Triangulation::new();
         for (_entity, iso, _size, geom_data, _asteroid) in (
             &entities,
             &isometries,
@@ -473,13 +543,15 @@ impl<'a> System<'a> for RenderingSystem {
                 Point2::new(line_width / 2.0, -line_length),
             ];
             let up = Vector2::new(0.0, -line_length);
-            let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
+            let rotation =
+                Rotation2::rotation_between(&up, &(&b.coords - a.coords));
             let iso = Isometry3::new(
                 Vector3::new(a.x, a.y, 0f32),
                 Vector3::new(0f32, 0f32, rotation.angle()),
             );
             let indices = [0u16, 1, 2, 0, 2, 3];
-            let geometry_data = GeometryData::new(&gl, &positions, &indices).unwrap();
+            let geometry_data =
+                GeometryData::new(&gl, &positions, &indices).unwrap();
             canvas.render_geometry(
                 &gl,
                 &viewport,
@@ -492,7 +564,9 @@ impl<'a> System<'a> for RenderingSystem {
         };
         flame::end("collectables");
         flame::start("animation");
-        for (iso, size, animation) in (&isometries, &sizes, &mut animations).join() {
+        for (iso, size, animation) in
+            (&isometries, &sizes, &mut animations).join()
+        {
             if visible(&*canvas, &iso.0, dims) {
                 let animation_frame = animation.next_frame();
                 if let Some(animation_frame) = animation_frame {
@@ -517,7 +591,6 @@ impl<'a> System<'a> for RenderingSystem {
             &mouse,
             &mut self.reader,
             &mut frame,
-            &image_datas,
             &gl,
             &mut canvas,
             &viewport,
@@ -531,29 +604,48 @@ impl<'a> System<'a> for RenderingSystem {
         flame::end("rendering");
         let spans = flame::spans();
         telegraph.insert("fps".to_string(), dev_info.fps as f32 / 60.0);
+        let rendered_spans = [
+            "rendering".to_string(),
+            // "dispatch".to_string(),
+            // "insert".to_string(),
+            // "asteroids".to_string(),
+            "asteroids rendering".to_string(),
+            "foreground rendering".to_string(),
+            "background rendering".to_string(),
+            "shadow rendering".to_string(),
+        ];
         if dev_info.draw_telemetry {
             for span in spans.iter() {
-                if [
-                    "rendering".to_string(),
-                    "dispatch".to_string(),
-                    "insert".to_string(),
-                    "asteroids".to_string(),
-                ]
-                .contains(&span.name.to_string())
-                {
-                    telegraph.insert(span.name.to_string(), span.delta as f32 / 1E9 * 60.0);
+                if rendered_spans.contains(&span.name.to_string()) {
+                    telegraph.insert(
+                        span.name.to_string(),
+                        span.delta as f32 / 1E9 * 60.0,
+                    );
                 }
                 if span.name == "dispatch" {
                     for subspan in span.children.iter() {
-                        telegraph
-                            .insert(subspan.name.to_string(), subspan.delta as f32 / 1E9 * 60.0);
+                        telegraph.insert(
+                            subspan.name.to_string(),
+                            subspan.delta as f32 / 1E9 * 60.0,
+                        );
+                    }
+                }
+                if span.name == "rendering" {
+                    for subspan in span.children.iter() {
+                        if rendered_spans.contains(&subspan.name.to_string()) {
+                            telegraph.insert(
+                                subspan.name.to_string(),
+                                subspan.delta as f32 / 1E9 * 60.0,
+                            );
+                        }
                     }
                 }
             }
             for name in telegraph.iter_names() {
                 if let Some(plot) = telegraph.iter(name.to_string()) {
                     render_plot(
-                        plot.0, plot.1, 14.0, 10.0, &gl, &viewport, &canvas, &mut frame,
+                        plot.0, plot.1, 14.0, 10.0, &gl, &viewport, &canvas,
+                        &mut frame,
                     );
                 }
             }

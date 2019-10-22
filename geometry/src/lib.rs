@@ -121,14 +121,22 @@ where
     }
 
     pub fn get_column(&self, x: f32) -> usize {
-        (self.n as i32 + ((self.rw + x - self.x) / (2.0 * self.rw)).floor() as i32) as usize
+        (self.n as i32
+            + ((self.rw + x - self.x) / (2.0 * self.rw)).floor() as i32)
+            as usize
     }
 
     pub fn get_row(&self, y: f32) -> usize {
-        (self.n as i32 + ((self.rh + y - self.y) / (2.0 * self.rh)).floor() as i32) as usize
+        (self.n as i32
+            + ((self.rh + y - self.y) / (2.0 * self.rh)).floor() as i32)
+            as usize
     }
 
-    pub fn get_rectangle(&self, row: usize, col: usize) -> ((f32, f32), (f32, f32)) {
+    pub fn get_rectangle(
+        &self,
+        row: usize,
+        col: usize,
+    ) -> ((f32, f32), (f32, f32)) {
         let point = self.get_cell_point(row, col);
         return (
             (point.x - self.rw + self.rbw, point.x + self.rw - self.rbw),
@@ -137,7 +145,8 @@ where
     }
 
     pub fn get_cell_point(&self, row: usize, column: usize) -> Point2 {
-        let (row, column) = (row as f32 - self.n as f32, column as f32 - self.n as f32);
+        let (row, column) =
+            (row as f32 - self.n as f32, column as f32 - self.n as f32);
         Point2::new(
             self.x + column * 2.0 * self.rw,
             self.y + row * 2.0 * self.rh,
@@ -153,8 +162,11 @@ where
     }
 
     pub fn update(&mut self, point: Point2, value: T) -> Result<(), ()> {
-        if (point.x - self.x).abs() < self.max_w && (point.y - self.y).abs() < self.max_h {
-            let id = self.size * self.get_row(point.y) + self.get_column(point.x);
+        if (point.x - self.x).abs() < self.max_w
+            && (point.y - self.y).abs() < self.max_h
+        {
+            let id =
+                self.size * self.get_row(point.y) + self.get_column(point.x);
             self.bricks[id] = value;
             return Ok(());
         }
@@ -186,7 +198,11 @@ pub fn generate_convex_polygon(samples_num: usize, size: f32) -> Polygon {
 
 // @vlad TODO refactor (it's copy paste from stack overflow)
 /// get tangent to circle from point
-pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Option<Point2>) {
+pub fn get_tangent(
+    circle: Point2,
+    r: f32,
+    point: Point2,
+) -> (Option<Point2>, Option<Point2>) {
     let npoint = (point - circle) / r;
     let xy = npoint.norm_squared();
     if xy - 1.0 <= EPS {
@@ -213,6 +229,34 @@ pub fn get_tangent(circle: Point2, r: f32, point: Point2) -> (Option<Point2>, Op
 pub struct Triangulation {
     pub points: Vec<Point2>,
     pub indicies: Vec<u16>,
+}
+
+impl Triangulation {
+    pub fn new() -> Self {
+        Self {
+            points: vec![],
+            indicies: vec![],
+        }
+    }
+
+    pub fn apply(&mut self, isometry: Isometry2) {
+        for p in self.points.iter_mut() {
+            *p = isometry * *p;
+        }
+    }
+
+    pub fn translate(&mut self, shift: Vector2) {
+        for p in self.points.iter_mut() {
+            *p += shift;
+        }
+    }
+
+    pub fn extend(&mut self, triangulation: Triangulation) {
+        self.points.extend(triangulation.points);
+        let id_shift = self.points.len() as u16;
+        self.indicies
+            .extend(triangulation.indicies.iter().map(|x| *x + id_shift));
+    }
 }
 
 pub trait TriangulateFromCenter {
@@ -265,7 +309,8 @@ impl Polygon {
             let edge_vec1 = p.coords - prev.coords;
             let edge_vec2 = next.coords - p.coords;
             let segment1 = Segment::new(prev, prev + edge_vec1);
-            let inside_vec = (-edge_vec1.normalize() + edge_vec2.normalize()) / 2.0;
+            let inside_vec =
+                (-edge_vec1.normalize() + edge_vec2.normalize()) / 2.0;
             let d = 1.0
                 * inside_vec
                     .dot(&edge_vec1)
@@ -280,8 +325,10 @@ impl Polygon {
                 let ray1 = Ray::new(o, h1);
                 let ray2 = Ray::new(o, -h1);
                 // dbg!((&ray1, &segment1));
-                let toi1 = segment1.toi_with_ray(&Isometry2::identity(), &ray1, true);
-                let toi2 = segment1.toi_with_ray(&Isometry2::identity(), &ray2, true);
+                let toi1 =
+                    segment1.toi_with_ray(&Isometry2::identity(), &ray1, true);
+                let toi2 =
+                    segment1.toi_with_ray(&Isometry2::identity(), &ray2, true);
                 match (toi1, toi2) {
                     (Some(toi), _) => {
                         h1 = h1 * toi;
@@ -335,7 +382,10 @@ impl Polygon {
             min_r = min_r.min((p - center).norm());
             max_r = max_r.max((p - center).norm());
         }
-        if (points[0].coords - center.coords).perp(&(points[1].coords - center.coords)) > 0.0 {
+        if (points[0].coords - center.coords)
+            .perp(&(points[1].coords - center.coords))
+            > 0.0
+        {
             points.reverse();
         }
         Polygon {
@@ -370,7 +420,8 @@ impl Polygon {
             p.y += self.height / 2.0;
             p.y /= h_div;
         }
-        let mut bullet = bullet + Vector2::new(self.width / 2.0, self.height / 2.0);
+        let mut bullet =
+            bullet + Vector2::new(self.width / 2.0, self.height / 2.0);
         bullet.x /= w_div;
         bullet.y /= h_div;
         let bullet = Point2::from(5.0 * bullet.coords);
@@ -431,8 +482,10 @@ fn x_angle(vec: Vector2) -> f32 {
 
 pub fn poly_to_segment(poly: Polygon, position: Point2) -> BlockSegment {
     let points = &poly.points;
-    let rotation =
-        Rotation2::rotation_between(&(points[0].coords + position.coords), &Vector2::x_axis());
+    let rotation = Rotation2::rotation_between(
+        &(points[0].coords + position.coords),
+        &Vector2::x_axis(),
+    );
     let mut point1 = points[0];
     let mut angle1 = x_angle(rotation * (point1.coords + position.coords));
     let mut point2 = points[0];
@@ -479,7 +532,8 @@ pub fn shadow_geometry(
             }
         }
         Geometry::Polygon(mut block_polygon) => {
-            let points: Vec<Point2> = block_polygon.points.iter().map(|x| rotation * x).collect();
+            let points: Vec<Point2> =
+                block_polygon.points.iter().map(|x| rotation * x).collect();
             block_polygon.points = points;
             Some(poly_to_segment(block_polygon, position))
         }

@@ -25,7 +25,6 @@ use red::data::*;
 use red::shader::Texture;
 use red::{DrawParams, DrawType, Operation, Stencil, StencilTest};
 use sdl2::rwops::RWops;
-use std::fmt;
 use std::path::Path;
 
 pub mod effects;
@@ -109,7 +108,11 @@ pub struct GeometryData {
 }
 
 impl GeometryData {
-    pub fn new(gl: &red::GL, positions: &[Point2], indices: &[u16]) -> Result<Self, String> {
+    pub fn new(
+        gl: &red::GL,
+        positions: &[Point2],
+        indices: &[u16],
+    ) -> Result<Self, String> {
         let shape: Vec<GeometryVertex> = positions
             .iter()
             .map(|pos| GeometryVertex {
@@ -140,6 +143,33 @@ pub struct WorldVertex {
     pub world_position: red::data::f32_f32_f32,
 }
 
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+#[derive(VertexAttribPointers)]
+pub struct WorldIsometry {
+    #[divisor = "1"]
+    pub world_position: red::data::f32_f32_f32,
+    #[divisor = "1"]
+    pub angle: red::data::f32_,
+}
+
+// we will pass it to shader for each image via instancing
+#[derive(Copy, Clone, Debug)]
+#[repr(C, packed)]
+#[derive(VertexAttribPointers)]
+pub struct AtlasRegion {
+    #[divisor = "1"]
+    pub offset: red::data::f32_f32,
+    #[divisor = "1"]
+    pub fraction_wh: red::data::f32_f32,
+}
+
+pub struct ImageInstancingData {
+    pub image_model: ImageModel,
+    pub regions: AtlasRegionBuffer<AtlasRegion>,
+    pub isometries: WorldIsometryBuffer<WorldIsometry>,
+}
+
 pub struct InstancingData {
     pub vertex_buffer: GeometryVertexBuffer<GeometryVertex>,
     pub indices: red::buffer::IndexBuffer,
@@ -154,8 +184,8 @@ pub struct TextData<'a> {
 }
 
 pub struct ImageModel {
-    positions: VertexBuffer<Vertex>,
-    indices: red::buffer::IndexBuffer,
+    pub positions: VertexBuffer<Vertex>,
+    pub indices: red::buffer::IndexBuffer,
 }
 
 #[derive(Debug, Component, Clone, Copy)]
@@ -165,7 +195,10 @@ pub struct AtlasImage {
     dim_scales: (f32, f32),
 }
 
-pub fn load_atlas_image(image_name: &str, atlas: &SerializedSpriteSheet) -> Option<AtlasImage> {
+pub fn load_atlas_image(
+    image_name: &str,
+    atlas: &SerializedSpriteSheet,
+) -> Option<AtlasImage> {
     if let Some(sprite) = atlas.sprites.get(image_name) {
         let offset = (
             sprite.x / atlas.texture_width,
@@ -210,21 +243,12 @@ impl AtlasImage {
     }
 }
 
-// impl fmt::Debug for AtlasImage {
-//     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-//         // write!(f, "Point {{ x: {}, y: {} }}", self.x, self.y)
-//         write!(
-//             f,
-//             "AtlasImage {{offset: {:?}, fraction_wh: {:?}, dim_scales: {:?}}}",
-//             self.offset, self.fraction_wh, self.dim_scales
-//         )
-//     }
-// }
-
 impl ImageModel {
     pub fn new(gl: &red::GL) -> Result<Self, String> {
-        let positions = vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
-        let textures = vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
+        let positions =
+            vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
+        let textures =
+            vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
         let shape: Vec<Vertex> = positions
             .into_iter()
             .zip(textures)
@@ -234,7 +258,8 @@ impl ImageModel {
             })
             .collect();
         let vertex_buffer = VertexBuffer::new(gl, &shape)?;
-        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0])?;
+        let index_buffer =
+            red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0])?;
         Ok(ImageModel {
             positions: vertex_buffer,
             indices: index_buffer,
@@ -252,8 +277,10 @@ pub struct ImageData {
 impl ImageData {
     pub fn new(gl: &red::GL, image_name: &str) -> Result<Self, String> {
         // let positions = vec![(-1f32, 1f32), (-1f32, -1f32), (1f32, -1f32), (1f32, 1f32)];
-        let positions = vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
-        let textures = vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
+        let positions =
+            vec![(-1f32, -1f32), (-1f32, 1f32), (1f32, 1f32), (1f32, -1f32)];
+        let textures =
+            vec![(0f32, 0f32), (0f32, 1f32), (1f32, 1f32), (1f32, 0f32)];
         let shape: Vec<Vertex> = positions
             .into_iter()
             .zip(textures)
@@ -263,10 +290,12 @@ impl ImageData {
             })
             .collect();
         let vertex_buffer = VertexBuffer::new(gl, &shape)?;
-        let index_buffer = red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0])?;
+        let index_buffer =
+            red::buffer::IndexBuffer::new(gl, &[0u16, 1, 2, 2, 3, 0])?;
         let texture = load_texture(gl, image_name);
         let dimensions = texture.dimensions();
-        let dimensions = Vector2::new(1.0, dimensions.1 as f32 / dimensions.0 as f32);
+        let dimensions =
+            Vector2::new(1.0, dimensions.1 as f32 / dimensions.0 as f32);
         Ok(ImageData {
             positions: vertex_buffer,
             indices: index_buffer,
@@ -311,16 +340,23 @@ pub fn create_shader_program(
         format!("{}\n{}", glsl_version, read_file(&vertex).unwrap()),
         format!("{}\n{}", glsl_version, read_file(&fragment).unwrap()),
     );
-    #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+    #[cfg(any(
+        target_os = "ios",
+        target_os = "android",
+        target_os = "emscripten"
+    ))]
     trace!(
         "{:?} \n {:?} \n {:?}",
         vertex_shader,
         "---",
         fragment_shader
     );
-    let vertex_shader = red::Shader::from_vert_source(&gl, &vertex_shader).unwrap();
-    let fragment_shader = red::Shader::from_frag_source(&gl, &fragment_shader).unwrap();
-    let program = red::Program::from_shaders(&gl, &[vertex_shader, fragment_shader])?;
+    let vertex_shader =
+        red::Shader::from_vert_source(&gl, &vertex_shader).unwrap();
+    let fragment_shader =
+        red::Shader::from_frag_source(&gl, &fragment_shader).unwrap();
+    let program =
+        red::Program::from_shaders(&gl, &[vertex_shader, fragment_shader])?;
     Ok(program)
 }
 
@@ -365,7 +401,7 @@ impl Into<DrawParams> for RenderMode {
 
 /// 2D graphics
 pub struct Canvas {
-    program: red::Program,       // @vlad TODO: we want to use many programs
+    program: red::Program, // @vlad TODO: we want to use many programs
     program_light: red::Program, // but for now simpler=better
     program_instancing: red::Program,
     program_primitive: red::Program,
@@ -388,15 +424,25 @@ pub struct Canvas {
 }
 
 impl Canvas {
-    pub fn new(gl: &red::GL, pref: &str, atlas: &str, glsl_version: &str) -> Result<Self, String> {
+    pub fn new(
+        gl: &red::GL,
+        pref: &str,
+        atlas: &str,
+        glsl_version: &str,
+    ) -> Result<Self, String> {
         let program = create_shader_program(gl, pref, "", glsl_version)?;
-        let program_primitive = create_shader_program(gl, pref, "primitive", glsl_version)?;
+        let program_primitive =
+            create_shader_program(gl, pref, "primitive", glsl_version)?;
         let program_primitive_texture =
             create_shader_program(gl, pref, "primitive_texture", glsl_version)?;
-        let program_light = create_shader_program(gl, pref, "light", glsl_version)?;
-        let program_instancing = create_shader_program(gl, pref, "instancing", glsl_version)?;
-        let program_glyph = create_shader_program(gl, pref, "text", &glsl_version)?;
-        let program_atlas = create_shader_program(gl, pref, "atlas", &glsl_version)?;
+        let program_light =
+            create_shader_program(gl, pref, "light", glsl_version)?;
+        let program_instancing =
+            create_shader_program(gl, pref, "instancing", glsl_version)?;
+        let program_glyph =
+            create_shader_program(gl, pref, "text", &glsl_version)?;
+        let program_atlas =
+            create_shader_program(gl, pref, "atlas", &glsl_version)?;
         let z_far = Z_FAR;
         let atlas = load_texture(gl, atlas);
         let image_model = ImageModel::new(gl).expect("failed image model");
@@ -443,23 +489,29 @@ impl Canvas {
                 Point2::new(line_width / 2.0, -line_length),
             ];
             let up = Vector2::new(0.0, -line_length);
-            let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
+            let rotation =
+                Rotation2::rotation_between(&up, &(&b.coords - a.coords));
             let iso = Isometry3::new(
                 Vector3::new(a.x, a.y, 0f32),
                 Vector3::new(0f32, 0f32, rotation.angle()),
             );
             let current_indices = [0u16, 1, 2, 1, 3, 2];
-            positions.extend(current_positions.iter().map(|x| iso3_iso2(&iso) * x));
+            positions
+                .extend(current_positions.iter().map(|x| iso3_iso2(&iso) * x));
             indices.extend(current_indices.iter().map(|x| cur_id + x));
             cur_id += current_indices.len() as u16;
         }
-        let geometry_data = GeometryData::new(&context, &positions, &indices).unwrap();
+        let geometry_data =
+            GeometryData::new(&context, &positions, &indices).unwrap();
         self.render_geometry(
             &context,
             &viewport,
             frame,
             &geometry_data,
-            &Isometry3::new(Vector3::new(0.0, 0.0, 0.0), Vector3::new(0f32, 0f32, 0f32)),
+            &Isometry3::new(
+                Vector3::new(0.0, 0.0, 0.0),
+                Vector3::new(0f32, 0f32, 0f32),
+            ),
             RenderMode::Draw,
             color,
         );
@@ -483,13 +535,15 @@ impl Canvas {
             Point2::new(line_width / 2.0, -line_length),
         ];
         let up = Vector2::new(0.0, -line_length);
-        let rotation = Rotation2::rotation_between(&up, &(&b.coords - a.coords));
+        let rotation =
+            Rotation2::rotation_between(&up, &(&b.coords - a.coords));
         let iso = Isometry3::new(
             Vector3::new(a.x, a.y, 0f32),
             Vector3::new(0f32, 0f32, rotation.angle()),
         );
         let indices = [0u16, 1, 2, 1, 3, 2];
-        let geometry_data = GeometryData::new(&context, &positions, &indices).unwrap();
+        let geometry_data =
+            GeometryData::new(&context, &positions, &indices).unwrap();
         self.render_geometry(
             &context,
             &viewport,
@@ -507,17 +561,28 @@ impl Canvas {
         let time = self.perlin_time as f64;
         let x = self.perlin_x.get([time, time]);
         let y = self.perlin_y.get([time, time]);
-        let noise: Vector3 = self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32);
+        let noise: Vector3 =
+            self.camera_wobble * Vector3::new(x as f32, y as f32, 0f32);
         self.observer
             + noise
-            + 2f32 * Vector3::new(self.direction_offset.x, self.direction_offset.y, 0f32)
+            + 2f32
+                * Vector3::new(
+                    self.direction_offset.x,
+                    self.direction_offset.y,
+                    0f32,
+                )
     }
 
     pub fn add_wobble(&mut self, wobble: f32) {
         self.camera_wobble += wobble;
     }
 
-    pub fn update_observer(&mut self, pos: Point2, speed_ratio: f32, direction: Vector2) {
+    pub fn update_observer(
+        &mut self,
+        pos: Point2,
+        speed_ratio: f32,
+        direction: Vector2,
+    ) {
         self.observer.x = pos.x;
         self.observer.y = pos.y;
         self.observer.z = (1.0 - SPEED_EMA) * self.observer.z
@@ -541,11 +606,13 @@ impl Canvas {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
         let program = &self.program_glyph;
-        let transform: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+        let transform: [[f32; 4]; 4] =
+            orthographic(dims.0, dims.1).to_homogeneous().into();
 
         // TODO move to resource
         let max_image_dimension = {
-            let value = unsafe { frame.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) };
+            let value =
+                unsafe { frame.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) };
             value as u32
         };
         let mut brush_action;
@@ -576,10 +643,13 @@ impl Canvas {
             match brush_action {
                 Ok(_) => break,
                 Err(BrushError::TextureTooSmall { suggested, .. }) => {
-                    let (new_width, new_height) = if (suggested.0 > max_image_dimension
+                    let (new_width, new_height) = if (suggested.0
+                        > max_image_dimension
                         || suggested.1 > max_image_dimension)
-                        && (text_data.glyph_brush.texture_dimensions().0 < max_image_dimension
-                            || text_data.glyph_brush.texture_dimensions().1 < max_image_dimension)
+                        && (text_data.glyph_brush.texture_dimensions().0
+                            < max_image_dimension
+                            || text_data.glyph_brush.texture_dimensions().1
+                                < max_image_dimension)
                     {
                         (max_image_dimension, max_image_dimension)
                     } else {
@@ -589,7 +659,8 @@ impl Canvas {
                     // eprintln!("Resizing glyph texture -> {}x{}", new_width, new_height);
 
                     // Recreate texture as a larger size to fit more
-                    text_data.glyph_texture = Texture::new(&frame.gl, (new_width, new_height)); //GlGlyphTexture::new((new_width, new_height));
+                    text_data.glyph_texture =
+                        Texture::new(&frame.gl, (new_width, new_height)); //GlGlyphTexture::new((new_width, new_height));
 
                     text_data.glyph_brush.resize_texture(new_width, new_height);
                 }
@@ -600,12 +671,12 @@ impl Canvas {
             BrushAction::Draw(vertices) => {
                 text_data.vertex_num = vertices.len() as i32;
                 unsafe {
-                    text_data
-                        .vertex_buffer
-                        .dynamic_draw_data(std::slice::from_raw_parts(
+                    text_data.vertex_buffer.dynamic_draw_data(
+                        std::slice::from_raw_parts(
                             vertices.as_ptr() as *const TextVertex,
                             vertices.len(),
-                        ));
+                        ),
+                    );
                 }
             }
             // vertex_max = vertex_max.max(vertex_count);
@@ -620,9 +691,12 @@ impl Canvas {
         unsafe {
             vao.bind();
             program.set_used();
-            frame
-                .gl
-                .draw_arrays_instanced(glow::TRIANGLE_STRIP, 0, 4, text_data.vertex_num);
+            frame.gl.draw_arrays_instanced(
+                glow::TRIANGLE_STRIP,
+                0,
+                4,
+                text_data.vertex_num,
+            );
             vao.unbind()
         }
     }
@@ -640,8 +714,10 @@ impl Canvas {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
-        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+        let perspective: [[f32; 4]; 4] =
+            perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] =
+            get_view(self.observer()).to_homogeneous().into();
         let vao = &geometry_data.positions.vao;
         let program = &self.program_light;
         program.set_uniform("model", model);
@@ -673,11 +749,14 @@ impl Canvas {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
         let (projection, view) = if with_projection {
-            let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-            let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+            let perspective: [[f32; 4]; 4] =
+                perspective(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] =
+                get_view(self.observer()).to_homogeneous().into();
             (perspective, view)
         } else {
-            let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+            let orthographic: [[f32; 4]; 4] =
+                orthographic(dims.0, dims.1).to_homogeneous().into();
             let view: [[f32; 4]; 4] = Matrix4::identity().into();
             (orthographic, view)
         };
@@ -716,8 +795,10 @@ impl Canvas {
         // } else {
         //     &self.default_params
         // };
-        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+        let perspective: [[f32; 4]; 4] =
+            perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] =
+            get_view(self.observer()).to_homogeneous().into();
         let vao = &self.image_model.positions.vao;
         let program = &self.program_atlas;
         program.set_uniform("model", model);
@@ -747,7 +828,12 @@ impl Canvas {
                 ..Default::default()
             }
         };
-        frame.draw(vao, Some(&self.image_model.indices), &program, &draw_params);
+        frame.draw(
+            vao,
+            Some(&self.image_model.indices),
+            &program,
+            &draw_params,
+        );
     }
 
     pub fn render(
@@ -771,8 +857,10 @@ impl Canvas {
         //     &self.default_params
         // };
         let scales = image_data.dim_scales;
-        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+        let perspective: [[f32; 4]; 4] =
+            perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] =
+            get_view(self.observer()).to_homogeneous().into();
         let vao = &image_data.positions.vao;
         let program = &self.program;
         program.set_uniform("model", model);
@@ -803,6 +891,47 @@ impl Canvas {
         frame.draw(vao, Some(&image_data.indices), &program, &draw_params);
     }
 
+    pub fn render_sprite_batch(
+        &self,
+        gl: &red::GL,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        sprite_batch: &SpriteBatch,
+    ) {
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let perspective: [[f32; 4]; 4] =
+            perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] =
+            get_view(self.observer()).to_homogeneous().into();
+        let vao = &sprite_batch.instancing_data.image_model.positions.vao;
+        let program = &self.program_instancing;
+        program.set_uniform("view", view);
+        program.set_uniform("perspective", perspective);
+        program.set_uniform("transparency", 1f32);
+        program.set_layout(
+            &gl,
+            vao,
+            &[
+                &sprite_batch.instancing_data.image_model.positions,
+                &sprite_batch.instancing_data.regions,
+                &sprite_batch.instancing_data.isometries,
+            ],
+        );
+        let draw_type = red::DrawType::Instancing(sprite_batch.len);
+        let draw_params = red::DrawParams {
+            stencil: None,
+            draw_type,
+            ..Default::default()
+        };
+        frame.draw(
+            vao,
+            Some(&sprite_batch.instancing_data.image_model.indices),
+            &program,
+            &draw_params,
+        );
+    }
+
     pub fn render_instancing(
         &self,
         gl: &red::GL,
@@ -815,8 +944,10 @@ impl Canvas {
         let model: [[f32; 4]; 4] = model.to_homogeneous().into();
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
-        let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-        let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+        let perspective: [[f32; 4]; 4] =
+            perspective(dims.0, dims.1).to_homogeneous().into();
+        let view: [[f32; 4]; 4] =
+            get_view(self.observer()).to_homogeneous().into();
         let vao = &instancing_data.vertex_buffer.vao;
         let program = &self.program_instancing;
         program.set_uniform("model", model);
@@ -831,7 +962,9 @@ impl Canvas {
                 &instancing_data.per_instance,
             ],
         );
-        let draw_type = red::DrawType::Instancing(instancing_data.per_instance.len.unwrap());
+        let draw_type = red::DrawType::Instancing(
+            instancing_data.per_instance.len.unwrap(),
+        );
         let draw_params = red::DrawParams {
             stencil: None,
             draw_type,
@@ -856,11 +989,14 @@ impl Canvas {
         let vao = &self.image_model.positions.vao;
         let program = &self.program_primitive_texture;
         let (projection, view) = if with_projection {
-            let perspective: [[f32; 4]; 4] = perspective(dims.0, dims.1).to_homogeneous().into();
-            let view: [[f32; 4]; 4] = get_view(self.observer()).to_homogeneous().into();
+            let perspective: [[f32; 4]; 4] =
+                perspective(dims.0, dims.1).to_homogeneous().into();
+            let view: [[f32; 4]; 4] =
+                get_view(self.observer()).to_homogeneous().into();
             (perspective, view)
         } else {
-            let orthographic: [[f32; 4]; 4] = orthographic(dims.0, dims.1).to_homogeneous().into();
+            let orthographic: [[f32; 4]; 4] =
+                orthographic(dims.0, dims.1).to_homogeneous().into();
             let view: [[f32; 4]; 4] = Matrix4::identity().into();
             (orthographic, view)
         };
@@ -871,10 +1007,18 @@ impl Canvas {
         program.set_uniform("tex", self.atlas.clone());
         program.set_uniform("dim_scales", dim_scales);
         // program.set_uniform("size", size);
+        // program.set_uniform("dim_scales", atlas_image.dim_scales);
+        program.set_uniform("offset", atlas_image.offset);
+        program.set_uniform("fraction_wh", atlas_image.fraction_wh);
         program.set_layout(&gl, vao, &[&self.image_model.positions]);
 
         let draw_params = DrawParams::default();
-        frame.draw(vao, Some(&self.image_model.indices), &program, &draw_params);
+        frame.draw(
+            vao,
+            Some(&self.image_model.indices),
+            &program,
+            &draw_params,
+        );
     }
 }
 
@@ -902,14 +1046,17 @@ pub fn unproject(
     z_far: f32,
 ) -> (Point3, Vector3) {
     let begin_ray = Point4::new(window_coord.x, window_coord.y, 0f32, 1f32);
-    let ingame_window_coord = Point4::new(window_coord.x, window_coord.y, z_far, 1f32);
+    let ingame_window_coord =
+        Point4::new(window_coord.x, window_coord.y, z_far, 1f32);
     let perspective: Matrix4 = perspective(width, height).into();
     let view: Matrix4 = get_view(observer).to_homogeneous().into();
     let inverse_transform = (perspective * view).try_inverse().unwrap();
     let unprojected_begin = inverse_transform * begin_ray;
     let unprojected_end = inverse_transform * ingame_window_coord;
-    let unprojected_begin = Point3::from_homogeneous(unprojected_begin.coords).unwrap();
-    let unprojected_end = Point3::from_homogeneous(unprojected_end.coords).unwrap();
+    let unprojected_begin =
+        Point3::from_homogeneous(unprojected_begin.coords).unwrap();
+    let unprojected_end =
+        Point3::from_homogeneous(unprojected_end.coords).unwrap();
     // * Why (perspective * view)^-1
     // * Exlanation:
     // * * this coords then passed to the Isometry and then as model to shader
@@ -957,22 +1104,26 @@ pub fn to_vertex(
     if gl_rect.max.x > gl_bounds.max.x {
         let old_width = gl_rect.width();
         gl_rect.max.x = gl_bounds.max.x;
-        tex_coords.max.x = tex_coords.min.x + tex_coords.width() * gl_rect.width() / old_width;
+        tex_coords.max.x =
+            tex_coords.min.x + tex_coords.width() * gl_rect.width() / old_width;
     }
     if gl_rect.min.x < gl_bounds.min.x {
         let old_width = gl_rect.width();
         gl_rect.min.x = gl_bounds.min.x;
-        tex_coords.min.x = tex_coords.max.x - tex_coords.width() * gl_rect.width() / old_width;
+        tex_coords.min.x =
+            tex_coords.max.x - tex_coords.width() * gl_rect.width() / old_width;
     }
     if gl_rect.max.y > gl_bounds.max.y {
         let old_height = gl_rect.height();
         gl_rect.max.y = gl_bounds.max.y;
-        tex_coords.max.y = tex_coords.min.y + tex_coords.height() * gl_rect.height() / old_height;
+        tex_coords.max.y = tex_coords.min.y
+            + tex_coords.height() * gl_rect.height() / old_height;
     }
     if gl_rect.min.y < gl_bounds.min.y {
         let old_height = gl_rect.height();
         gl_rect.min.y = gl_bounds.min.y;
-        tex_coords.min.y = tex_coords.max.y - tex_coords.height() * gl_rect.height() / old_height;
+        tex_coords.min.y = tex_coords.max.y
+            - tex_coords.height() * gl_rect.height() / old_height;
     }
 
     [

@@ -7,6 +7,8 @@
 			],
 			ships_number: 6,
 			const_distribution : [
+				("lazer_enemy", 5),
+				("rift", 5),
 				("rotship", 1),
 				("reflect_bullet_enemy", 1)
 			],

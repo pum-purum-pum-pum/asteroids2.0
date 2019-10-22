@@ -2,7 +2,9 @@ use common::*;
 use derive_deref::{Deref, DerefMut};
 use ncollide2d::shape::ShapeHandle;
 use ncollide2d::world::CollisionGroups;
-use nphysics2d::object::{BodyHandle, BodyStatus, ColliderDesc, ColliderHandle, RigidBodyDesc};
+use nphysics2d::object::{
+    BodyHandle, BodyStatus, ColliderDesc, ColliderHandle, RigidBodyDesc,
+};
 use nphysics2d::volumetric::volumetric::Volumetric;
 use nphysics2d::world::World;
 use specs::Component;
@@ -27,7 +29,11 @@ pub fn angle_shortest_dist(a0: f32, a1: f32) -> f32 {
 ///
 /// Inspired by proportional-derivative controllers, but approximated with just the current spin
 /// instead of error derivatives. Uses arbitrary constants tuned for player control.
-pub fn calculate_player_ship_spin_for_aim(aim: Vector2, rotation: f32, speed: f32) -> f32 {
+pub fn calculate_player_ship_spin_for_aim(
+    aim: Vector2,
+    rotation: f32,
+    speed: f32,
+) -> f32 {
     let target_rot = if aim.x == 0.0 && aim.y == 0.0 {
         rotation
     } else {
@@ -86,7 +92,10 @@ impl Component for PhysicsComponent {
 }
 
 impl PhysicsComponent {
-    pub fn new(body_handle: BodyHandle, collider_handle: ColliderHandle) -> Self {
+    pub fn new(
+        body_handle: BodyHandle,
+        collider_handle: ColliderHandle,
+    ) -> Self {
         PhysicsComponent {
             body_handle,
             collider_handle,

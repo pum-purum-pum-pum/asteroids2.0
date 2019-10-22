@@ -44,7 +44,8 @@ impl<'a> System<'a> for SoundSystem {
             for i in placement.start..placement.end {
                 let current_channel = sdl2::mixer::Channel(i as i32);
                 if !current_channel.is_playing()
-                    && Instant::now().duration_since(placement.last_upd) >= placement.gap
+                    && Instant::now().duration_since(placement.last_upd)
+                        >= placement.gap
                 {
                     placement.last_upd = Instant::now();
                     current_channel.play(sound, 0).unwrap();
@@ -55,7 +56,8 @@ impl<'a> System<'a> for SoundSystem {
                     if n < 10f32 {
                         fade = 1.0;
                     }
-                    current_channel.set_volume((EFFECT_MAX_VOLUME as f32 * fade) as i32);
+                    current_channel
+                        .set_volume((EFFECT_MAX_VOLUME as f32 * fade) as i32);
                     break;
                 }
             }
@@ -64,7 +66,10 @@ impl<'a> System<'a> for SoundSystem {
             if lazer.active() {
                 if loop_sound.player_lazer_channel.is_none() {
                     let channel = sdl2::mixer::Channel::all()
-                        .play(&sounds.get(preloaded_sounds.lazer).unwrap().0, -1)
+                        .play(
+                            &sounds.get(preloaded_sounds.lazer).unwrap().0,
+                            -1,
+                        )
                         .unwrap();
                     music.menu_play = false; // hacky
                     loop_sound.player_lazer_channel = Some(channel);
@@ -80,7 +85,8 @@ impl<'a> System<'a> for SoundSystem {
             AppState::Play(_) => {
                 if music.current_battle.is_none() {
                     let mut rng = thread_rng();
-                    let music_id = rng.gen_range(0, music_data.battle_music.len());
+                    let music_id =
+                        rng.gen_range(0, music_data.battle_music.len());
                     sdl2::mixer::Music::halt();
                     music.menu_play = false;
                     music_data.battle_music[music_id].play(-1).unwrap();

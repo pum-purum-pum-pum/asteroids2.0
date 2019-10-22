@@ -14,12 +14,17 @@ fn reflect_bullet(
     let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
     let position = body.position();
     let mut velocity = *body.velocity();
-    let vel = reflection.speed * reflect(velocity.linear, normal.normalize()).normalize();
+    let vel = reflection.speed
+        * reflect(velocity.linear, normal.normalize()).normalize();
     *velocity.as_vector_mut() = Vector3::new(vel.x, vel.y, 0.0);
     let standart = Vector2::new(0.0, -1.0);
-    let alpha = Rotation2::rotation_between(&standart, &velocity.linear).angle();
+    let alpha =
+        Rotation2::rotation_between(&standart, &velocity.linear).angle();
     let position = Isometry2::new(
-        Vector2::new(position.translation.vector.x, position.translation.vector.y),
+        Vector2::new(
+            position.translation.vector.x,
+            position.translation.vector.y,
+        ),
         alpha,
     );
     let mut new_reflection = reflection.clone();
@@ -72,9 +77,18 @@ fn damage_ship(
             preloaded_images,
         );
     }
-    if process_damage(lifes.get_mut(ship).unwrap(), shields.get_mut(ship), damage) {
+    if process_damage(
+        lifes.get_mut(ship).unwrap(),
+        shields.get_mut(ship),
+        damage,
+    ) {
         // ship is done... Explode it
-        ship_explode(ship_pos, insert_channel, sounds_channel, preloaded_sounds);
+        ship_explode(
+            ship_pos,
+            insert_channel,
+            sounds_channel,
+            preloaded_sounds,
+        );
         if is_character {
             to_menu(app_state, progress, &mut macro_game.score_table);
         }
@@ -84,7 +98,8 @@ fn damage_ship(
 
 #[derive(Default)]
 pub struct CollisionSystem {
-    colliding_pairs: Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
+    colliding_pairs:
+        Vec<(CollisionObjectHandle, CollisionObjectHandle, Vector2)>,
     colliding_start_events: Vec<(CollisionObjectHandle, CollisionObjectHandle)>,
 }
 
@@ -186,7 +201,8 @@ impl<'a> System<'a> for CollisionSystem {
                 let mut asteroid_explosion = false;
                 let mut bullet_position = None;
                 if projectiles.get(entity2).is_some() {
-                    let proj_pos = isometries.get(entity2).unwrap().0.translation.vector;
+                    let proj_pos =
+                        isometries.get(entity2).unwrap().0.translation.vector;
                     let proj_pos2d = Point2::new(proj_pos.x, proj_pos.y);
                     bullet_position = Some(proj_pos2d);
                     bullet_contact(
@@ -264,7 +280,8 @@ impl<'a> System<'a> for CollisionSystem {
                     }
                 }
                 if asteroid_explosion {
-                    insert_channel.single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
+                    insert_channel
+                        .single_write(InsertEvent::Wobble(EXPLOSION_WOBBLE));
                     let isometry = isometries.get(asteroid).unwrap().0;
                     let position = isometry.translation.vector;
                     let polygon = polygons.get(asteroid).unwrap();
@@ -288,13 +305,17 @@ impl<'a> System<'a> for CollisionSystem {
             if ships.get(entity2).is_some() {
                 swap(&mut entity1, &mut entity2);
             }
-            if ships.get(entity1).is_some() && projectiles.get(entity2).is_some() {
+            if ships.get(entity1).is_some()
+                && projectiles.get(entity2).is_some()
+            {
                 let ship = entity1;
                 let projectile = entity2;
                 let projectile_damage = damages.get(projectile).unwrap().0;
                 let isometry = isometries.get(ship).unwrap().0;
-                let projectile_pos = isometries.get(projectile).unwrap().0.translation.vector;
-                let projectile_pos = Point2::new(projectile_pos.x, projectile_pos.y);
+                let projectile_pos =
+                    isometries.get(projectile).unwrap().0.translation.vector;
+                let projectile_pos =
+                    Point2::new(projectile_pos.x, projectile_pos.y);
                 let position = isometry.translation.vector;
                 damage_ship(
                     character_markers.get(ship).is_some(),
@@ -343,8 +364,10 @@ impl<'a> System<'a> for CollisionSystem {
                     let character_ship = ship1;
                     let other_ship = ship2;
                     // entities.delete(other_ship).unwrap();
-                    sounds_channel
-                        .single_write(Sound(preloaded_sounds.collision, Point2::new(0f32, 0f32)));
+                    sounds_channel.single_write(Sound(
+                        preloaded_sounds.collision,
+                        Point2::new(0f32, 0f32),
+                    ));
                     if process_damage(
                         lifes.get_mut(other_ship).unwrap(),
                         shields.get_mut(other_ship),
@@ -364,7 +387,11 @@ impl<'a> System<'a> for CollisionSystem {
                         shields.get_mut(character_ship),
                         damages.get(other_ship).unwrap().0,
                     ) {
-                        to_menu(&mut app_state, &mut progress, &mut macro_game.score_table);
+                        to_menu(
+                            &mut app_state,
+                            &mut progress,
+                            &mut macro_game.score_table,
+                        );
                         // delete character
                         entities.delete(character_ship).unwrap();
                     }

@@ -53,18 +53,34 @@ impl<'a> System<'a> for GUISystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let d = (w * w + h * h).sqrt();
         //contorls
-        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "emscripten"
+        ))]
         let stick_size = w / 80.0;
-        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "emscripten"
+        ))]
         let ctrl_size = stick_size * 10.0;
-        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "emscripten"
+        ))]
         let move_controller = VecController::new(
             Point2::new(ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
             Image(preloaded_images.circle),
         );
-        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "emscripten"
+        ))]
         let attack_controller = VecController::new(
             Point2::new(w - ctrl_size, h - ctrl_size),
             ctrl_size,
@@ -81,32 +97,52 @@ impl<'a> System<'a> for GUISystem {
             return;
         };
         // move controller
-        #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "android",
+            target_os = "emscripten"
+        ))]
         {
             match move_controller.set(0, &mut ui, &touches) {
                 Some(dir) => {
-                    let (character, _) = (&entities, &character_markers).join().next().unwrap();
+                    let (character, _) =
+                        (&entities, &character_markers).join().next().unwrap();
                     let (_character_isometry, mut character_velocity) = {
                         let character_body = world
-                            .rigid_body(physics.get(character).unwrap().body_handle)
+                            .rigid_body(
+                                physics.get(character).unwrap().body_handle,
+                            )
                             .unwrap();
                         (*character_body.position(), *character_body.velocity())
                     };
 
-                    for (iso, _vel, spin, _char_marker) in
-                        (&isometries, &mut velocities, &mut spins, &character_markers).join()
+                    for (iso, _vel, spin, _char_marker) in (
+                        &isometries,
+                        &mut velocities,
+                        &mut spins,
+                        &character_markers,
+                    )
+                        .join()
                     {
-                        let player_torque =
-                            DT * calculate_player_ship_spin_for_aim(dir, iso.rotation(), spin.0);
-                        spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                        let player_torque = DT
+                            * calculate_player_ship_spin_for_aim(
+                                dir,
+                                iso.rotation(),
+                                spin.0,
+                            );
+                        spin.0 +=
+                            player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
                     }
 
                     // let rotation = isometries.get(character).unwrap().0.rotation;
                     // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
-                    let thrust = ship_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
+                    let thrust = ship_stats.thrust_force
+                        * Vector3::new(dir.x, dir.y, 0.0);
                     *character_velocity.as_vector_mut() += thrust;
                     let character_body = world
-                        .rigid_body_mut(physics.get(character).unwrap().body_handle)
+                        .rigid_body_mut(
+                            physics.get(character).unwrap().body_handle,
+                        )
                         .unwrap();
                     character_body.set_velocity(character_velocity);
                 }
@@ -123,17 +159,25 @@ impl<'a> System<'a> for GUISystem {
                             let position = isometry.0.translation.vector;
                             // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
                             let velocity_rel = blaster.bullet_speed * dir;
-                            let char_velocity = velocities.get(character).unwrap();
+                            let char_velocity =
+                                velocities.get(character).unwrap();
                             let projectile_velocity = Velocity::new(
                                 char_velocity.0.x + velocity_rel.x,
                                 char_velocity.0.y + velocity_rel.y,
                             );
-                            sounds_channel.single_write(Sound(preloaded_sounds.shot));
-                            let rotation =
-                                Rotation2::rotation_between(&Vector2::new(0.0, 1.0), &dir);
+                            sounds_channel
+                                .single_write(Sound(preloaded_sounds.shot));
+                            let rotation = Rotation2::rotation_between(
+                                &Vector2::new(0.0, 1.0),
+                                &dir,
+                            );
                             insert_channel.single_write(InsertEvent::Bullet {
                                 kind: EntityType::Player,
-                                iso: Point3::new(position.x, position.y, rotation.angle()),
+                                iso: Point3::new(
+                                    position.x,
+                                    position.y,
+                                    rotation.angle(),
+                                ),
                                 velocity: Point2::new(
                                     projectile_velocity.0.x,
                                     projectile_velocity.0.y,
@@ -227,22 +271,28 @@ impl<'a> System<'a> for GUISystem {
             });
             ui.primitives.push(Primitive {
                 kind: PrimitiveKind::Text(Text {
-                    position: Point2::new(x_pos + 2.0 * icon_size, y_pos + icon_size / 2.0),
+                    position: Point2::new(
+                        x_pos + 2.0 * icon_size,
+                        y_pos + icon_size / 2.0,
+                    ),
                     text: ability.text.clone(),
                 }),
                 with_projection: false,
             });
         }
 
-        let (_character, _) = (&entities, &character_markers).join().next().unwrap();
+        let (_character, _) =
+            (&entities, &character_markers).join().next().unwrap();
         // "UI" things
         // experience and level bars
         let experiencebar_w = w / 5.0;
         let experiencebar_h = h / 100.0;
-        let experience_position = Point2::new(w / 2.0 - experiencebar_w / 2.0, h - h / 20.0);
+        let experience_position =
+            Point2::new(w / 2.0 - experiencebar_w / 2.0, h - h / 20.0);
         let experience_bar = Rectangle {
             position: experience_position,
-            width: (progress.experience as f32 / progress.current_max_experience() as f32)
+            width: (progress.experience as f32
+                / progress.current_max_experience() as f32)
                 * experiencebar_w,
             height: experiencebar_h,
             color: pallete.experience_color.clone(),
@@ -251,7 +301,8 @@ impl<'a> System<'a> for GUISystem {
         let border = d / 200f32;
         ui.primitives.push(Primitive {
             kind: PrimitiveKind::Picture(Picture {
-                position: experience_position + Vector2::new(-border / 2.0, -border / 2.0),
+                position: experience_position
+                    + Vector2::new(-border / 2.0, -border / 2.0),
                 width: experiencebar_w + border,
                 height: experiencebar_h + border,
                 image: preloaded_images.bar,
@@ -260,8 +311,10 @@ impl<'a> System<'a> for GUISystem {
         });
         ui.primitives.push(Primitive {
             kind: PrimitiveKind::Picture(Picture {
-                position: experience_position + Vector2::new(-border / 2.0, -border / 2.0),
-                width: (progress.experience as f32 / progress.current_max_experience() as f32)
+                position: experience_position
+                    + Vector2::new(-border / 2.0, -border / 2.0),
+                width: (progress.experience as f32
+                    / progress.current_max_experience() as f32)
                     * experiencebar_w,
                 height: experiencebar_h,
                 image: preloaded_images.bar,
@@ -291,11 +344,14 @@ impl<'a> System<'a> for GUISystem {
         let (lifebar_w, lifebar_h) = (w / 4f32, h / 50.0);
         let health_y = h / 40.0;
         let shields_y = health_y + h / 13.0;
-        for (life, shield, _character) in (&lifes, &shields, &character_markers).join() {
+        for (life, shield, _character) in
+            (&lifes, &shields, &character_markers).join()
+        {
             {
                 // upgrade bar
                 let border = d / 200f32;
-                let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
+                let (health_back_w, health_back_h) =
+                    (lifebar_w + border, lifebar_h + border);
                 ui.primitives.push(Primitive {
                     kind: PrimitiveKind::Picture(Picture {
                         position: Point2::new(
@@ -309,7 +365,8 @@ impl<'a> System<'a> for GUISystem {
                     with_projection: false,
                 });
 
-                let (health_back_w, health_back_h) = (lifebar_w + border, lifebar_h + border);
+                let (health_back_w, health_back_h) =
+                    (lifebar_w + border, lifebar_h + border);
                 ui.primitives.push(Primitive {
                     kind: PrimitiveKind::Picture(Picture {
                         position: Point2::new(
@@ -326,13 +383,15 @@ impl<'a> System<'a> for GUISystem {
 
             let lifes_bar = Rectangle {
                 position: Point2::new(w / 2.0 - lifebar_w / 2.0, health_y),
-                width: (life.0 as f32 / ship_stats.max_health as f32) * lifebar_w,
+                width: (life.0 as f32 / ship_stats.max_health as f32)
+                    * lifebar_w,
                 height: lifebar_h,
                 color: pallete.life_color.clone(),
             };
             let shields_bar = Rectangle {
                 position: Point2::new(w / 2.0 - lifebar_w / 2.0, shields_y),
-                width: (shield.0 as f32 / ship_stats.max_shield as f32) * lifebar_w,
+                width: (shield.0 as f32 / ship_stats.max_shield as f32)
+                    * lifebar_w,
                 height: lifebar_h,
                 color: pallete.shield_color,
             };

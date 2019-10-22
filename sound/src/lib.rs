@@ -4,7 +4,9 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
-use sdl2::mixer::{InitFlag, Music, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS};
+use sdl2::mixer::{
+    InitFlag, Music, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS,
+};
 use sdl2::{AudioSubsystem, TimerSubsystem};
 use specs::prelude::*;
 use specs_derive::Component;
@@ -92,8 +94,9 @@ pub fn init_sound<'a>(
     let channels = DEFAULT_CHANNELS; // Stereo
     let chunk_size = 1_024;
     sdl2::mixer::open_audio(frequency, format, channels, chunk_size)?;
-    let mixer_context =
-        sdl2::mixer::init(InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG)?;
+    let mixer_context = sdl2::mixer::init(
+        InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG,
+    )?;
     sdl2::mixer::allocate_channels(SOUND_CHANNELS);
     let mut name_to_sound: HashMap<String, specs::Entity> = HashMap::new();
 
@@ -111,7 +114,8 @@ pub fn init_sound<'a>(
         for sound_save in sounds_save.0.iter() {
             let name = &sound_save.name;
             let file = format!("assets/music/{}.wav", name);
-            let sound_placement = SoundPlacement::new(id, id + sound_save.count, sound_save.gap);
+            let sound_placement =
+                SoundPlacement::new(id, id + sound_save.count, sound_save.gap);
             id += sound_save.count;
             let path = Path::new(&file);
             let sound_chunk = ThreadPin::new(SoundData(

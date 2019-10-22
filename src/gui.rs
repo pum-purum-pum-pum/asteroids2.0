@@ -251,7 +251,8 @@ impl Button {
         let mut res = vec![];
         let mut add_w = 0f32;
         let mut add_h = 0f32;
-        let selected_ids: Vec<usize> = ui.selectors.iter().filter_map(|(_, i)| *i).collect();
+        let selected_ids: Vec<usize> =
+            ui.selectors.iter().filter_map(|(_, i)| *i).collect();
         if selected_ids.contains(&self.id) {
             add_w += self.width * 0.2;
             add_h += self.height * 0.2;
@@ -266,7 +267,8 @@ impl Button {
         if let Some(color) = self.color {
             let rectangle = Primitive {
                 kind: PrimitiveKind::Rectangle(Rectangle {
-                    position: self.position - Vector2::new(add_w / 2.0, add_h / 2.0),
+                    position: self.position
+                        - Vector2::new(add_w / 2.0, add_h / 2.0),
                     width: self.width,
                     height: self.height,
                     color: color,
@@ -278,7 +280,8 @@ impl Button {
         if let Some(image) = self.image {
             let picture = Primitive {
                 kind: PrimitiveKind::Picture(Picture {
-                    position: self.position - Vector2::new(add_w / 2.0, add_h / 2.0),
+                    position: self.position
+                        - Vector2::new(add_w / 2.0, add_h / 2.0),
                     width: self.width + add_w,
                     height: self.height + add_h,
                     image: image,

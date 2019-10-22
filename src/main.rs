@@ -28,7 +28,10 @@ pub use voronois;
 
 /// int SDL_main(int argc, char *argv[])
 #[no_mangle]
-pub extern "C" fn SDL_main(_argc: libc::c_int, _argv: *const *const libc::c_char) -> libc::c_int {
+pub extern "C" fn SDL_main(
+    _argc: libc::c_int,
+    _argv: *const *const libc::c_char,
+) -> libc::c_int {
     main().unwrap();
     return 0;
 }

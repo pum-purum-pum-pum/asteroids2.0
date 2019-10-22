@@ -1,30 +1,26 @@
 #[cfg(any(target_os = "android"))]
 use backtrace::Backtrace;
-use ron::de::from_str;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::rwops::RWops;
-use serde::{Deserialize, Serialize};
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
-use std::collections::HashMap;
-use std::io::Read;
+
 #[cfg(any(target_os = "android"))]
 use std::panic;
 // use rand::prelude::*;
 use crate::gui::{Primitive, UI};
 use crate::setup::*;
 use crate::systems::{
-    AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen, GUISystem, GamePlaySystem,
-    InsertSystem, KinematicSystem, MenuRenderingSystem, RenderingSystem, ScoreTableRendering,
-    SoundSystem, UpgradeGUI,
+    AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen,
+    GUISystem, GamePlaySystem, InsertSystem, KinematicSystem,
+    MenuRenderingSystem, RenderingSystem, ScoreTableRendering, SoundSystem,
+    UpgradeGUI,
 };
 use common::*;
 use components::*;
-use gfx_h::{
-    effects::MenuParticles, AtlasImage, Canvas, MovementParticles, ParticlesData,
-};
+use gfx_h::{effects::MenuParticles, Canvas, MovementParticles, ParticlesData};
 use log::info;
 use physics::safe_maintain;
 use physics_system::PhysicsSystem;
@@ -49,10 +45,14 @@ pub fn run() -> Result<(), String> {
     setup_text(&context, &mut specs_world);
     let atlas = read_atlas("assets/out.ron");
     let name_to_atlas = setup_images(&atlas);
-    let mut keys_channel: EventChannel<Keycode> = EventChannel::with_capacity(100);
-    let mut sounds_channel: EventChannel<Sound> = EventChannel::with_capacity(30);
-    let mut insert_channel: EventChannel<InsertEvent> = EventChannel::with_capacity(100);
-    let mut primitives_channel: EventChannel<Primitive> = EventChannel::with_capacity(100);
+    let mut keys_channel: EventChannel<Keycode> =
+        EventChannel::with_capacity(100);
+    let mut sounds_channel: EventChannel<Sound> =
+        EventChannel::with_capacity(30);
+    let mut insert_channel: EventChannel<InsertEvent> =
+        EventChannel::with_capacity(100);
+    let mut primitives_channel: EventChannel<Primitive> =
+        EventChannel::with_capacity(100);
     let name_to_animation = load_animations(&atlas);
     load_description(&mut specs_world, &name_to_atlas);
     let preloaded_images = preloaded_images(&name_to_atlas, &name_to_animation);
@@ -63,15 +63,18 @@ pub fn run() -> Result<(), String> {
     // let engine_particles = ThreadPin::new(ParticlesData::Engine(
     //     Engine::new(&display, )
     // ))
-    let movement_particles_entity = specs_world.create_entity().with(movement_particles).build();
+    let movement_particles_entity =
+        specs_world.create_entity().with(movement_particles).build();
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
     };
 
     let physics_system = PhysicsSystem::default();
     let insert_system = InsertSystem::new(insert_channel.register_reader());
-    let rendering_system = RenderingSystem::new(primitives_channel.register_reader());
-    let rendering_system2 = RenderingSystem::new(primitives_channel.register_reader());
+    let rendering_system =
+        RenderingSystem::new(primitives_channel.register_reader());
+    let rendering_system2 =
+        RenderingSystem::new(primitives_channel.register_reader());
     let menu_rendering_system = MenuRenderingSystem;
     let dead_screen_system = DeadScreen::default();
     let common_respawn = CommonRespawn::default();
@@ -86,7 +89,8 @@ pub fn run() -> Result<(), String> {
         .with_thread_local(rendering_system2)
         .with_thread_local(physics_system.clone())
         .build();
-    let score_table_system = ScoreTableRendering::new(primitives_channel.register_reader());
+    let score_table_system =
+        ScoreTableRendering::new(primitives_channel.register_reader());
     let mut score_table_dispatcher = DispatcherBuilder::new()
         .with_thread_local(score_table_system)
         .build();
@@ -199,7 +203,8 @@ pub fn run() -> Result<(), String> {
             let mut mouse_state = specs_world.write_resource::<Mouse>();
             mouse_state.set_left(buttons.contains(&MouseButton::Left));
             mouse_state.set_right(buttons.contains(&MouseButton::Right));
-            let dims = specs_world.read_resource::<red::Viewport>().dimensions();
+            let dims =
+                specs_world.read_resource::<red::Viewport>().dimensions();
             mouse_state.set_position(
                 state.x(),
                 state.y(),
@@ -219,11 +224,15 @@ pub fn run() -> Result<(), String> {
                             0,
                             state.x() as f32,
                             state.y() as f32,
-                            specs_world.read_resource::<ThreadPin<Canvas>>().observer(),
+                            specs_world
+                                .read_resource::<ThreadPin<Canvas>>()
+                                .observer(),
                             0f32,
                             dims.0 as u32,
                             dims.1 as u32,
-                            specs_world.read_resource::<ThreadPin<Canvas>>().z_far,
+                            specs_world
+                                .read_resource::<ThreadPin<Canvas>>()
+                                .z_far,
                         ))
                     } else {
                         None
@@ -242,7 +251,10 @@ pub fn run() -> Result<(), String> {
                                         finger.id as usize,
                                         finger.x * dims.0 as f32,
                                         finger.y * dims.1 as f32,
-                                        specs_world.read_resource::<ThreadPin<Canvas>>().observer(),
+                                        specs_world
+                                            .read_resource::<ThreadPin<Canvas>>(
+                                            )
+                                            .observer(),
                                         finger.pressure,
                                         dims.0 as u32,
                                         dims.1 as u32,
@@ -318,27 +330,37 @@ pub fn run() -> Result<(), String> {
                         enumerate_arrays: true,
                         ..PrettyConfig::default()
                     };
-                    let s = to_string_pretty(&*specs_world.write_resource::<MacroGame>(), pretty)
-                        .expect("Serialization failed");
+                    let s = to_string_pretty(
+                        &*specs_world.write_resource::<MacroGame>(),
+                        pretty,
+                    )
+                    .expect("Serialization failed");
                     let file = "rons/macro_game.ron";
                     // let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
                     eprintln!("{}", s);
-                    if let Ok(mut rw) = RWops::from_file(Path::new(&file), "w+") {
-                        rw.write(s.as_bytes()).expect("failed to load macro game");
+                    if let Ok(mut rw) = RWops::from_file(Path::new(&file), "w+")
+                    {
+                        rw.write(s.as_bytes())
+                            .expect("failed to load macro game");
                     } else {
                         let mut rw = RWops::from_file(Path::new(&file), "w")
                             .expect("failed to load macro game");
                         rw.write(s.as_bytes()).expect("failed to write");
                     }
-                    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+                    flame::dump_html(
+                        &mut File::create("flame-graph.html").unwrap(),
+                    )
+                    .unwrap();
                 }
                 sdl2::event::Event::Window {
                     win_event: sdl2::event::WindowEvent::Resized(w, h),
                     ..
                 } => {
-                    let mut viewport = specs_world.write_resource::<red::Viewport>();
+                    let mut viewport =
+                        specs_world.write_resource::<red::Viewport>();
                     viewport.update_size(w, h);
-                    let context = specs_world.read_resource::<ThreadPin<red::GL>>();
+                    let context =
+                        specs_world.read_resource::<ThreadPin<red::GL>>();
                     viewport.set_used(&*context);
                 }
                 _ => (),

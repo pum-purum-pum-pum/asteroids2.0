@@ -53,12 +53,13 @@ impl<'a> System<'a> for AISystem {
             mut sounds_channel,
             preloaded_sounds,
         ) = data;
-        let (character_entity, character_position, _) =
-            if let Some(value) = (&entities, &isometries, &character_markers).join().next() {
-                value
-            } else {
-                return;
-            };
+        let (character_entity, character_position, _) = if let Some(value) =
+            (&entities, &isometries, &character_markers).join().next()
+        {
+            value
+        } else {
+            return;
+        };
         let character_position = character_position.0.translation.vector;
         for (entity, iso, vel, physics_component, spin, _enemy, ai) in (
             &entities,
@@ -77,7 +78,8 @@ impl<'a> System<'a> for AISystem {
             let dir = Vector2::new(diff.x, diff.y).normalize();
             let pos = Point2::new(position.x, position.y);
             let ray = Ray::new(pos, dir);
-            let enemy_collision_groups = get_collision_groups(EntityType::Enemy);
+            let enemy_collision_groups =
+                get_collision_groups(EntityType::Enemy);
             let nearby = get_min_dist(&mut world, ray, enemy_collision_groups);
             let mut character_noticed = false;
             if let Some(body) = nearby.1 {
@@ -86,18 +88,22 @@ impl<'a> System<'a> for AISystem {
                     character_noticed = true;
                 }
             };
-            let follow_area = if let Some(multy_lazer) = multy_lazers.get(entity) {
-                multy_lazer.first_distance() * 0.95
-            } else {
-                SCREEN_AREA
-            };
+            let follow_area =
+                if let Some(multy_lazer) = multy_lazers.get(entity) {
+                    multy_lazer.first_distance() * 0.95
+                } else {
+                    SCREEN_AREA
+                };
             for ai_type in ai.kinds.iter() {
                 match ai_type {
                     AIType::Shoot => {
                         // Copy paste from top
                         let gun = cannons.get_mut(entity);
                         if let Some(gun) = gun {
-                            if diff.norm() < SCREEN_AREA && gun.shoot() && character_noticed {
+                            if diff.norm() < SCREEN_AREA
+                                && gun.shoot()
+                                && character_noticed
+                            {
                                 let bullets = gun.spawn_bullets(
                                     EntityType::Enemy,
                                     isometry,
@@ -149,32 +155,44 @@ impl<'a> System<'a> for AISystem {
                             }
                         }
                         if diff.norm() > follow_area {
-                            if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
+                            if let Some(multy_lazer) =
+                                multy_lazers.get_mut(entity)
+                            {
                                 multy_lazer.set_all(false);
                             }
                         } else {
-                            if let Some(multy_lazer) = multy_lazers.get_mut(entity) {
+                            if let Some(multy_lazer) =
+                                multy_lazers.get_mut(entity)
+                            {
                                 multy_lazer.set_all(true);
                             }
                         }
                     }
                     AIType::Follow => {
-                        let speed = ship_stats.get(entity).unwrap().thrust_force;
+                        let speed =
+                            ship_stats.get(entity).unwrap().thrust_force;
                         let mut is_chain = false;
                         if let Some(chain) = chains.get(entity) {
                             if let Some(iso) = isometries.get(chain.follow) {
                                 is_chain = true;
                                 let follow_vector = iso.0.translation.vector;
-                                let follow_pos = Point2::new(follow_vector.x, follow_vector.y);
+                                let follow_pos = Point2::new(
+                                    follow_vector.x,
+                                    follow_vector.y,
+                                );
                                 let diff = follow_pos - pos;
                                 // if diff.norm() > 1.5f32 { // for not overlap
                                 let dir = diff.normalize();
                                 let ai_vel = speed * dir;
                                 *vel = Velocity::new(ai_vel.x, ai_vel.y);
-                                let body =
-                                    world.rigid_body_mut(physics_component.body_handle).unwrap();
+                                let body = world
+                                    .rigid_body_mut(
+                                        physics_component.body_handle,
+                                    )
+                                    .unwrap();
                                 let mut velocity = *body.velocity();
-                                *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                                *velocity.as_vector_mut() =
+                                    Vector3::new(vel.0.x, vel.0.y, spin.0);
                                 body.set_velocity(velocity);
                                 // }
                             }
@@ -189,29 +207,40 @@ impl<'a> System<'a> for AISystem {
                                 let vel_vec = DAMPING_FACTOR * vel.0;
                                 *vel = Velocity::new(vel_vec.x, vel_vec.y);
                             }
-                            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                            let body = world
+                                .rigid_body_mut(physics_component.body_handle)
+                                .unwrap();
                             let mut velocity = *body.velocity();
-                            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                            *velocity.as_vector_mut() =
+                                Vector3::new(vel.0.x, vel.0.y, spin.0);
                             body.set_velocity(velocity);
                         }
                     }
                     AIType::FollowRotate { spin: rot_spin } => {
-                        let speed = ship_stats.get(entity).unwrap().thrust_force;
+                        let speed =
+                            ship_stats.get(entity).unwrap().thrust_force;
                         let mut is_chain = false;
                         if let Some(chain) = chains.get(entity) {
                             if let Some(iso) = isometries.get(chain.follow) {
                                 is_chain = true;
                                 let follow_vector = iso.0.translation.vector;
-                                let follow_pos = Point2::new(follow_vector.x, follow_vector.y);
+                                let follow_pos = Point2::new(
+                                    follow_vector.x,
+                                    follow_vector.y,
+                                );
                                 let diff = follow_pos - pos;
                                 // if diff.norm() > 1.5f32 { // for not overlap
                                 let dir = diff.normalize();
                                 let ai_vel = speed * dir;
                                 *vel = Velocity::new(ai_vel.x, ai_vel.y);
-                                let body =
-                                    world.rigid_body_mut(physics_component.body_handle).unwrap();
+                                let body = world
+                                    .rigid_body_mut(
+                                        physics_component.body_handle,
+                                    )
+                                    .unwrap();
                                 let mut velocity = *body.velocity();
-                                *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                                *velocity.as_vector_mut() =
+                                    Vector3::new(vel.0.x, vel.0.y, spin.0);
                                 body.set_velocity(velocity);
                                 // }
                             }
@@ -226,25 +255,30 @@ impl<'a> System<'a> for AISystem {
                             } else {
                                 // let vel_vec = DAMPING_FACTOR * vel.0;
                                 let ai_vel = speed * dir;
-                                let tangent_vel =
-                                    rot_spin / rot_spin.abs() * Vector2::new(-ai_vel.y, ai_vel.x);
+                                let tangent_vel = rot_spin / rot_spin.abs()
+                                    * Vector2::new(-ai_vel.y, ai_vel.x);
                                 let spiral = 0.3;
                                 *vel = Velocity::new(
                                     tangent_vel.x + ai_vel.x * spiral,
                                     tangent_vel.y + ai_vel.y * spiral,
                                 );
                             }
-                            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                            let body = world
+                                .rigid_body_mut(physics_component.body_handle)
+                                .unwrap();
                             let mut velocity = *body.velocity();
-                            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                            *velocity.as_vector_mut() =
+                                Vector3::new(vel.0.x, vel.0.y, spin.0);
                             body.set_velocity(velocity);
                         }
                     }
                     AIType::Aim => {
                         let ship_torque = DT
                             * calculate_player_ship_spin_for_aim(
-                                Vector2::new(character_position.x, character_position.y)
-                                    - Vector2::new(position.x, position.y),
+                                Vector2::new(
+                                    character_position.x,
+                                    character_position.y,
+                                ) - Vector2::new(position.x, position.y),
                                 iso.rotation(),
                                 spin.0,
                             );
@@ -258,23 +292,29 @@ impl<'a> System<'a> for AISystem {
                         let diff = character_position - position;
                         let dir = speed * (diff).normalize();
                         *vel = Velocity::new(dir.x, dir.y);
-                        let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                        let body = world
+                            .rigid_body_mut(physics_component.body_handle)
+                            .unwrap();
                         let mut velocity = *body.velocity();
-                        *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                        *velocity.as_vector_mut() =
+                            Vector3::new(vel.0.x, vel.0.y, spin.0);
                         body.set_velocity(velocity);
                     }
                     AIType::Charging(_) => {
                         let speed = 0.2f32;
-                        let charging = chargings
-                            .get_mut(entity)
-                            .expect("no charging component while have charging AI");
+                        let charging = chargings.get_mut(entity).expect(
+                            "no charging component while have charging AI",
+                        );
                         if charging.shoot() {
                             let diff = character_position - position;
                             let dir = speed * (diff).normalize();
                             *vel = Velocity::new(dir.x, dir.y);
-                            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+                            let body = world
+                                .rigid_body_mut(physics_component.body_handle)
+                                .unwrap();
                             let mut velocity = *body.velocity();
-                            *velocity.as_vector_mut() = Vector3::new(vel.0.x, vel.0.y, spin.0);
+                            *velocity.as_vector_mut() =
+                                Vector3::new(vel.0.x, vel.0.y, spin.0);
                             body.set_velocity(velocity);
                         }
                     }

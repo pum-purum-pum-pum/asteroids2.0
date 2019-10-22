@@ -3,7 +3,9 @@ use std::ops::AddAssign;
 use std::time::{Duration, Instant};
 
 use common::*;
-pub use geometry::{BlockSegment, FogGrid, Geometry, NebulaGrid, PlanetGrid, Polygon, StarsGrid};
+pub use geometry::{
+    BlockSegment, FogGrid, Geometry, NebulaGrid, PlanetGrid, Polygon, StarsGrid,
+};
 pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{ortho_unproject, unproject_with_z, Canvas as SDLCanvas};
 pub use gfx_h::{AtlasImage, ImageData};
@@ -17,7 +19,7 @@ pub const FINGER_NUMBER: usize = 20;
 use rand::prelude::*;
 use sdl2::mixer::Channel;
 
-pub const ASTEROID_MAX_LIFES: usize = 300usize;
+pub const ASTEROID_MAX_LIFES: usize = 180usize;
 
 pub const BULLET_SPEED_INIT: f32 = 0.5;
 pub const THRUST_FORCE_INIT: f32 = 0.01;
@@ -584,7 +586,8 @@ impl Finger {
         let (x, y) = (x as f32, height_u as f32 - y as f32);
         let (x, y) = (2f32 * x / width - 1f32, 2f32 * y / height - 1f32);
         // with z=0f32 -- which is coordinate of our canvas in 3d space
-        let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, -y));
+        let ortho_point =
+            ortho_unproject(width_u, height_u, Point2::new(x, -y));
         let point = unproject_with_z(
             observer,
             &Point2::new(x, -y),
@@ -643,7 +646,14 @@ impl Mouse {
         let ortho_point = ortho_unproject(width_u, height_u, Point2::new(x, y));
         self.o_x = ortho_point.x;
         self.o_y = ortho_point.y;
-        let point = unproject_with_z(observer, &Point2::new(x, y), 0f32, width_u, height_u, z_far);
+        let point = unproject_with_z(
+            observer,
+            &Point2::new(x, y),
+            0f32,
+            width_u,
+            height_u,
+            z_far,
+        );
         self.x = point.x;
         self.y = point.y;
     }
@@ -847,13 +857,20 @@ pub enum GunKindSave {
 }
 
 impl GunKindSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> GunKind {
+    pub fn convert(
+        &self,
+        name_to_image: &HashMap<String, AtlasImage>,
+    ) -> GunKind {
         match self {
             GunKindSave::ShotGun(shotgun_save) => {
                 GunKind::ShotGun(shotgun_save.convert(name_to_image))
             }
-            GunKindSave::MultyLazer(multy_lazer) => GunKind::MultyLazer(multy_lazer.clone()),
-            GunKindSave::Cannon(cannon_save) => GunKind::Cannon(cannon_save.convert(name_to_image)),
+            GunKindSave::MultyLazer(multy_lazer) => {
+                GunKind::MultyLazer(multy_lazer.clone())
+            }
+            GunKindSave::Cannon(cannon_save) => {
+                GunKind::Cannon(cannon_save.convert(name_to_image))
+            }
             GunKindSave::RocketGun(rocket_save) => {
                 GunKind::RocketGun(rocket_save.convert(name_to_image))
             }
@@ -964,7 +981,8 @@ pub trait Gun {
     fn recharge_time(&self) -> Duration;
 
     fn is_ready(&self) -> bool {
-        Instant::now().duration_since(self.recharge_start()) >= self.recharge_time()
+        Instant::now().duration_since(self.recharge_start())
+            >= self.recharge_time()
     }
 
     fn shoot(&mut self) -> bool {
@@ -1018,7 +1036,10 @@ pub struct ShotGunSave {
 }
 
 impl ShotGunSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> ShotGun {
+    pub fn convert(
+        &self,
+        name_to_image: &HashMap<String, AtlasImage>,
+    ) -> ShotGun {
         ShotGun::new(
             self.recharge_time,
             self.bullets_damage,
@@ -1099,8 +1120,15 @@ impl Gun for ShotGun {
             );
             res.push(InsertEvent::Bullet {
                 kind: entity_type,
-                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
-                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                iso: Point3::new(
+                    position.x,
+                    position.y,
+                    isometry.rotation.euler_angles().2,
+                ),
+                velocity: Point2::new(
+                    projectile_velocity.0.x,
+                    projectile_velocity.0.y,
+                ),
                 size: self.bullet_size,
                 damage: bullet_damage,
                 owner: owner,
@@ -1120,7 +1148,8 @@ impl Gun for ShotGun {
                 let sign = j * 2 - 1;
                 let shift = self.angle_shift * i as f32 * sign as f32;
                 let rotation = Rotation3::new(Vector3::new(0f32, 0f32, shift));
-                let direction = isometry * (rotation * Vector3::new(0f32, -1f32, 0f32));
+                let direction =
+                    isometry * (rotation * Vector3::new(0f32, -1f32, 0f32));
                 let velocity_rel = bullet_speed * direction;
                 let projectile_velocity = Velocity::new(
                     ship_velocity.x + velocity_rel.x,
@@ -1133,7 +1162,10 @@ impl Gun for ShotGun {
                         position.y,
                         isometry.rotation.euler_angles().2 + shift,
                     ),
-                    velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                    velocity: Point2::new(
+                        projectile_velocity.0.x,
+                        projectile_velocity.0.y,
+                    ),
                     size: self.bullet_size,
                     damage: self.bullets_damage,
                     owner: owner,
@@ -1196,7 +1228,10 @@ pub struct RocketGunSave {
 }
 
 impl RocketGunSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> RocketGun {
+    pub fn convert(
+        &self,
+        name_to_image: &HashMap<String, AtlasImage>,
+    ) -> RocketGun {
         RocketGun::new(
             self.recharge_time,
             self.bullets_damage,
@@ -1218,7 +1253,10 @@ pub struct CannonSave {
 }
 
 impl CannonSave {
-    pub fn convert(&self, name_to_image: &HashMap<String, AtlasImage>) -> Cannon {
+    pub fn convert(
+        &self,
+        name_to_image: &HashMap<String, AtlasImage>,
+    ) -> Cannon {
         Cannon::new(
             self.recharge_time,
             self.bullets_damage,
@@ -1289,7 +1327,11 @@ impl Gun for RocketGun {
             // );
             let insert_event = InsertEvent::Rocket {
                 kind: entity_type,
-                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                iso: Point3::new(
+                    position.x,
+                    position.y,
+                    isometry.rotation.euler_angles().2,
+                ),
                 damage: bullet_damage,
                 owner: owner,
                 rocket_image: self.bullet_image,
@@ -1327,7 +1369,8 @@ impl Gun for Cannon {
             let position = isometry.translation.vector;
             let mut rng = rand::thread_rng();
             let shift = rng.gen_range(-0.2f32, 0.2f32);
-            let direction = isometry * Vector3::new(shift, -1f32, 0f32).normalize();
+            let direction =
+                isometry * Vector3::new(shift, -1f32, 0f32).normalize();
             let velocity_rel = bullet_speed * direction;
             let projectile_velocity = Velocity::new(
                 ship_velocity.x + velocity_rel.x,
@@ -1335,9 +1378,16 @@ impl Gun for Cannon {
             );
             let insert_event = InsertEvent::Bullet {
                 kind: entity_type,
-                iso: Point3::new(position.x, position.y, isometry.rotation.euler_angles().2),
+                iso: Point3::new(
+                    position.x,
+                    position.y,
+                    isometry.rotation.euler_angles().2,
+                ),
                 size: self.bullet_size,
-                velocity: Point2::new(projectile_velocity.0.x, projectile_velocity.0.y),
+                velocity: Point2::new(
+                    projectile_velocity.0.x,
+                    projectile_velocity.0.y,
+                ),
                 damage: bullet_damage,
                 owner: owner,
                 bullet_image: self.bullet_image,

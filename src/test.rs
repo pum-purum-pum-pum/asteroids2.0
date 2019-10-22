@@ -20,8 +20,9 @@ fn sound() -> Result<(), String> {
     let channels = DEFAULT_CHANNELS; // Stereo
     let chunk_size = 1_024;
     sdl2::mixer::open_audio(frequency, format, channels, chunk_size)?;
-    let _mixer_context =
-        sdl2::mixer::init(InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG)?;
+    let _mixer_context = sdl2::mixer::init(
+        InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG,
+    )?;
     sdl2::mixer::allocate_channels(4);
     println!("query spec => {:?}", sdl2::mixer::query_spec());
     let sound_file_path = Path::new("assets/shot.wav");

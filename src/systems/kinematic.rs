@@ -36,19 +36,33 @@ impl<'a> System<'a> for KinematicSystem {
             mut world,
         ) = data;
         info!("asteroids: kinematic system started");
-        for (physics_component, _, _) in (&physics, !&asteroid_markers, !&projectiles).join() {
-            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+        for (physics_component, _, _) in
+            (&physics, !&asteroid_markers, !&projectiles).join()
+        {
+            let body =
+                world.rigid_body_mut(physics_component.body_handle).unwrap();
             let mut velocity = *body.velocity();
             *velocity.as_vector_mut() *= DAMPING_FACTOR;
             body.set_velocity(velocity);
             body.activate();
         }
         // activate asteroid bodyes
-        for (physics_component, _asteroid) in (&physics, &asteroid_markers).join() {
-            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+        for (physics_component, _asteroid) in
+            (&physics, &asteroid_markers).join()
+        {
+            let body =
+                world.rigid_body_mut(physics_component.body_handle).unwrap();
             body.activate();
         }
-        for (entity, ship_stats, _isometry, _velocity, physics_component, spin, _ship) in (
+        for (
+            entity,
+            ship_stats,
+            _isometry,
+            _velocity,
+            physics_component,
+            spin,
+            _ship,
+        ) in (
             &entities,
             &ships_stats,
             &mut isometries,
@@ -59,7 +73,8 @@ impl<'a> System<'a> for KinematicSystem {
         )
             .join()
         {
-            let body = world.rigid_body_mut(physics_component.body_handle).unwrap();
+            let body =
+                world.rigid_body_mut(physics_component.body_handle).unwrap();
             if let Some(_) = character_markers.get(entity) {
                 body.set_angular_velocity(ship_stats.torque * spin.0);
             } else {
@@ -67,7 +82,9 @@ impl<'a> System<'a> for KinematicSystem {
             }
         }
         let mut attach_pairs = vec![];
-        for (entity, _, attach) in (&entities, &mut isometries, &attach_positions).join() {
+        for (entity, _, attach) in
+            (&entities, &mut isometries, &attach_positions).join()
+        {
             attach_pairs.push((entity, attach.0));
         }
         for (entity, attach) in attach_pairs.iter() {

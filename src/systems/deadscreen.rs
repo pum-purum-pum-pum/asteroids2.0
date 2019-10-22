@@ -71,7 +71,9 @@ impl<'a> System<'a> for DeadScreen {
             for (entity, _ship_marker) in (&entities, &ship_markers).join() {
                 entities.delete(entity).unwrap();
             }
-            for (entity, _asteroid_marker) in (&entities, &asteroid_markers).join() {
+            for (entity, _asteroid_marker) in
+                (&entities, &asteroid_markers).join()
+            {
                 entities.delete(entity).unwrap();
             }
             *spawned_upgrades = vec![];
