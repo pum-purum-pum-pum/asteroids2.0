@@ -9,6 +9,7 @@ use specs::World as SpecsWorld;
 
 #[cfg(any(target_os = "android"))]
 use std::panic;
+use std::sync::{Arc, Mutex};
 // use rand::prelude::*;
 use crate::gui::{Primitive, UI};
 use crate::setup::*;
@@ -16,7 +17,7 @@ use crate::systems::{
     AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen,
     GUISystem, GamePlaySystem, InsertSystem, KinematicSystem,
     MenuRenderingSystem, RenderingSystem, ScoreTableRendering, SoundSystem,
-    UpgradeGUI,
+    UpgradeGUI, DestroySync
 };
 use common::*;
 use components::*;
@@ -45,6 +46,8 @@ pub fn run() -> Result<(), String> {
     setup_text(&context, &mut specs_world);
     let atlas = read_atlas("assets/out.ron");
     let name_to_atlas = setup_images(&atlas);
+    let mut asteroids_spawn_channel: EventChannel<InsertEvent> =
+        EventChannel::with_capacity(100);
     let mut keys_channel: EventChannel<Keycode> =
         EventChannel::with_capacity(100);
     let mut sounds_channel: EventChannel<Sound> =
@@ -68,7 +71,8 @@ pub fn run() -> Result<(), String> {
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
     };
-
+    let destroy_sync = DestroySync::new(asteroids_spawn_channel.register_reader());
+    specs_world.add_resource(Arc::new(Mutex::new(asteroids_spawn_channel)));
     let physics_system = PhysicsSystem::default();
     let insert_system = InsertSystem::new(insert_channel.register_reader());
     let rendering_system =
@@ -108,6 +112,7 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(FogGrid::new(2, 50f32, 50f32, 5f32, 5f32));
 
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
+    specs_world.add_resource(TimeTracker::new());
     specs_world.add_resource(name_to_atlas);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
@@ -146,6 +151,7 @@ pub fn run() -> Result<(), String> {
                 "collision_system",
             ],
         )
+        .with(destroy_sync, "destroy_sync", &[])
         .with(KinematicSystem {}, "kinematic_system", &["physics_system"])
         // .with_thread_local(insert_system)
         .build();

@@ -151,6 +151,8 @@ pub struct WorldIsometry {
     pub world_position: red::data::f32_f32_f32,
     #[divisor = "1"]
     pub angle: red::data::f32_,
+    #[divisor = "1"]
+    pub scale: red::data::f32_,
 }
 
 // we will pass it to shader for each image via instancing
@@ -162,6 +164,8 @@ pub struct AtlasRegion {
     pub offset: red::data::f32_f32,
     #[divisor = "1"]
     pub fraction_wh: red::data::f32_f32,
+    #[divisor = "1"]
+    pub dim_scales: red::data::f32_f32,
 }
 
 pub struct ImageInstancingData {
@@ -406,6 +410,7 @@ pub struct Canvas {
     program_instancing: red::Program,
     program_primitive: red::Program,
     program_primitive_texture: red::Program,
+    program_sprite_batch: red::Program,
     pub program_glyph: red::Program,
     program_atlas: red::Program,
     observer: Point3,
@@ -443,6 +448,8 @@ impl Canvas {
             create_shader_program(gl, pref, "text", &glsl_version)?;
         let program_atlas =
             create_shader_program(gl, pref, "atlas", &glsl_version)?;
+        let program_sprite_batch =
+            create_shader_program(gl, pref, "spritebatch", &glsl_version)?;
         let z_far = Z_FAR;
         let atlas = load_texture(gl, atlas);
         let image_model = ImageModel::new(gl).expect("failed image model");
@@ -453,6 +460,7 @@ impl Canvas {
             program_light,
             program_instancing,
             program_atlas,
+            program_sprite_batch,
             observer: Point3::new(0f32, 0f32, z_far),
             program_glyph,
             perlin_x: Perlin::new().set_seed(0),
@@ -897,6 +905,8 @@ impl Canvas {
         viewport: &red::Viewport,
         frame: &mut red::Frame,
         sprite_batch: &SpriteBatch,
+        with_lights: bool,
+        blend: Option<red::Blend>,
     ) {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
@@ -905,10 +915,12 @@ impl Canvas {
         let view: [[f32; 4]; 4] =
             get_view(self.observer()).to_homogeneous().into();
         let vao = &sprite_batch.instancing_data.image_model.positions.vao;
-        let program = &self.program_instancing;
+        let program = &self.program_sprite_batch;
         program.set_uniform("view", view);
         program.set_uniform("perspective", perspective);
-        program.set_uniform("transparency", 1f32);
+        // program.set_uniform("dim_scales", atlas_image.dim_scales);
+        program.set_uniform("tex", self.atlas.clone()); // this is just shallow copy if idx
+        // program.set_uniform("scale", 1.0);
         program.set_layout(
             &gl,
             vao,
@@ -919,10 +931,24 @@ impl Canvas {
             ],
         );
         let draw_type = red::DrawType::Instancing(sprite_batch.len);
-        let draw_params = red::DrawParams {
-            stencil: None,
-            draw_type,
-            ..Default::default()
+        let draw_params = if with_lights {
+            red::DrawParams {
+                draw_type,
+                stencil: Some(Stencil {
+                    ref_value: 1,
+                    mask: 0xFF,
+                    test: StencilTest::NotEqual,
+                    pass_operation: None,
+                }),
+                blend,
+                ..Default::default()
+            }
+        } else {
+            DrawParams {
+                draw_type,
+                blend,
+                ..Default::default()
+            }
         };
         frame.draw(
             vao,
@@ -1141,4 +1167,65 @@ pub fn to_vertex(
         color[2],
         color[3],
     ]
+}
+
+pub struct SpriteBatch {
+    pub instancing_data: ImageInstancingData,
+    pub len: usize,
+}
+
+impl SpriteBatch {
+    pub fn new(
+        gl: &red::GL,
+        images: &[AtlasImage],
+        isometries: &[Isometry3],
+        sizes: &[f32],
+    ) -> Self {
+        let image_model = ImageModel::new(gl).expect("failed image model");
+        let regions: Vec<AtlasRegion> = images
+            .iter()
+            .map(|image| AtlasRegion {
+                offset: red::data::f32_f32 {
+                    d0: image.offset.0,
+                    d1: image.offset.1,
+                },
+                fraction_wh: red::data::f32_f32::new(
+                    image.fraction_wh.0,
+                    image.fraction_wh.1,
+                ),
+                dim_scales: red::data::f32_f32::new(
+                    image.dim_scales.0,
+                    image.dim_scales.1,
+                )
+            })
+            .collect();
+        let isometries: Vec<WorldIsometry> = isometries
+            .iter()
+            .zip(sizes.iter())
+            .map(|(iso, size)| {
+                let pos = iso.translation.vector;
+                let angle = iso.rotation.euler_angles().2;
+                WorldIsometry {
+                    world_position: red::data::f32_f32_f32::new(
+                        pos.x, pos.y, pos.z,
+                    ),
+                    angle: red::data::f32_::new(angle),
+                    scale: red::data::f32_::new(*size)
+                }
+            })
+            .collect();
+        let regions = AtlasRegionBuffer::new(gl, &regions)
+            .expect("failed to create regions buffer");
+        let isometries = WorldIsometryBuffer::new(gl, &isometries)
+            .expect("failed to create isometries buffer");
+        let instancing_data = ImageInstancingData {
+            image_model,
+            regions,
+            isometries,
+        };
+        SpriteBatch {
+            instancing_data,
+            len: images.len(),
+        }
+    }
 }

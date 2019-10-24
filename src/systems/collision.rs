@@ -128,6 +128,7 @@ impl<'a> System<'a> for CollisionSystem {
         Write<'a, AppState>,
         WriteExpect<'a, MacroGame>,
         WriteExpect<'a, GlobalParams>,
+        ReadExpect<'a, Arc<Mutex<EventChannel<InsertEvent>>>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -156,6 +157,7 @@ impl<'a> System<'a> for CollisionSystem {
             mut app_state,
             mut macro_game,
             mut global_params,
+            asteroids_channel,
         ) = data;
         self.colliding_pairs.clear();
         self.colliding_start_events.clear();
@@ -293,12 +295,17 @@ impl<'a> System<'a> for CollisionSystem {
                         &preloaded_images,
                         polygon.max_r,
                     );
-                    spawn_asteroids(
-                        isometries.get(asteroid).unwrap().0,
-                        polygons.get(asteroid).unwrap(),
-                        &mut insert_channel,
-                        bullet_position,
-                    );
+                    let iso = isometries.get(asteroid).unwrap().0;
+                    let poly = polygons.get(asteroid).unwrap().clone();
+                    let channel_arc = (*asteroids_channel).clone();
+                    thread::spawn(move || {
+                        spawn_asteroids(
+                            iso,
+                            poly,
+                            channel_arc,
+                            bullet_position,
+                        );
+                    });
                     entities.delete(asteroid).unwrap();
                 }
             }

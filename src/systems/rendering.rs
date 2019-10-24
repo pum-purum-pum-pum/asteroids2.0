@@ -1,5 +1,5 @@
 pub use crate::gui::{Button, Picture, Rectangle, Selector};
-use gfx_h::effects::SpriteBatch;
+use gfx_h::SpriteBatch;
 use gfx_h::{unproject_with_z, RenderMode, TextData};
 use num_enum::TryFromPrimitive;
 use telemetry::{render_plot, TeleGraph};
@@ -229,7 +229,7 @@ impl<'a> System<'a> for RenderingSystem {
         frame.set_clear_color(global_params.red.min(1.0), 0.004, 0.0, 1.0);
         // frame.set_clear_color(0.15, 0.004, 0.0, 1.0);
         frame.set_clear_stencil(0);
-        // frame.clear_color_and_stencil();
+        frame.clear_color_and_stencil();
         flame::start("color");
         frame.clear_color();
         flame::end("color");
@@ -305,9 +305,10 @@ impl<'a> System<'a> for RenderingSystem {
 
             flame::end("shadow rendering");
         };
-        flame::start("background rendering");
+        flame::start("sprite batch rendering");
         let mut images_batch = vec![];
         let mut isometries_batch = vec![];
+        let mut sizes_batch = vec![];
         for (entity, iso, atlas_image, size) in
             (&entities, &isometries, &atlas_images, &sizes).join()
         {
@@ -316,25 +317,11 @@ impl<'a> System<'a> for RenderingSystem {
                 || nebulas.get(entity).is_some()
                 || _fog_markers.get(entity).is_some()
             {
-                canvas.render_atlas(
-                    &gl,
-                    &viewport,
-                    &mut frame,
-                    &atlas_image,
-                    &iso.0,
-                    size.0,
-                    false,
-                    None,
-                );
                 images_batch.push(*atlas_image);
                 isometries_batch.push(iso.0);
+                sizes_batch.push(size.0);
             }
         }
-        let sprite_batch =
-            SpriteBatch::new(&gl, &images_batch, &isometries_batch);
-        canvas.render_sprite_batch(&gl, &viewport, &mut frame, &sprite_batch);
-        flame::end("background rendering");
-        flame::start("foreground rendering");
         for (iso, atlas_image, size, (), (), (), ()) in (
             &isometries,
             &atlas_images,
@@ -346,18 +333,29 @@ impl<'a> System<'a> for RenderingSystem {
         )
             .join()
         {
-            canvas.render_atlas(
-                &gl,
-                &viewport,
-                &mut frame,
-                &atlas_image,
-                &iso.0,
-                size.0,
-                true,
-                None,
-            )
+            images_batch.push(*atlas_image);
+            isometries_batch.push(iso.0);
+            sizes_batch.push(size.0);
         }
-        flame::end("foreground rendering");
+        // flame::start("animation");
+        for (iso, size, animation) in
+            (&isometries, &sizes, &mut animations).join()
+        {
+            if visible(&*canvas, &iso.0, dims) {
+                let animation_frame = animation.next_frame();
+                if let Some(animation_frame) = animation_frame {
+                    images_batch.push(animation_frame.image);
+                    isometries_batch.push(iso.0);
+                    sizes_batch.push(size.0);
+                };
+            }
+        }
+        // flame::end("animation");
+
+        let sprite_batch =
+        SpriteBatch::new(&gl, &images_batch, &isometries_batch, &sizes_batch);
+        canvas.render_sprite_batch(&gl, &viewport, &mut frame, &sprite_batch, true, None);
+        flame::end("sprite batch rendering");
         flame::start("particles rendering");
         for (entity, particles_data) in (&entities, &mut particles_datas).join()
         {
@@ -532,7 +530,6 @@ impl<'a> System<'a> for RenderingSystem {
             }
         }
         flame::end("asteroids rendering");
-        flame::start("collectables");
         let _render_line = |a: Point2, b: Point2| {
             let line_width = 0.05;
             let line_length = (b.coords - a.coords).norm();
@@ -562,28 +559,6 @@ impl<'a> System<'a> for RenderingSystem {
                 Point3::new(1f32, 1f32, 1f32),
             );
         };
-        flame::end("collectables");
-        flame::start("animation");
-        for (iso, size, animation) in
-            (&isometries, &sizes, &mut animations).join()
-        {
-            if visible(&*canvas, &iso.0, dims) {
-                let animation_frame = animation.next_frame();
-                if let Some(animation_frame) = animation_frame {
-                    canvas.render_atlas(
-                        &gl,
-                        &viewport,
-                        &mut frame,
-                        &animation_frame.image,
-                        &iso.0,
-                        1f32,
-                        false,
-                        None,
-                    )
-                };
-            }
-        }
-        flame::end("animation");
         flame::start("primitives rendering");
         primitives_channel.iter_write(ui.primitives.drain(..));
         sounds_channel.iter_write(ui.sounds.drain(..));
@@ -606,13 +581,15 @@ impl<'a> System<'a> for RenderingSystem {
         telegraph.insert("fps".to_string(), dev_info.fps as f32 / 60.0);
         let rendered_spans = [
             "rendering".to_string(),
-            // "dispatch".to_string(),
-            // "insert".to_string(),
+            "dispatch".to_string(),
+            "insert".to_string(),
             // "asteroids".to_string(),
-            "asteroids rendering".to_string(),
-            "foreground rendering".to_string(),
-            "background rendering".to_string(),
-            "shadow rendering".to_string(),
+            // "asteroids rendering".to_string(),
+            // "foreground rendering".to_string(),
+            // "background rendering".to_string(),
+            // "shadow rendering".to_string(),
+            // "sprite batch rendering".to_string(),
+            // "clear".to_string()
         ];
         if dev_info.draw_telemetry {
             for span in spans.iter() {

@@ -249,6 +249,6 @@ impl<'a> System<'a> for CommonRespawn {
                 entities.delete(entity).unwrap();
             }
         }
-        dbg!((&entities).join().count());
+        // dbg!((&entities).join().count());
     }
 }

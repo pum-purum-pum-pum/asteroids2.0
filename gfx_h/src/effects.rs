@@ -3,60 +3,6 @@
 use super::*;
 use std::time::{Duration, Instant};
 
-pub struct SpriteBatch {
-    pub instancing_data: ImageInstancingData,
-    pub len: usize,
-}
-
-impl SpriteBatch {
-    pub fn new(
-        gl: &red::GL,
-        images: &[AtlasImage],
-        isometries: &[Isometry3],
-    ) -> Self {
-        let image_model = ImageModel::new(gl).expect("failed image model");
-        let regions: Vec<AtlasRegion> = images
-            .iter()
-            .map(|image| AtlasRegion {
-                offset: red::data::f32_f32 {
-                    d0: image.offset.0,
-                    d1: image.offset.1,
-                },
-                fraction_wh: red::data::f32_f32::new(
-                    image.fraction_wh.0,
-                    image.fraction_wh.1,
-                ),
-            })
-            .collect();
-        let isometries: Vec<WorldIsometry> = isometries
-            .iter()
-            .map(|iso| {
-                let pos = iso.translation.vector;
-                let angle = iso.rotation.euler_angles().2;
-                WorldIsometry {
-                    world_position: red::data::f32_f32_f32::new(
-                        pos.x, pos.y, pos.z,
-                    ),
-                    angle: red::data::f32_::new(angle),
-                }
-            })
-            .collect();
-        let regions = AtlasRegionBuffer::new(gl, &regions)
-            .expect("failed to create regions buffer");
-        let isometries = WorldIsometryBuffer::new(gl, &isometries)
-            .expect("failed to create isometries buffer");
-        let instancing_data = ImageInstancingData {
-            image_model,
-            regions,
-            isometries,
-        };
-        SpriteBatch {
-            instancing_data,
-            len: images.len(),
-        }
-    }
-}
-
 pub enum ParticlesData {
     MovementParticles(MovementParticles),
     Explosion(Explosion),

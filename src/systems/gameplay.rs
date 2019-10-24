@@ -44,6 +44,7 @@ impl<'a> System<'a> for GamePlaySystem {
         Write<'a, AppState>,
         WriteExpect<'a, MacroGame>,
         WriteExpect<'a, GlobalParams>,
+        ReadExpect<'a, Arc<Mutex<EventChannel<InsertEvent>>>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -85,6 +86,7 @@ impl<'a> System<'a> for GamePlaySystem {
             mut app_state,
             mut macro_game,
             mut global_params,
+            asteroids_channel
         ) = data;
         info!("asteroids: gameplay started");
         if let Some((shield, life, ship_stats, _character)) =
@@ -178,6 +180,7 @@ impl<'a> System<'a> for GamePlaySystem {
                                 blast.blast_damage,
                             ) {
                                 if is_asteroid {
+                                    let asteroid = entity;
                                     let polygon = polygons.get(entity).unwrap();
                                     asteroid_explode(
                                         Point2::new(position.x, position.y),
@@ -187,12 +190,17 @@ impl<'a> System<'a> for GamePlaySystem {
                                         &preloaded_images,
                                         polygon.max_r,
                                     );
-                                    spawn_asteroids(
-                                        isometry.0,
-                                        polygons.get(entity).unwrap(),
-                                        &mut insert_channel,
-                                        None,
-                                    );
+                                    let iso = isometries.get(asteroid).unwrap().0;
+                                    let poly = polygons.get(asteroid).unwrap().clone();
+                                    let channel_arc = (*asteroids_channel).clone();
+                                    thread::spawn(move || {
+                                        spawn_asteroids(
+                                            iso,
+                                            poly,
+                                            channel_arc,
+                                            None,
+                                        );
+                                    });
                                 }
                                 if is_character {
                                     to_menu(

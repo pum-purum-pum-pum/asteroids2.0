@@ -11,6 +11,11 @@ use nphysics2d::algebra::ForceType;
 use nphysics2d::algebra::Force2;
 use physics::*;
 pub const MENU_VELOCITY: (f32, f32) = (0.0, 0.2);
+pub const FRAME60: f32 = 1f32 / 60f32;
+
+pub fn normalize_60frame(duration: Duration) -> f32 {
+    duration.as_millis() as f32 / 1E3 / FRAME60
+}
 
 #[derive(Default, Clone)]
 pub struct PhysicsSystem;
@@ -31,6 +36,7 @@ impl<'a> System<'a> for PhysicsSystem {
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
         Read<'a, AppState>,
+        WriteExpect<'a, TimeTracker>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -48,8 +54,11 @@ impl<'a> System<'a> for PhysicsSystem {
             mut world,
             mut nebula_grid,
             mut planet_grid,
-            app_state
+            app_state,
+            mut time_tracker,
         ) = data;
+        let time_scaler = normalize_60frame(time_tracker.update());
+        world.set_timestep(PHYSICS_SIMULATION_TIME * time_scaler);
         let (character_position, character_prev_position) = {
             if let Some((character, isometry, _)) = (&entities, &isometries, &character_markers).join().next() {
                 let body = world

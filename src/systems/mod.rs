@@ -1,4 +1,6 @@
 use std::mem::swap;
+use std::thread;
+use std::sync::{Arc, Mutex};
 
 use common::*;
 use rand::prelude::*;
@@ -36,6 +38,7 @@ mod rendering;
 mod score_table;
 mod sound_system;
 mod upgrade_ui;
+mod destroy_sync;
 
 pub use ai::*;
 pub use collision::*;
@@ -52,6 +55,7 @@ pub use rendering::*;
 pub use score_table::*;
 pub use sound_system::*;
 pub use upgrade_ui::*;
+pub use destroy_sync::*;
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const VELOCITY_MAX: f32 = 1f32;
@@ -152,10 +156,16 @@ fn get_collision_groups(kind: EntityType) -> CollisionGroups {
     }
 }
 
-pub fn spawn_asteroids<'a>(
+pub fn calculate_shards(
+
+) {
+
+}
+
+pub fn spawn_asteroids(
     isometry: Isometry3,
-    polygon: &Polygon,
-    insert_channel: &mut Write<'a, EventChannel<InsertEvent>>,
+    polygon: Polygon,
+    mut insert_channel: Arc<Mutex<EventChannel<InsertEvent>>>,
     bullet_position: Option<Point2>,
 ) {
     flame::start("asteroids");
@@ -181,36 +191,36 @@ pub fn spawn_asteroids<'a>(
                 polygon: poly.clone(),
                 spin: rng.gen_range(-1E-2, 1E-2),
             };
-            insert_channel.single_write(insert_event);
+            insert_channel.lock().unwrap().single_write(insert_event);
         }
     } else {
         // spawn coins and stuff
         let spawn_position = Point2::new(position.x, position.y);
         if rng.gen_range(0.0, 1.0) < 0.1 {
-            insert_channel.single_write(InsertEvent::Health {
+            insert_channel.lock().unwrap().single_write(InsertEvent::Health {
                 value: 100,
                 position: spawn_position,
             })
         }
 
         if rng.gen_range(0.0, 1.0) < 0.1 {
-            insert_channel.single_write(InsertEvent::Coin {
+            insert_channel.lock().unwrap().single_write(InsertEvent::Coin {
                 value: 1,
                 position: spawn_position,
             });
         }
         if rng.gen_range(0.0, 1.0) < 0.05 {
-            insert_channel.single_write(InsertEvent::SideBulletCollectable {
+            insert_channel.lock().unwrap().single_write(InsertEvent::SideBulletCollectable {
                 position: spawn_position,
             });
         }
         if rng.gen_range(0.0, 1.0) < 0.02 {
-            insert_channel.single_write(InsertEvent::DoubleCoinsCollectable {
+            insert_channel.lock().unwrap().single_write(InsertEvent::DoubleCoinsCollectable {
                 position: spawn_position,
             });
         }
         if rng.gen_range(0.0, 1.0) < 0.02 {
-            insert_channel.single_write(InsertEvent::DoubleExpCollectable {
+            insert_channel.lock().unwrap().single_write(InsertEvent::DoubleExpCollectable {
                 position: spawn_position,
             });
         }

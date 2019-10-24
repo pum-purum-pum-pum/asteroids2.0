@@ -28,6 +28,25 @@ pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
+pub struct TimeTracker {
+    timestamp: Instant,
+}
+
+impl TimeTracker {
+    pub fn new() -> Self {
+        TimeTracker {
+            timestamp: Instant::now()
+        }
+    }
+
+    pub fn update(&mut self) -> Duration {
+        let now = Instant::now();
+        let res = now - self.timestamp;
+        self.timestamp = now;
+        res
+    }
+}
+
 pub struct DevInfo {
     pub fps: usize,
     current_count: usize,

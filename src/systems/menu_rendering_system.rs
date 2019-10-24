@@ -51,8 +51,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
             preloaded_sounds,
         ) = data;
         let mut frame = red::Frame::new(&gl);
-        frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
-        frame.clear_color();
+        // frame.set_clear_color(0.0, 0.0, 0.0, 1.0);
+        // frame.clear_color();
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         // return;
@@ -295,17 +295,6 @@ impl<'a> System<'a> for MenuRenderingSystem {
         if score_table_button.place_and_check(&mut ui, &*mouse) {
             *app_state = AppState::ScoreTable;
         }
-        menu_particles.update(0.5);
-        canvas.render_instancing(
-            &gl,
-            &viewport,
-            &mut frame,
-            &menu_particles.instancing_data,
-            &Isometry3::new(
-                Vector3::new(0f32, 0f32, 0f32),
-                Vector3::new(0f32, 0f32, 0f32),
-            ),
-        );
         let button_w = button_w / 2.0;
         let button_h = button_w;
         let button = Button::new(

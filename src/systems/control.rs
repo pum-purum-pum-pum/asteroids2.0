@@ -52,6 +52,7 @@ impl<'a> System<'a> for ControlSystem {
         Write<'a, Progress>,
         WriteExpect<'a, MacroGame>,
         WriteExpect<'a, DevInfo>,
+        ReadExpect<'a, Arc<Mutex<EventChannel<InsertEvent>>>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -85,6 +86,7 @@ impl<'a> System<'a> for ControlSystem {
             mut progress,
             mut macro_game,
             mut dev_info,
+            asteroids_channel
         ) = data;
         info!("asteroids: started control system");
         let (ship_stats, _) = if let Some(value) =
@@ -192,12 +194,17 @@ impl<'a> System<'a> for ControlSystem {
                                             &preloaded_images,
                                             polygon.max_r,
                                         );
-                                        spawn_asteroids(
-                                            explosion_isometry,
-                                            polygons.get(asteroid).unwrap(),
-                                            &mut insert_channel,
-                                            None,
-                                        );
+                                        let iso = isometries.get(asteroid).unwrap().0;
+                                        let poly = polygons.get(asteroid).unwrap().clone();
+                                        let channel_arc = (*asteroids_channel).clone();
+                                        thread::spawn(move || {
+                                            spawn_asteroids(
+                                                iso,
+                                                poly,
+                                                channel_arc,
+                                                None,
+                                            );
+                                        });
                                     } else {
                                         let target_position = isometries
                                             .get(*target_entity)
