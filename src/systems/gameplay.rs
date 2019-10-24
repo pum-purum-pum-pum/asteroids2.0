@@ -126,23 +126,29 @@ impl<'a> System<'a> for GamePlaySystem {
         let char_isometry = char_isometry.clone(); // to avoid borrow
         let pos3d = char_isometry.0.translation.vector;
         let character_position = Point2::new(pos3d.x, pos3d.y);
-        { // player trace
+        {
+            // player trace
             let mut transparent_basic = preloaded_images.basic_ship;
             transparent_basic.transparency = 0.1;
             let trace = entities.create();
             lazy_update.insert(trace, *sizes.get(char_entity).unwrap());
             lazy_update.insert(trace, transparent_basic);
             lazy_update.insert(trace, char_isometry);
-            lazy_update.insert(trace, Lifetime::new(Duration::from_millis(300)));
+            lazy_update
+                .insert(trace, Lifetime::new(Duration::from_millis(300)));
             // let transparent_projectile = ;
-            for (entity, iso, projectile, bullet_image, size) in (&entities, &isometries, &projectiles, &atlas_images, &sizes).join() {
+            for (entity, iso, projectile, bullet_image, size) in
+                (&entities, &isometries, &projectiles, &atlas_images, &sizes)
+                    .join()
+            {
                 let mut transparent_bullet = bullet_image.clone();
                 transparent_bullet.transparency = 0.1;
                 let trace = entities.create();
                 lazy_update.insert(trace, *size);
                 lazy_update.insert(trace, transparent_bullet);
                 lazy_update.insert(trace, iso.clone());
-                lazy_update.insert(trace, Lifetime::new(Duration::from_millis(300)));
+                lazy_update
+                    .insert(trace, Lifetime::new(Duration::from_millis(300)));
             }
         }
         for (entity, lifetime) in (&entities, &mut lifetimes).join() {

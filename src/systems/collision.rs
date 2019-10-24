@@ -280,7 +280,9 @@ impl<'a> System<'a> for CollisionSystem {
                             &mut global_params,
                             Point2::new(position.x, position.y),
                             Point2::new(position.x, position.y),
-                            (ASTEROID_DAMAGE as f32 * sizes.get(asteroid).unwrap().0) as usize,
+                            (ASTEROID_DAMAGE as f32
+                                * sizes.get(asteroid).unwrap().0)
+                                as usize,
                             false,
                         );
                         global_params.damaged(DAMAGED_RED);
