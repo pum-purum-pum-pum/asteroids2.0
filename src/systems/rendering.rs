@@ -177,6 +177,7 @@ impl<'a> System<'a> for RenderingSystem {
         WriteExpect<'a, GlobalParams>,
         ReadExpect<'a, DevInfo>,
         Write<'a, EventChannel<Sound>>,
+        ReadExpect<'a, PreloadedImages>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -220,6 +221,7 @@ impl<'a> System<'a> for RenderingSystem {
             mut global_params,
             dev_info,
             mut sounds_channel,
+            preloaded_images,
         ) = data;
         let dims = viewport.dimensions();
         flame::start("rendering");
@@ -350,11 +352,27 @@ impl<'a> System<'a> for RenderingSystem {
                 };
             }
         }
-        // flame::end("animation");
-
-        let sprite_batch =
-        SpriteBatch::new(&gl, &images_batch, &isometries_batch, &sizes_batch);
-        canvas.render_sprite_batch(&gl, &viewport, &mut frame, &sprite_batch, true, None);
+        // mouse
+        let cursor_iso = Isometry::new(mouse.x, mouse.y, 0f32);
+        let cursor_image = preloaded_images.cursor;
+        let cursor_size = 0.5f32;
+        images_batch.push(cursor_image);
+        isometries_batch.push(cursor_iso.0);
+        sizes_batch.push(cursor_size);
+        let sprite_batch = SpriteBatch::new(
+            &gl,
+            &images_batch,
+            &isometries_batch,
+            &sizes_batch,
+        );
+        canvas.render_sprite_batch(
+            &gl,
+            &viewport,
+            &mut frame,
+            &sprite_batch,
+            true,
+            None,
+        );
         flame::end("sprite batch rendering");
         flame::start("particles rendering");
         for (entity, particles_data) in (&entities, &mut particles_datas).join()

@@ -15,9 +15,9 @@ use crate::gui::{Primitive, UI};
 use crate::setup::*;
 use crate::systems::{
     AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen,
-    GUISystem, GamePlaySystem, InsertSystem, KinematicSystem,
+    DestroySync, GUISystem, GamePlaySystem, InsertSystem, KinematicSystem,
     MenuRenderingSystem, RenderingSystem, ScoreTableRendering, SoundSystem,
-    UpgradeGUI, DestroySync
+    UpgradeGUI,
 };
 use common::*;
 use components::*;
@@ -71,7 +71,8 @@ pub fn run() -> Result<(), String> {
     let preloaded_particles = PreloadedParticles {
         movement: movement_particles_entity,
     };
-    let destroy_sync = DestroySync::new(asteroids_spawn_channel.register_reader());
+    let destroy_sync =
+        DestroySync::new(asteroids_spawn_channel.register_reader());
     specs_world.add_resource(Arc::new(Mutex::new(asteroids_spawn_channel)));
     let physics_system = PhysicsSystem::default();
     let insert_system = InsertSystem::new(insert_channel.register_reader());

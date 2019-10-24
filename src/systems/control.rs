@@ -86,7 +86,7 @@ impl<'a> System<'a> for ControlSystem {
             mut progress,
             mut macro_game,
             mut dev_info,
-            asteroids_channel
+            asteroids_channel,
         ) = data;
         info!("asteroids: started control system");
         let (ship_stats, _) = if let Some(value) =
@@ -194,9 +194,14 @@ impl<'a> System<'a> for ControlSystem {
                                             &preloaded_images,
                                             polygon.max_r,
                                         );
-                                        let iso = isometries.get(asteroid).unwrap().0;
-                                        let poly = polygons.get(asteroid).unwrap().clone();
-                                        let channel_arc = (*asteroids_channel).clone();
+                                        let iso =
+                                            isometries.get(asteroid).unwrap().0;
+                                        let poly = polygons
+                                            .get(asteroid)
+                                            .unwrap()
+                                            .clone();
+                                        let channel_arc =
+                                            (*asteroids_channel).clone();
                                         thread::spawn(move || {
                                             spawn_asteroids(
                                                 iso,

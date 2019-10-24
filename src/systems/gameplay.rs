@@ -29,6 +29,8 @@ impl<'a> System<'a> for GamePlaySystem {
             ReadStorage<'a, DoubleCoinsCollectable>,
             ReadStorage<'a, DoubleExpCollectable>,
             ReadStorage<'a, CollectableMarker>,
+            ReadStorage<'a, AtlasImage>,
+            ReadStorage<'a, Size>,
         ),
         ReadStorage<'a, Projectile>,
         ReadExpect<'a, PreloadedImages>,
@@ -45,6 +47,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteExpect<'a, MacroGame>,
         WriteExpect<'a, GlobalParams>,
         ReadExpect<'a, Arc<Mutex<EventChannel<InsertEvent>>>>,
+        Read<'a, LazyUpdate>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -71,6 +74,8 @@ impl<'a> System<'a> for GamePlaySystem {
                 double_coins_collectable,
                 double_exp_collectable,
                 collectables,
+                atlas_images,
+                sizes,
             ),
             projectiles,
             preloaded_images,
@@ -86,7 +91,8 @@ impl<'a> System<'a> for GamePlaySystem {
             mut app_state,
             mut macro_game,
             mut global_params,
-            asteroids_channel
+            asteroids_channel,
+            lazy_update,
         ) = data;
         info!("asteroids: gameplay started");
         if let Some((shield, life, ship_stats, _character)) =
@@ -120,6 +126,25 @@ impl<'a> System<'a> for GamePlaySystem {
         let char_isometry = char_isometry.clone(); // to avoid borrow
         let pos3d = char_isometry.0.translation.vector;
         let character_position = Point2::new(pos3d.x, pos3d.y);
+        { // player trace
+            let mut transparent_basic = preloaded_images.basic_ship;
+            transparent_basic.transparency = 0.1;
+            let trace = entities.create();
+            lazy_update.insert(trace, *sizes.get(char_entity).unwrap());
+            lazy_update.insert(trace, transparent_basic);
+            lazy_update.insert(trace, char_isometry);
+            lazy_update.insert(trace, Lifetime::new(Duration::from_millis(300)));
+            // let transparent_projectile = ;
+            for (entity, iso, projectile, bullet_image, size) in (&entities, &isometries, &projectiles, &atlas_images, &sizes).join() {
+                let mut transparent_bullet = bullet_image.clone();
+                transparent_bullet.transparency = 0.1;
+                let trace = entities.create();
+                lazy_update.insert(trace, *size);
+                lazy_update.insert(trace, transparent_bullet);
+                lazy_update.insert(trace, iso.clone());
+                lazy_update.insert(trace, Lifetime::new(Duration::from_millis(300)));
+            }
+        }
         for (entity, lifetime) in (&entities, &mut lifetimes).join() {
             if lifetime.delete() {
                 if side_bullet_ability.get(entity).is_some() {
@@ -190,9 +215,12 @@ impl<'a> System<'a> for GamePlaySystem {
                                         &preloaded_images,
                                         polygon.max_r,
                                     );
-                                    let iso = isometries.get(asteroid).unwrap().0;
-                                    let poly = polygons.get(asteroid).unwrap().clone();
-                                    let channel_arc = (*asteroids_channel).clone();
+                                    let iso =
+                                        isometries.get(asteroid).unwrap().0;
+                                    let poly =
+                                        polygons.get(asteroid).unwrap().clone();
+                                    let channel_arc =
+                                        (*asteroids_channel).clone();
                                     thread::spawn(move || {
                                         spawn_asteroids(
                                             iso,

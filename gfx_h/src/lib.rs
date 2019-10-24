@@ -166,6 +166,8 @@ pub struct AtlasRegion {
     pub fraction_wh: red::data::f32_f32,
     #[divisor = "1"]
     pub dim_scales: red::data::f32_f32,
+    #[divisor = "1"]
+    pub transparency: red::data::f32_,
 }
 
 pub struct ImageInstancingData {
@@ -197,11 +199,13 @@ pub struct AtlasImage {
     offset: (f32, f32),
     fraction_wh: (f32, f32),
     dim_scales: (f32, f32),
+    pub transparency: f32,
 }
 
 pub fn load_atlas_image(
     image_name: &str,
     atlas: &SerializedSpriteSheet,
+    transparency: f32,
 ) -> Option<AtlasImage> {
     if let Some(sprite) = atlas.sprites.get(image_name) {
         let offset = (
@@ -219,6 +223,7 @@ pub fn load_atlas_image(
             dim_scales: dimensions,
             fraction_wh,
             offset,
+            transparency,
         })
     } else {
         None
@@ -226,7 +231,11 @@ pub fn load_atlas_image(
 }
 
 impl AtlasImage {
-    pub fn new(image_name: &str, atlas: &SerializedSpriteSheet) -> Self {
+    pub fn new(
+        image_name: &str,
+        atlas: &SerializedSpriteSheet,
+        transparency: f32,
+    ) -> Self {
         let sprite = atlas.sprites[image_name].clone();
         let offset = (
             sprite.x / atlas.texture_width,
@@ -243,6 +252,7 @@ impl AtlasImage {
             dim_scales: dimensions,
             fraction_wh,
             offset,
+            transparency,
         }
     }
 }
@@ -920,7 +930,7 @@ impl Canvas {
         program.set_uniform("perspective", perspective);
         // program.set_uniform("dim_scales", atlas_image.dim_scales);
         program.set_uniform("tex", self.atlas.clone()); // this is just shallow copy if idx
-        // program.set_uniform("scale", 1.0);
+                                                        // program.set_uniform("scale", 1.0);
         program.set_layout(
             &gl,
             vao,
@@ -1196,7 +1206,8 @@ impl SpriteBatch {
                 dim_scales: red::data::f32_f32::new(
                     image.dim_scales.0,
                     image.dim_scales.1,
-                )
+                ),
+                transparency: red::data::f32_::new(image.transparency),
             })
             .collect();
         let isometries: Vec<WorldIsometry> = isometries
@@ -1210,7 +1221,7 @@ impl SpriteBatch {
                         pos.x, pos.y, pos.z,
                     ),
                     angle: red::data::f32_::new(angle),
-                    scale: red::data::f32_::new(*size)
+                    scale: red::data::f32_::new(*size),
                 }
             })
             .collect();

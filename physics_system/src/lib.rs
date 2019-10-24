@@ -6,7 +6,7 @@ use std::time::{Instant, Duration};
 use specs::prelude::*;
 use specs::Join;
 use nphysics2d::world::World;
-use nphysics2d::object::{Body, BodyStatus, BodyHandle};
+use nphysics2d::object::{Body};
 use nphysics2d::algebra::ForceType;
 use nphysics2d::algebra::Force2;
 use physics::*;

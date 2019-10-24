@@ -35,7 +35,7 @@ pub struct TimeTracker {
 impl TimeTracker {
     pub fn new() -> Self {
         TimeTracker {
-            timestamp: Instant::now()
+            timestamp: Instant::now(),
         }
     }
 
@@ -573,6 +573,7 @@ pub struct PreloadedImages {
     pub blast: Animation,
     pub bullet_contact: Animation,
     pub locked: AtlasImage,
+    pub cursor: AtlasImage,
 }
 
 pub struct PreloadedParticles {
@@ -630,10 +631,13 @@ pub type Touches = [Option<Finger>; FINGER_NUMBER];
 
 #[derive(Default, Debug)]
 pub struct Mouse {
+    // normalized coordinates
     pub x01: f32,
     pub y01: f32,
+    // projecteid in orthogonal perspective
     pub o_x: f32,
     pub o_y: f32,
+    // projected with regular perspective
     pub x: f32,
     pub y: f32,
     pub left_released: bool,

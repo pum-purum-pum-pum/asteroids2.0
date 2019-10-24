@@ -408,7 +408,7 @@ impl Polygon {
     }
 
     pub fn deconstruct(&self, bullet: Point2, sites: usize) -> Vec<Polygon> {
-        if self.min_r < 0.8 {
+        if self.min_r < 0.7 {
             return vec![];
         }
         let mut transofrmed_points = self.points.clone();
@@ -438,25 +438,6 @@ impl Polygon {
             res.push(Polygon::new(poly.to_vec()));
         }
         res
-        // polys.iter().map(|poly |Polygon::new(poly.to_vec())).collect()
-        // let mut res = vec![];
-        // if self.points.len() == 3 {
-        //     return vec![self.clone()];
-        // }
-        // // dummy destruct for now
-        // let triangulation = self.triangulate();
-        // let points = triangulation.points;
-        // let indicies = triangulation.indicies;
-        // let mut i = 0usize;
-        // while i < indicies.len() {
-        //     res.push(Polygon::new(vec![
-        //         points[indicies[i] as usize],
-        //         points[indicies[i + 1] as usize],
-        //         points[indicies[i + 2] as usize],
-        //     ]));
-        //     i += 3;
-        // }
-        // res
     }
 }
 

@@ -1,6 +1,8 @@
 use super::*;
 use log::info;
 
+const ASTEROID_DAMAGE: usize = 150usize;
+
 fn reflect_bullet(
     projectile: specs::Entity,
     physics_components: &ReadStorage<PhysicsComponent>,
@@ -118,6 +120,7 @@ impl<'a> System<'a> for CollisionSystem {
         WriteStorage<'a, Lifetime>,
         ReadStorage<'a, Damage>,
         WriteStorage<'a, Polygon>,
+        ReadStorage<'a, Size>,
         Write<'a, World<f32>>,
         Read<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
@@ -147,6 +150,7 @@ impl<'a> System<'a> for CollisionSystem {
             mut lifetimes,
             damages,
             polygons,
+            sizes,
             mut world,
             bodies_map,
             mut insert_channel,
@@ -276,9 +280,10 @@ impl<'a> System<'a> for CollisionSystem {
                             &mut global_params,
                             Point2::new(position.x, position.y),
                             Point2::new(position.x, position.y),
-                            3usize,
+                            (ASTEROID_DAMAGE as f32 * sizes.get(asteroid).unwrap().0) as usize,
                             false,
                         );
+                        global_params.damaged(DAMAGED_RED);
                     }
                 }
                 if asteroid_explosion {
