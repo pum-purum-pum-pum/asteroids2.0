@@ -520,7 +520,7 @@
                 max_shield: 0,
                 damage: 10
             ),
-            size: 0.4,
+            size: 0.8,
             image_name: "bomberman",
         )
     ],

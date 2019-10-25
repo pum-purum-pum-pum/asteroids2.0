@@ -57,7 +57,11 @@ impl<'a> System<'a> for PhysicsSystem {
             app_state,
             mut time_tracker,
         ) = data;
-        let time_scaler = normalize_60frame(time_tracker.update());
+        let mut time_scaler = normalize_60frame(time_tracker.update());
+        // kludge to avoid big gaps (like running system after stopped physics world in menu)
+        if time_scaler > 50.0 * FRAME60 {
+            time_scaler = 1.0;
+        }
         world.set_timestep(PHYSICS_SIMULATION_TIME * time_scaler);
         let (character_position, character_prev_position) = {
             if let Some((character, isometry, _)) = (&entities, &isometries, &character_markers).join().next() {
