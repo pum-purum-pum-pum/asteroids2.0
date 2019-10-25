@@ -310,22 +310,66 @@ impl<'a> System<'a> for RenderingSystem {
             flame::end("shadow rendering");
         };
         flame::start("sprite batch rendering");
-        let mut images_batch = vec![];
-        let mut isometries_batch = vec![];
-        let mut sizes_batch = vec![];
+        // struct to store batch data(needed to do z sorting)
+        pub struct MiniBatch {
+            pub images: Vec<AtlasImage>,
+            pub isometries: Vec<Isometry3>,
+            pub sizes: Vec<f32>
+        }
+
+        impl MiniBatch {
+            pub fn new() -> Self {
+                // TODO: with capacity
+                Self {
+                    images: vec![],
+                    isometries: vec![],
+                    sizes: vec![]
+                }
+            }
+
+            pub fn append(
+                &mut self,
+                image: AtlasImage, 
+                isometry: Isometry3, 
+                size: f32
+            ) {
+                self.images.push(image);
+                self.isometries.push(isometry);
+                self.sizes.push(size);
+            }
+
+            pub fn extend(&mut self, other: MiniBatch) {
+                self.images.extend(other.images.iter());
+                self.isometries.extend(other.isometries.iter());
+                self.sizes.extend(other.sizes.iter());
+            }
+        }
+        let mut all_batch = MiniBatch::new();
+        let mut stars_batch = MiniBatch::new();
+        let mut nebulas_batch = MiniBatch::new();
+        let mut planets_batch = MiniBatch::new();
+        let mut fog_batch = MiniBatch::new();
         for (entity, iso, atlas_image, size) in
             (&entities, &isometries, &atlas_images, &sizes).join()
         {
-            if planets.get(entity).is_some()
-                || stars.get(entity).is_some()
-                || nebulas.get(entity).is_some()
-                || _fog_markers.get(entity).is_some()
-            {
-                images_batch.push(*atlas_image);
-                isometries_batch.push(iso.0);
-                sizes_batch.push(size.0);
+            if stars.get(entity).is_some() {
+                stars_batch.append(*atlas_image, iso.0, size.0);
+            }
+            if nebulas.get(entity).is_some() {
+                nebulas_batch.append(*atlas_image, iso.0, size.0);
+            }
+
+            if planets.get(entity).is_some() {
+                planets_batch.append(*atlas_image, iso.0, size.0);
+            }            
+            if _fog_markers.get(entity).is_some() {
+                fog_batch.append(*atlas_image, iso.0, size.0)
             }
         }
+        all_batch.extend(stars_batch);
+        all_batch.extend(nebulas_batch);
+        all_batch.extend(planets_batch);
+        all_batch.extend(fog_batch);
         for (entity, iso, atlas_image, size, (), (), (), ()) in (
             &entities,
             &isometries,
@@ -345,9 +389,7 @@ impl<'a> System<'a> for RenderingSystem {
                 0f32
             };
             image.color = (1f32, 1f32, 1f32, intensity);
-            images_batch.push(image);
-            isometries_batch.push(iso.0);
-            sizes_batch.push(size.0);
+            all_batch.append(image, iso.0, size.0);
         }
         // flame::start("animation");
         for (iso, size, animation) in
@@ -356,9 +398,7 @@ impl<'a> System<'a> for RenderingSystem {
             if visible(&*canvas, &iso.0, dims) {
                 let animation_frame = animation.next_frame();
                 if let Some(animation_frame) = animation_frame {
-                    images_batch.push(animation_frame.image);
-                    isometries_batch.push(iso.0);
-                    sizes_batch.push(size.0);
+                    all_batch.append(animation_frame.image, iso.0, size.0);
                 };
             }
         }
@@ -367,10 +407,8 @@ impl<'a> System<'a> for RenderingSystem {
             let cursor_iso = Isometry::new(mouse.x, mouse.y, 0f32);
             let cursor_image = preloaded_images.cursor;
             let cursor_size = 0.5f32;
-            images_batch.push(cursor_image);
-            isometries_batch.push(cursor_iso.0);
             let cursor_scale = if mouse.left { 1f32 } else { 2f32 };
-            sizes_batch.push(cursor_size * cursor_scale);
+            all_batch.append(cursor_image, cursor_iso.0, cursor_size * cursor_scale);
         }
         // speed glow
         {
@@ -379,16 +417,14 @@ impl<'a> System<'a> for RenderingSystem {
             {
                 let mut glow_image = preloaded_images.basic_ship;
                 glow_image.transparency = vel.0.norm().min(1f32);
-                images_batch.push(glow_image);
-                isometries_batch.push(iso.0);
-                sizes_batch.push(1f32);
+                all_batch.append(glow_image, iso.0, 1f32);
             }
         }
         let sprite_batch = SpriteBatch::new(
             &gl,
-            &images_batch,
-            &isometries_batch,
-            &sizes_batch,
+            &all_batch.images,
+            &all_batch.isometries,
+            &all_batch.sizes
         );
         canvas.render_sprite_batch(
             &gl,
