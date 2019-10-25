@@ -20,6 +20,7 @@ impl<'a> System<'a> for GamePlaySystem {
             WriteStorage<'a, Polygon>,
             WriteStorage<'a, Shield>,
             WriteStorage<'a, Lifes>,
+            WriteStorage<'a, DamageFlash>,
             ReadStorage<'a, ShipStats>,
             ReadStorage<'a, Coin>,
             ReadStorage<'a, Exp>,
@@ -65,6 +66,7 @@ impl<'a> System<'a> for GamePlaySystem {
                 polygons,
                 mut shields,
                 mut lifes,
+                mut flashes,
                 ships_stats,
                 coins,
                 exps,
@@ -95,6 +97,9 @@ impl<'a> System<'a> for GamePlaySystem {
             lazy_update,
         ) = data;
         info!("asteroids: gameplay started");
+        for flash in (&mut flashes).join() {
+            flash.0 /= 1.2f32;
+        }
         if let Some((shield, life, ship_stats, _character)) =
             (&mut shields, &mut lifes, &ships_stats, &character_markers)
                 .join()

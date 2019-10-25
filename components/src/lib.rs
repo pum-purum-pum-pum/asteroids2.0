@@ -465,6 +465,10 @@ impl Gun for Charge {
     }
 }
 
+// used to add white color for entities that were damaged
+#[derive(Component, Debug, Clone, Copy)]
+pub struct DamageFlash(pub f32);
+
 #[derive(Component, Debug, Clone, Copy)]
 pub struct Size(pub f32);
 

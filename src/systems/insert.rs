@@ -375,6 +375,7 @@ impl<'a> System<'a> for InsertSystem {
                         lazy_update.insert(enemy, Spin::default());
                         lazy_update.insert(enemy, enemy_shape);
                         lazy_update.insert(enemy, Size(size));
+                        lazy_update.insert(enemy, DamageFlash(0f32));
                         PhysicsComponent::safe_insert(
                             &mut physics,
                             enemy,

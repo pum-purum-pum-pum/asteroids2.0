@@ -168,6 +168,9 @@ pub struct AtlasRegion {
     pub dim_scales: red::data::f32_f32,
     #[divisor = "1"]
     pub transparency: red::data::f32_,
+    // r, g, b, intensity
+    #[divisor = "1"]
+    pub color: red::data::f32_f32_f32_f32,
 }
 
 pub struct ImageInstancingData {
@@ -200,6 +203,8 @@ pub struct AtlasImage {
     fraction_wh: (f32, f32),
     dim_scales: (f32, f32),
     pub transparency: f32,
+    // r, g, b, intensity
+    pub color: (f32, f32, f32, f32),
 }
 
 pub fn load_atlas_image(
@@ -224,6 +229,7 @@ pub fn load_atlas_image(
             fraction_wh,
             offset,
             transparency,
+            color: (0f32, 0f32, 0f32, 0f32),
         })
     } else {
         None
@@ -235,6 +241,7 @@ impl AtlasImage {
         image_name: &str,
         atlas: &SerializedSpriteSheet,
         transparency: f32,
+        color: (f32, f32, f32, f32),
     ) -> Self {
         let sprite = atlas.sprites[image_name].clone();
         let offset = (
@@ -253,6 +260,7 @@ impl AtlasImage {
             fraction_wh,
             offset,
             transparency,
+            color,
         }
     }
 }
@@ -1208,6 +1216,12 @@ impl SpriteBatch {
                     image.dim_scales.1,
                 ),
                 transparency: red::data::f32_::new(image.transparency),
+                color: red::data::f32_f32_f32_f32(
+                    image.color.0,
+                    image.color.1,
+                    image.color.2,
+                    image.color.3,
+                ),
             })
             .collect();
         let isometries: Vec<WorldIsometry> = isometries

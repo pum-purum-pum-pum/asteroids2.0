@@ -163,6 +163,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Chain>,
             ReadStorage<'a, Rift>,
             ReadStorage<'a, ThreadPin<GeometryData>>,
+            ReadStorage<'a, DamageFlash>,
         ),
         WriteExpect<'a, TeleGraph>,
         Read<'a, Mouse>,
@@ -207,6 +208,7 @@ impl<'a> System<'a> for RenderingSystem {
                 _chains,
                 rifts,
                 geom_datas,
+                damage_flash,
             ),
             mut telegraph,
             mouse,
@@ -324,7 +326,8 @@ impl<'a> System<'a> for RenderingSystem {
                 sizes_batch.push(size.0);
             }
         }
-        for (iso, atlas_image, size, (), (), (), ()) in (
+        for (entity, iso, atlas_image, size, (), (), (), ()) in (
+            &entities,
             &isometries,
             &atlas_images,
             &sizes,
@@ -335,7 +338,14 @@ impl<'a> System<'a> for RenderingSystem {
         )
             .join()
         {
-            images_batch.push(*atlas_image);
+            let mut image = *atlas_image;
+            let intensity = if let Some(flash) = damage_flash.get(entity) {
+                flash.0
+            } else {
+                0f32
+            };
+            image.color = (1f32, 1f32, 1f32, intensity);
+            images_batch.push(image);
             isometries_batch.push(iso.0);
             sizes_batch.push(size.0);
         }
@@ -352,13 +362,28 @@ impl<'a> System<'a> for RenderingSystem {
                 };
             }
         }
-        // mouse
-        let cursor_iso = Isometry::new(mouse.x, mouse.y, 0f32);
-        let cursor_image = preloaded_images.cursor;
-        let cursor_size = 0.5f32;
-        images_batch.push(cursor_image);
-        isometries_batch.push(cursor_iso.0);
-        sizes_batch.push(cursor_size);
+        // cursor image
+        {
+            let cursor_iso = Isometry::new(mouse.x, mouse.y, 0f32);
+            let cursor_image = preloaded_images.cursor;
+            let cursor_size = 0.5f32;
+            images_batch.push(cursor_image);
+            isometries_batch.push(cursor_iso.0);
+            let cursor_scale = if mouse.left { 1f32 } else { 2f32 };
+            sizes_batch.push(cursor_size * cursor_scale);
+        }
+        // speed glow
+        {
+            if let Some((iso, vel, _char_marker)) =
+                (&isometries, &velocities, &character_markers).join().next()
+            {
+                let mut glow_image = preloaded_images.basic_ship;
+                glow_image.transparency = vel.0.norm().min(1f32);
+                images_batch.push(glow_image);
+                isometries_batch.push(iso.0);
+                sizes_batch.push(1f32);
+            }
+        }
         let sprite_batch = SpriteBatch::new(
             &gl,
             &images_batch,

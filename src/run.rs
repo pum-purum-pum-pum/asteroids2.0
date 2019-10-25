@@ -43,6 +43,8 @@ pub fn run() -> Result<(), String> {
     // We need to own _gl_context to avoid RAII crazyness
     let (context, sdl_context, render_loop, _gl_context, hdpi, canvas) =
         setup_gfx(&mut specs_world)?;
+    // Hide the cursor
+    sdl_context.mouse().show_cursor(false);
     setup_text(&context, &mut specs_world);
     let atlas = read_atlas("assets/out.ron");
     let name_to_atlas = setup_images(&atlas);

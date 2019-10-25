@@ -121,6 +121,7 @@ impl<'a> System<'a> for CollisionSystem {
         ReadStorage<'a, Damage>,
         WriteStorage<'a, Polygon>,
         ReadStorage<'a, Size>,
+        WriteStorage<'a, DamageFlash>,
         Write<'a, World<f32>>,
         Read<'a, BodiesMap>,
         Write<'a, EventChannel<InsertEvent>>,
@@ -151,6 +152,7 @@ impl<'a> System<'a> for CollisionSystem {
             damages,
             polygons,
             sizes,
+            mut flashes,
             mut world,
             bodies_map,
             mut insert_channel,
@@ -285,7 +287,14 @@ impl<'a> System<'a> for CollisionSystem {
                                 as usize,
                             false,
                         );
-                        global_params.damaged(DAMAGED_RED);
+                        bullet_contact(
+                            Point2::new(position.x, position.y),
+                            &mut insert_channel,
+                            &mut sounds_channel,
+                            &preloaded_sounds,
+                            &preloaded_images,
+                        );
+                        global_params.damaged(2.0 * DAMAGED_RED);
                     }
                 }
                 if asteroid_explosion {
@@ -331,6 +340,9 @@ impl<'a> System<'a> for CollisionSystem {
                 let projectile_pos =
                     Point2::new(projectile_pos.x, projectile_pos.y);
                 let position = isometry.translation.vector;
+                if let Some(flash) = flashes.get_mut(ship) {
+                    flash.0 = (flash.0 + 0.5).min(1f32);
+                }
                 damage_ship(
                     character_markers.get(ship).is_some(),
                     ship,

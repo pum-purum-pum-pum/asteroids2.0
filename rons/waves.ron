@@ -3,7 +3,7 @@
 		(
 			distribution: [
 				("kamikadzer", 0.5),
-				("bomberman", 0.5),
+				//("bomberman", 0.5),
 			],
 			ships_number: 6,
 			const_distribution : [
@@ -12,6 +12,7 @@
 				//("rift", 5),
 				//("rotship", 1),
 				//("reflect_bullet_enemy", 1),
+				//("chains", 2),
 				("lazer_boss", 2)
 			],
 			iterations: 1
