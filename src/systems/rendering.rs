@@ -1,6 +1,7 @@
 pub use crate::gui::{Button, Picture, Rectangle, Selector};
-use gfx_h::SpriteBatch;
-use gfx_h::{unproject_with_z, RenderMode, TextData};
+use gfx_h::{
+    unproject_with_z, RenderMode, SpriteBatch, TextData, WorldTextData,
+};
 use num_enum::TryFromPrimitive;
 use telemetry::{render_plot, TeleGraph};
 
@@ -62,9 +63,13 @@ pub fn render_primitives<'a>(
     viewport: &ReadExpect<'a, red::Viewport>,
     primitives_channel: &mut Write<'a, EventChannel<Primitive>>,
     text_data: &mut WriteExpect<'a, ThreadPin<TextData<'static>>>,
+    world_text_data: &mut WriteExpect<'a, ThreadPin<WorldTextData<'static>>>,
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
+    let world_text_scale = Scale::uniform(
+        ((w * w + h * h).sqrt() / 10000.0 * mouse.hdpi as f32).round(),
+    );
     let scale = Scale::uniform(
         ((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round(),
     );
@@ -106,24 +111,61 @@ pub fn render_primitives<'a>(
             }
             Primitive {
                 kind: PrimitiveKind::Text(text),
-                with_projection: _,
+                with_projection,
             } => {
                 use glyph_brush::{HorizontalAlign, Layout, VerticalAlign};
-                text_data.glyph_brush.queue(Section {
-                    text: &text.text,
-                    scale,
-                    screen_position: (text.position.x, text.position.y),
-                    // bounds: (w /3.15, h),
-                    color: [1.0, 1.0, 1.0, 1.0],
-                    layout: Layout::default()
-                        .h_align(HorizontalAlign::Center)
-                        .v_align(VerticalAlign::Center),
-                    ..Section::default()
-                });
+                if *with_projection {
+                    // INSANE hack to deal with projections and glyph brush!
+                    // calculating text screen coords via projections on CPU
+                    // YEEEY!
+                    use gfx_h::{get_view, ortho_unproject_real, perspective};
+                    let persp = perspective(dims.0 as u32, dims.1 as u32)
+                        .to_homogeneous();
+                    let view = get_view(canvas.observer()).to_homogeneous();
+                    let t_pos = persp
+                        * view
+                        * Point4::new(
+                            text.position.x,
+                            text.position.y,
+                            0.0,
+                            1.0,
+                        );
+                    let point = ortho_unproject_real(
+                        dims.0 as u32,
+                        dims.1 as u32,
+                        t_pos,
+                    );
+                    let point = (point.x, point.y);
+                    world_text_data.glyph_brush.queue(Section {
+                        text: &text.text,
+                        scale: world_text_scale,
+                        screen_position: point,
+                        // bounds: (w /20.0, h / 20.0),
+                        color: [1.0, 1.0, 1.0, 1.0],
+                        layout: Layout::default()
+                            .h_align(HorizontalAlign::Center)
+                            .v_align(VerticalAlign::Center),
+                        ..Section::default()
+                    });
+                } else {
+                    // orthographic projection
+                    text_data.glyph_brush.queue(Section {
+                        text: &text.text,
+                        scale,
+                        screen_position: (text.position.x, text.position.y),
+                        // bounds: (w /3.15, h),
+                        color: [1.0, 1.0, 1.0, 1.0],
+                        layout: Layout::default()
+                            .h_align(HorizontalAlign::Center)
+                            .v_align(VerticalAlign::Center),
+                        ..Section::default()
+                    });
+                }
             }
         }
     }
-    canvas.render_text(text_data, &viewport, frame);
+    canvas.render_text(text_data, &viewport, frame, false);
+    canvas.render_world_text(world_text_data, &viewport, frame, false);
 }
 
 pub struct RenderingSystem {
@@ -164,6 +206,7 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Rift>,
             ReadStorage<'a, ThreadPin<GeometryData>>,
             ReadStorage<'a, DamageFlash>,
+            ReadStorage<'a, WorldText>,
         ),
         WriteExpect<'a, TeleGraph>,
         Read<'a, Mouse>,
@@ -175,6 +218,7 @@ impl<'a> System<'a> for RenderingSystem {
         Write<'a, EventChannel<Primitive>>,
         Write<'a, UI>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
+        WriteExpect<'a, ThreadPin<WorldTextData<'static>>>,
         WriteExpect<'a, GlobalParams>,
         ReadExpect<'a, DevInfo>,
         Write<'a, EventChannel<Sound>>,
@@ -209,6 +253,7 @@ impl<'a> System<'a> for RenderingSystem {
                 rifts,
                 geom_datas,
                 damage_flash,
+                world_texts,
             ),
             mut telegraph,
             mouse,
@@ -220,6 +265,7 @@ impl<'a> System<'a> for RenderingSystem {
             mut primitives_channel,
             mut ui,
             mut text_data,
+            mut world_text_data,
             mut global_params,
             dev_info,
             mut sounds_channel,
@@ -314,7 +360,7 @@ impl<'a> System<'a> for RenderingSystem {
         pub struct MiniBatch {
             pub images: Vec<AtlasImage>,
             pub isometries: Vec<Isometry3>,
-            pub sizes: Vec<f32>
+            pub sizes: Vec<f32>,
         }
 
         impl MiniBatch {
@@ -323,15 +369,15 @@ impl<'a> System<'a> for RenderingSystem {
                 Self {
                     images: vec![],
                     isometries: vec![],
-                    sizes: vec![]
+                    sizes: vec![],
                 }
             }
 
             pub fn append(
                 &mut self,
-                image: AtlasImage, 
-                isometry: Isometry3, 
-                size: f32
+                image: AtlasImage,
+                isometry: Isometry3,
+                size: f32,
             ) {
                 self.images.push(image);
                 self.isometries.push(isometry);
@@ -361,7 +407,7 @@ impl<'a> System<'a> for RenderingSystem {
 
             if planets.get(entity).is_some() {
                 planets_batch.append(*atlas_image, iso.0, size.0);
-            }            
+            }
             if _fog_markers.get(entity).is_some() {
                 fog_batch.append(*atlas_image, iso.0, size.0)
             }
@@ -408,7 +454,11 @@ impl<'a> System<'a> for RenderingSystem {
             let cursor_image = preloaded_images.cursor;
             let cursor_size = 0.5f32;
             let cursor_scale = if mouse.left { 1f32 } else { 2f32 };
-            all_batch.append(cursor_image, cursor_iso.0, cursor_size * cursor_scale);
+            all_batch.append(
+                cursor_image,
+                cursor_iso.0,
+                cursor_size * cursor_scale,
+            );
         }
         // speed glow
         {
@@ -424,7 +474,7 @@ impl<'a> System<'a> for RenderingSystem {
             &gl,
             &all_batch.images,
             &all_batch.isometries,
-            &all_batch.sizes
+            &all_batch.sizes,
         );
         canvas.render_sprite_batch(
             &gl,
@@ -638,6 +688,20 @@ impl<'a> System<'a> for RenderingSystem {
                 Point3::new(1f32, 1f32, 1f32),
             );
         };
+        for (iso, text) in (&isometries, &world_texts).join() {
+            ui.primitives.push(Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(
+                        iso.0.translation.vector.x,
+                        iso.0.translation.vector.y,
+                    ),
+                    color: (1.0, 1.0, 1.0, 1.0),
+                    text: text.text.clone(),
+                }),
+                with_projection: true,
+            });
+        }
+        for (i, (iso, _)) in (&isometries, &ship_markers).join().enumerate() {}
         flame::start("primitives rendering");
         primitives_channel.iter_write(ui.primitives.drain(..));
         sounds_channel.iter_write(ui.sounds.drain(..));
@@ -650,6 +714,7 @@ impl<'a> System<'a> for RenderingSystem {
             &viewport,
             &mut primitives_channel,
             &mut text_data,
+            &mut world_text_data,
         );
         flame::end("primitives rendering");
         // for (name, span) in time_spans.iter() {

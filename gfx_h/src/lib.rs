@@ -192,6 +192,13 @@ pub struct TextData<'a> {
     pub glyph_brush: GlyphBrush<'a, GlyphVertex, DefaultSectionHasher>,
 }
 
+pub struct WorldTextData<'a> {
+    pub vertex_buffer: TextVertexBuffer<TextVertex>,
+    pub vertex_num: i32,
+    pub glyph_texture: red::Texture,
+    pub glyph_brush: GlyphBrush<'a, GlyphVertex, DefaultSectionHasher>,
+}
+
 pub struct ImageModel {
     pub positions: VertexBuffer<Vertex>,
     pub indices: red::buffer::IndexBuffer,
@@ -628,12 +635,134 @@ impl Canvas {
         text_data: &mut TextData,
         viewport: &red::Viewport,
         frame: &mut red::Frame,
+        persp: bool,
     ) {
         let dims = viewport.dimensions();
         let dims = (dims.0 as u32, dims.1 as u32);
         let program = &self.program_glyph;
-        let transform: [[f32; 4]; 4] =
-            orthographic(dims.0, dims.1).to_homogeneous().into();
+        let transform: [[f32; 4]; 4] = if persp {
+            perspective(dims.0, dims.1).to_homogeneous().into()
+        } else {
+            orthographic(dims.0, dims.1).to_homogeneous().into()
+        };
+        let view: [[f32; 4]; 4] = if persp {
+            get_view(self.observer()).to_homogeneous().into()
+        } else {
+            Matrix4::identity().into()
+        };
+        // TODO move to resource
+        let max_image_dimension = {
+            let value =
+                unsafe { frame.gl.get_parameter_i32(glow::MAX_TEXTURE_SIZE) };
+            value as u32
+        };
+        let mut brush_action;
+        loop {
+            let current_texture = text_data.glyph_texture.texture.clone();
+            brush_action = text_data.glyph_brush.process_queued(
+                |rect, tex_data| unsafe {
+                    // eprintln!("{:?}, {:?}", rect, tex_data);
+                    // Update part of gpu texture with new glyph alpha values
+                    frame
+                        .gl
+                        .bind_texture(glow::TEXTURE_2D, Some(current_texture));
+                    frame.gl.tex_sub_image_2d_u8_slice(
+                        glow::TEXTURE_2D,
+                        -0,
+                        rect.min.x as _,
+                        rect.min.y as _,
+                        rect.width() as _,
+                        rect.height() as _,
+                        glow::RED,
+                        glow::UNSIGNED_BYTE,
+                        Some(tex_data),
+                    );
+                    gl_assert_ok(&frame.gl)
+                },
+                to_vertex,
+            );
+            match brush_action {
+                Ok(_) => break,
+                Err(BrushError::TextureTooSmall { suggested, .. }) => {
+                    let (new_width, new_height) = if (suggested.0
+                        > max_image_dimension
+                        || suggested.1 > max_image_dimension)
+                        && (text_data.glyph_brush.texture_dimensions().0
+                            < max_image_dimension
+                            || text_data.glyph_brush.texture_dimensions().1
+                                < max_image_dimension)
+                    {
+                        (max_image_dimension, max_image_dimension)
+                    } else {
+                        suggested
+                    };
+
+                    // Recreate texture as a larger size to fit more
+                    text_data.glyph_texture =
+                        Texture::new(&frame.gl, (new_width, new_height)); //GlGlyphTexture::new((new_width, new_height));
+
+                    text_data.glyph_brush.resize_texture(new_width, new_height);
+                }
+            }
+        }
+
+        match brush_action.unwrap() {
+            BrushAction::Draw(vertices) => {
+                text_data.vertex_num = vertices.len() as i32;
+                unsafe {
+                    text_data.vertex_buffer.dynamic_draw_data(
+                        std::slice::from_raw_parts(
+                            vertices.as_ptr() as *const TextVertex,
+                            vertices.len(),
+                        ),
+                    );
+                }
+            }
+            // vertex_max = vertex_max.max(vertex_count);
+            // }
+            BrushAction::ReDraw => {}
+        }
+        program.set_uniform("transform", transform);
+        program.set_uniform("font_tex", text_data.glyph_texture.clone());
+        program.set_uniform("view", view);
+        let text_vb: &TextVertexBuffer<TextVertex> = &text_data.vertex_buffer;
+        program.set_layout(&frame.gl, &text_vb.vao, &[text_vb]);
+        let vao = &text_vb.vao;
+        unsafe {
+            vao.bind();
+            program.set_used();
+            frame.gl.draw_arrays_instanced(
+                glow::TRIANGLE_STRIP,
+                0,
+                4,
+                text_data.vertex_num,
+            );
+            vao.unbind()
+        }
+    }
+
+    // copy paste (TODO. trait for text data...)
+    pub fn render_world_text(
+        &self,
+        text_data: &mut WorldTextData,
+        viewport: &red::Viewport,
+        frame: &mut red::Frame,
+        persp: bool,
+    ) {
+        let dims = viewport.dimensions();
+        let dims = (dims.0 as u32, dims.1 as u32);
+        let program = &self.program_glyph;
+        let view: [[f32; 4]; 4] = if persp {
+            get_view(self.observer()).to_homogeneous().into()
+        } else {
+            Matrix4::identity().into()
+        };
+        let transform: [[f32; 4]; 4] = if persp {
+            perspective(dims.0, dims.1).to_homogeneous().into()
+        // _orthographic_from_zero(dims.0, dims.1).to_homogeneous().into()
+        } else {
+            orthographic(dims.0, dims.1).to_homogeneous().into()
+        };
 
         // TODO move to resource
         let max_image_dimension = {
@@ -681,9 +810,7 @@ impl Canvas {
                     } else {
                         suggested
                     };
-                    // eprint!("\r                            \r");
-                    // eprintln!("Resizing glyph texture -> {}x{}", new_width, new_height);
-
+                    // let (new_width, new_height) = (new_width / 50, new_height / 50);
                     // Recreate texture as a larger size to fit more
                     text_data.glyph_texture =
                         Texture::new(&frame.gl, (new_width, new_height)); //GlGlyphTexture::new((new_width, new_height));
@@ -710,6 +837,7 @@ impl Canvas {
             BrushAction::ReDraw => {}
         }
         program.set_uniform("transform", transform);
+        program.set_uniform("view", view);
         program.set_uniform("font_tex", text_data.glyph_texture.clone());
         let text_vb: &TextVertexBuffer<TextVertex> = &text_data.vertex_buffer;
         program.set_layout(&frame.gl, &text_vb.vao, &[text_vb]);
@@ -1075,11 +1203,20 @@ pub fn orthographic(width: u32, height: u32) -> Orthographic3<f32> {
     Orthographic3::new(0f32, width as f32, 0f32, height as f32, -1f32, 1f32)
 }
 
+// it's from 2d not real
 pub fn ortho_unproject(width: u32, height: u32, point: Point2) -> Point2 {
     let ortho: Matrix4 = orthographic(width, height).into();
     let unortho = ortho.try_inverse().unwrap();
     let res = unortho * Point4::new(point.x, point.y, 1f32, 1f32);
     Point2::new(res.x, res.y)
+}
+
+// wow such a name (REAL)
+pub fn ortho_unproject_real(width: u32, height: u32, point: Point4) -> Point2 {
+    let ortho: Matrix4 = orthographic(width, height).into();
+    let unortho = ortho.try_inverse().unwrap();
+    let res = unortho * point;
+    Point2::new(res.x / res.w, res.y / res.w)
 }
 
 pub fn unproject(

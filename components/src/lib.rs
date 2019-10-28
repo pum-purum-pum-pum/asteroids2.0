@@ -9,7 +9,7 @@ pub use geometry::{
 pub use gfx_h::animation::{Animation, AnimationFrame};
 use gfx_h::{ortho_unproject, unproject_with_z, Canvas as SDLCanvas};
 pub use gfx_h::{AtlasImage, ImageData};
-pub use physics::{BodiesMap, PhysicsComponent};
+pub use physics::{BodiesMap, PhysicsComponent, PHYSICS_SIMULATION_TIME};
 pub use sound::{SoundData, SoundPlacement};
 
 use serde::{Deserialize, Serialize};
@@ -30,20 +30,30 @@ pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
 pub struct TimeTracker {
     timestamp: Instant,
+    game_timestamp: Instant,
 }
 
 impl TimeTracker {
     pub fn new() -> Self {
         TimeTracker {
             timestamp: Instant::now(),
+            game_timestamp: Instant::now(),
         }
     }
 
     pub fn update(&mut self) -> Duration {
         let now = Instant::now();
-        let res = now - self.timestamp;
+        let mut res = now - self.timestamp;
+        if res > Duration::from_millis(800) {
+            res = Duration::from_millis(0);
+        }
+        self.game_timestamp += res;
         self.timestamp = now;
         res
+    }
+
+    pub fn now(&self) -> Instant {
+        self.game_timestamp
     }
 }
 
@@ -389,6 +399,11 @@ impl ShipKindSave {
 //         }
 //     }
 // }
+
+#[derive(Debug, Clone, Component)]
+pub struct WorldText {
+    pub text: String,
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum PlayState {

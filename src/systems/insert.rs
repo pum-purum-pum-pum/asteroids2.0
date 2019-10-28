@@ -75,6 +75,21 @@ use log::info;
 //     }
 // }
 
+pub fn add_text(
+    entities: &Entities,
+    text: WorldText,
+    lazy_update: &Read<LazyUpdate>,
+    position: Point2,
+    lifetime: Option<Lifetime>,
+) {
+    let entity = entities.create();
+    lazy_update.insert(entity, text);
+    lazy_update.insert(entity, Isometry::new(position.x, position.y, 0f32));
+    if let Some(lifetime) = lifetime {
+        lazy_update.insert(entity, lifetime);
+    }
+}
+
 pub struct InsertSystem {
     reader: ReaderId<InsertEvent>,
 }

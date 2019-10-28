@@ -70,6 +70,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         ui.primitives.push(Primitive {
             kind: PrimitiveKind::Text(Text {
                 position: Point2::new(w - w / 7.0, h / 20.0),
+                color: (1.0, 1.0, 1.0, 1.0),
                 text: format!("$ {}", macro_game.coins).to_string(),
             }),
             with_projection: false,

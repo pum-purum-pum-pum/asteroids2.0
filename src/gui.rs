@@ -303,6 +303,7 @@ impl Button {
             kind: PrimitiveKind::Text(Text {
                 position: crazy_position,
                 text: self.text.clone(),
+                color: (1.0, 1.0, 1.0, 1.0),
             }),
             with_projection: self.with_projection,
         }
@@ -324,6 +325,7 @@ impl Button {
 #[derive(Clone)]
 pub struct Text {
     pub position: Point2,
+    pub color: (f32, f32, f32, f32),
     pub text: String,
 }
 

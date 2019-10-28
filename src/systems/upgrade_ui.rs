@@ -106,6 +106,7 @@ impl<'a> System<'a> for UpgradeGUI {
                             upgrade_button_h + 2.0 * shift,
                         ),
                         text: upg.name.clone(),
+                        color: (1.0, 1.0, 1.0, 1.0),
                     }),
                     with_projection: false,
                 });
@@ -155,6 +156,7 @@ impl<'a> System<'a> for UpgradeGUI {
                             w / 2.0,
                             upgrade_button_h + 4.0 * shift,
                         ),
+                        color: (1.0, 1.0, 1.0, 1.0),
                         text: avaliable_upgrades[upgrade].description.clone(),
                     }),
                     with_projection: false,

@@ -2,7 +2,7 @@
 	[
 		(
 			distribution: [
-				("kamikadzer", 0.5),
+				//("kamikadzer", 0.5),
 				//("bomberman", 0.5),
 			],
 			ships_number: 6,
@@ -10,10 +10,10 @@
 				//("chains_dark", 4),
 				//("lazer_enemy", 5),
 				//("rift", 5),
-				//("rotship", 1),
+				("rotship", 1),
 				//("reflect_bullet_enemy", 1),
 				//("chains", 2),
-				("lazer_boss", 2)
+				//("lazer_boss", 2)
 			],
 			iterations: 1
 		),

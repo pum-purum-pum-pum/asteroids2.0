@@ -50,6 +50,7 @@ impl<'a> System<'a> for DeadScreen {
             kind: PrimitiveKind::Text(Text {
                 position: Point2::new(w / 2.0, h / 2.0),
                 text: format!("Your score: {}", progress.score),
+                color: (1.0, 1.0, 1.0, 1.0),
             }),
             with_projection: false,
         });

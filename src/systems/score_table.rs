@@ -1,5 +1,5 @@
 use super::*;
-use gfx_h::TextData;
+use gfx_h::{TextData, WorldTextData};
 
 pub struct ScoreTableRendering {
     reader: ReaderId<Primitive>,
@@ -21,6 +21,7 @@ impl<'a> System<'a> for ScoreTableRendering {
         Write<'a, UI>,
         Read<'a, Mouse>,
         WriteExpect<'a, ThreadPin<TextData<'static>>>,
+        WriteExpect<'a, ThreadPin<WorldTextData<'static>>>,
         Write<'a, AppState>,
         ReadExpect<'a, MacroGame>,
     );
@@ -34,6 +35,7 @@ impl<'a> System<'a> for ScoreTableRendering {
             mut ui,
             mouse,
             mut text_data,
+            mut world_text_data,
             mut app_state,
             macro_game,
         ) = data;
@@ -51,6 +53,7 @@ impl<'a> System<'a> for ScoreTableRendering {
             ui.primitives.push(Primitive {
                 kind: PrimitiveKind::Text(Text {
                     position: Point2::new(w / 20.0, current_h),
+                    color: (1.0, 1.0, 1.0, 1.0),
                     text: format!("{}", score).to_string(),
                 }),
                 with_projection: false,
@@ -83,6 +86,7 @@ impl<'a> System<'a> for ScoreTableRendering {
             &viewport,
             &mut primitives_channel,
             &mut text_data,
+            &mut world_text_data,
         );
     }
 }

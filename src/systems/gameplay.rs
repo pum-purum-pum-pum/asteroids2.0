@@ -269,7 +269,19 @@ impl<'a> System<'a> for GamePlaySystem {
             if (pos3d - collectable_position).norm() < COLLECT_RADIUS {
                 let mut rng = thread_rng();
                 if let Some(coin) = coins.get(entity) {
-                    let coin_number = rng.gen_range(0, 2);
+                    let coin_number = rng.gen_range(1, 3);
+                    add_text(
+                        &entities,
+                        WorldText {
+                            text: format!("+{}", coin_number).to_string(),
+                        },
+                        &lazy_update,
+                        Point2::new(
+                            collectable_position.x,
+                            collectable_position.y,
+                        ),
+                        Some(Lifetime::new(Duration::from_secs(1))),
+                    );
                     let coin_sound = if coin_number == 0 {
                         preloaded_sounds.coin
                     } else {
@@ -295,6 +307,18 @@ impl<'a> System<'a> for GamePlaySystem {
                         ),
                     ));
                     progress.add_score(3 * exp.0);
+                    add_text(
+                        &entities,
+                        WorldText {
+                            text: format!("+{}", exp.0).to_string(),
+                        },
+                        &lazy_update,
+                        Point2::new(
+                            collectable_position.x,
+                            collectable_position.y,
+                        ),
+                        Some(Lifetime::new(Duration::from_secs(1))),
+                    );
                     progress.add_exp(exp.0);
                 }
                 if let Some(health) = healths.get(entity) {
@@ -302,6 +326,18 @@ impl<'a> System<'a> for GamePlaySystem {
                 }
                 if side_bullet_collectables.get(entity).is_some() {
                     insert_channel.single_write(InsertEvent::SideBulletAbility);
+                    add_text(
+                        &entities,
+                        WorldText {
+                            text: "Side bullets".to_string(),
+                        },
+                        &lazy_update,
+                        Point2::new(
+                            collectable_position.x,
+                            collectable_position.y,
+                        ),
+                        Some(Lifetime::new(Duration::from_secs(1))),
+                    );
                     if let Some(gun) = shotguns.get_mut(char_entity) {
                         gun.side_projectiles_number += 1;
                     }
