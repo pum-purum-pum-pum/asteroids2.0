@@ -202,20 +202,20 @@ impl<'a> System<'a> for UpgradeGUI {
                         gun.bullet_speed += 0.1 * BULLET_SPEED_INIT;
                     }
                 }
-                UpgradeType::BulletReflection => {
-                    if let Some(gun) = shotguns.get_mut(character) {
-                        if let Some(ref mut reflection) = gun.reflection {
-                            // reflection.speed += 0.5;
-                            reflection.lifetime += Duration::from_millis(200);
-                        } else {
-                            gun.reflection = Some(Reflection {
-                                speed: 0.4,
-                                lifetime: Duration::from_millis(1500),
-                                times: None,
-                            })
-                        }
-                    }
-                }
+                // UpgradeType::BulletReflection => {
+                //     if let Some(gun) = shotguns.get_mut(character) {
+                //         if let Some(ref mut reflection) = gun.reflection {
+                //             // reflection.speed += 0.5;
+                //             reflection.lifetime += Duration::from_millis(200);
+                //         } else {
+                //             gun.reflection = Some(Reflection {
+                //                 speed: 0.4,
+                //                 lifetime: Duration::from_millis(1500),
+                //                 times: None,
+                //             })
+                //         }
+                //     }
+                // }
                 UpgradeType::LazerLength => {
                     if let Some(multy_lazer) =
                         multiple_lazers.get_mut(character)

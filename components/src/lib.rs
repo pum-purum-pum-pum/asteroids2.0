@@ -272,6 +272,10 @@ pub enum InsertEvent {
         position: Point2,
     },
     DoubleExpAbility,
+    ReflectBulletAbility,
+    ReflectBulletCollectable {
+        position: Point2,
+    },
     DoubleExpCollectable {
         position: Point2,
     },
@@ -349,7 +353,7 @@ pub enum UpgradeType {
     ShieldSize,
     HealthSize,
     LazerLength,
-    BulletReflection,
+    // BulletReflection,
     Maneuverability,
 }
 
@@ -786,6 +790,12 @@ pub struct Coin(pub usize);
 
 #[derive(Component)]
 pub struct DoubleCoinsCollectable;
+
+#[derive(Component)]
+pub struct ReflectBulletAbility;
+
+#[derive(Component)]
+pub struct ReflectBulletCollectable;
 
 #[derive(Component)]
 pub struct DoubleCoinsAbility;

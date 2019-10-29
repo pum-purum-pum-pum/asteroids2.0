@@ -66,6 +66,9 @@ const SCREEN_AREA: f32 = 10f32;
 const PLAYER_AREA: f32 = 20f32;
 const ACTIVE_AREA: f32 = 40f32;
 // the same for NEBULAS
+#[cfg(debug_assertions)]
+const ASTEROIDS_MIN_NUMBER: usize = 20;
+#[cfg(not(debug_assertions))]
 const ASTEROIDS_MIN_NUMBER: usize = 100;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
@@ -83,7 +86,9 @@ const BULLET_CONTACT_LIFETIME_SECS: u64 = 1;
 const COLLECTABLE_SIDE_BULLET: u64 = 5;
 const SIDE_BULLET_LIFETIME_SEC: u64 = 6;
 const DOUBLE_COINS_LIFETIME_SEC: u64 = 5;
+const REFLECT_BULLET_LIFETIME_SEC: u64 = 5;
 const COLLECTABLE_DOUBLE_COINS_SEC: u64 = 5;
+const COLLECTABLE_REFLECT_BULLET_SEC: u64 = 5;
 const DESTUCTION_SITES: usize = 20;
 
 pub fn initial_asteroid_velocity() -> Velocity2 {
@@ -156,6 +161,8 @@ fn get_collision_groups(kind: EntityType) -> CollisionGroups {
     }
 }
 
+
+// side effect -- spawn all kind of dropables from asteroid
 pub fn spawn_asteroids(
     isometry: Isometry3,
     polygon: Polygon,
@@ -226,6 +233,13 @@ pub fn spawn_asteroids(
         if rng.gen_range(0.0, 1.0) < 0.02 {
             insert_channel.lock().unwrap().single_write(
                 InsertEvent::DoubleExpCollectable {
+                    position: spawn_position,
+                },
+            );
+        }
+        if rng.gen_range(0.0, 1.0) < 0.02 {
+            insert_channel.lock().unwrap().single_write(
+                InsertEvent::ReflectBulletCollectable {
                     position: spawn_position,
                 },
             );

@@ -35,6 +35,8 @@ impl<'a> System<'a> for GamePlaySystem {
             ReadStorage<'a, AtlasImage>,
             ReadStorage<'a, Size>,
         ),
+        ReadStorage<'a, ReflectBulletCollectable>,
+        ReadStorage<'a, ReflectBulletAbility>,
         ReadExpect<'a, red::Viewport>,
         ReadStorage<'a, Projectile>,
         ReadExpect<'a, PreloadedImages>,
@@ -85,6 +87,8 @@ impl<'a> System<'a> for GamePlaySystem {
                 atlas_images,
                 sizes,
             ),
+            reflect_bullet_collectable,
+            reflect_bullet_ability,
             viewport,
             projectiles,
             preloaded_images,
@@ -170,9 +174,11 @@ impl<'a> System<'a> for GamePlaySystem {
             if lifetime.delete() {
                 if double_coins_abilities.get(entity).is_some() {
                     upgrade_stats.coins_mult /= 2;
+                    entities.delete(entity).unwrap();
                 }
                 if double_exp_abilities.get(entity).is_some() {
                     upgrade_stats.exp_mult /= 2;
+                    entities.delete(entity).unwrap();
                 }
                 if side_bullet_ability.get(entity).is_some() {
                     if let Some(gun) = shotguns.get_mut(char_entity) {
@@ -187,6 +193,21 @@ impl<'a> System<'a> for GamePlaySystem {
                     {
                         multy_lazer.minus_side_lazers();
                     }
+                    entities.delete(entity).unwrap();
+                }
+                if let Some(reflect_ability) = reflect_bullet_ability.get(entity) {
+                    dbg!(reflect_bullet_ability.count());
+                    if reflect_bullet_ability.count() == 1 {
+                        if let Some(gun) = shotguns.get_mut(char_entity) {
+                            if gun.reflection.is_some() {
+                                gun.reflection = None
+                            }
+                        }
+                        // if let Some(ref mut reflection) = gun.reflection {
+                        //     reflection.lifetime += Duration::from_millis(200);
+                        // }
+                    }
+                    entities.delete(entity).unwrap();
                 }
                 if let Some(blast) = blasts.get(entity) {
                     let owner =
@@ -270,6 +291,7 @@ impl<'a> System<'a> for GamePlaySystem {
                             }
                         }
                     }
+                    entities.delete(entity).unwrap();
                 }
                 entities.delete(entity).unwrap()
             }
@@ -383,6 +405,22 @@ impl<'a> System<'a> for GamePlaySystem {
                         Some(Lifetime::new(Duration::from_secs(1))),
                     );
                     insert_channel.single_write(InsertEvent::DoubleCoinsAbility)
+                }
+                if reflect_bullet_collectable.get(entity).is_some() {
+                    add_text(
+                        &entities,
+                        TextComponent {
+                            text: "Reflectable".to_string(),
+                            color: (1.0, 1.0, 1.0, 1.0)
+                        },
+                        &lazy_update,
+                        Point2::new(
+                            collectable_position.x,
+                            collectable_position.y,
+                        ),
+                        Some(Lifetime::new(Duration::from_secs(1))),
+                    );
+                    insert_channel.single_write(InsertEvent::ReflectBulletAbility)
                 }
                 if double_exp_collectable.get(entity).is_some() {
                     add_text(

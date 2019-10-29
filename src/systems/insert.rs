@@ -119,6 +119,8 @@ impl<'a> System<'a> for InsertSystem {
     type SystemData = (
         Entities<'a>,
         WriteStorage<'a, PhysicsComponent>,
+        WriteStorage<'a, ShotGun>,
+        ReadStorage<'a, CharacterMarker>,
         ReadExpect<'a, ThreadPin<red::GL>>,
         WriteExpect<'a, PreloadedImages>,
         Write<'a, World<f32>>,
@@ -134,6 +136,8 @@ impl<'a> System<'a> for InsertSystem {
         let (
             entities,
             mut physics,
+            mut shotguns,
+            character_markers,
             gl,
             preloaded_images,
             mut world,
@@ -635,10 +639,6 @@ impl<'a> System<'a> for InsertSystem {
                     lazy_update.insert(coin_entity, Size(0.5));
                     lazy_update
                         .insert(coin_entity, preloaded_images.double_exp);
-                    lazy_update.insert(
-                        coin_entity,
-                        Lifetime::new(Duration::from_secs(COIN_LIFETIME_SECS)),
-                    );
                 }
                 InsertEvent::DoubleExpAbility => {
                     upgrades_stats.exp_mult *= 2;
@@ -648,6 +648,48 @@ impl<'a> System<'a> for InsertSystem {
                         entity,
                         Lifetime::new(Duration::from_secs(
                             DOUBLE_COINS_LIFETIME_SEC,
+                        )),
+                    );
+                }
+                InsertEvent::ReflectBulletCollectable { position } => {
+                    let iso = Isometry::new(position.x, position.y, 0f32);
+                    let reflect_bullet_entity = entities.create();
+                    lazy_update.insert(reflect_bullet_entity, CollectableMarker);
+                    lazy_update.insert(reflect_bullet_entity, ReflectBulletCollectable);
+                    lazy_update.insert(
+                        reflect_bullet_entity,
+                        Lifetime::new(Duration::from_secs(
+                            COLLECTABLE_REFLECT_BULLET_SEC,
+                        )),
+                    );
+                    lazy_update.insert(reflect_bullet_entity, iso);
+                    lazy_update.insert(reflect_bullet_entity, Size(0.5));
+                    lazy_update
+                        .insert(reflect_bullet_entity, preloaded_images.attack_speed_upgrade);
+                }
+                InsertEvent::ReflectBulletAbility => {
+                    let (character, _) =
+                        (&entities, &character_markers)
+                            .join()
+                            .next()
+                            .unwrap();
+                    if let Some(gun) = shotguns.get_mut(character) {
+                        if let Some(ref mut reflection) = gun.reflection {
+                            reflection.lifetime += Duration::from_millis(200);
+                        } else {
+                            gun.reflection = Some(Reflection {
+                                speed: 0.4,
+                                lifetime: Duration::from_millis(1500),
+                                times: None,
+                            })
+                        }
+                    }
+                    let entity = entities.create();
+                    lazy_update.insert(entity, ReflectBulletAbility);
+                    lazy_update.insert(
+                        entity,
+                        Lifetime::new(Duration::from_secs(
+                            REFLECT_BULLET_LIFETIME_SEC,
                         )),
                     );
                 }
