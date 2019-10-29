@@ -107,6 +107,7 @@ impl<'a> System<'a> for UpgradeGUI {
                         ),
                         text: upg.name.clone(),
                         color: (1.0, 1.0, 1.0, 1.0),
+                        font_size: 1.0
                     }),
                     with_projection: false,
                 });
@@ -158,6 +159,7 @@ impl<'a> System<'a> for UpgradeGUI {
                         ),
                         color: (1.0, 1.0, 1.0, 1.0),
                         text: avaliable_upgrades[upgrade].description.clone(),
+                        font_size: 1.0
                     }),
                     with_projection: false,
                 });

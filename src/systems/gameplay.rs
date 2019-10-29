@@ -30,9 +30,12 @@ impl<'a> System<'a> for GamePlaySystem {
             ReadStorage<'a, DoubleCoinsCollectable>,
             ReadStorage<'a, DoubleExpCollectable>,
             ReadStorage<'a, CollectableMarker>,
+            ReadStorage<'a, DoubleCoinsAbility>,
+            ReadStorage<'a, DoubleExpAbility>,
             ReadStorage<'a, AtlasImage>,
             ReadStorage<'a, Size>,
         ),
+        ReadExpect<'a, red::Viewport>,
         ReadStorage<'a, Projectile>,
         ReadExpect<'a, PreloadedImages>,
         Write<'a, EventChannel<InsertEvent>>,
@@ -49,6 +52,7 @@ impl<'a> System<'a> for GamePlaySystem {
         WriteExpect<'a, GlobalParams>,
         ReadExpect<'a, Arc<Mutex<EventChannel<InsertEvent>>>>,
         Read<'a, LazyUpdate>,
+        Write<'a, UpgradesStats>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -76,9 +80,12 @@ impl<'a> System<'a> for GamePlaySystem {
                 double_coins_collectable,
                 double_exp_collectable,
                 collectables,
+                double_coins_abilities,
+                double_exp_abilities,
                 atlas_images,
                 sizes,
             ),
+            viewport,
             projectiles,
             preloaded_images,
             mut insert_channel,
@@ -95,7 +102,10 @@ impl<'a> System<'a> for GamePlaySystem {
             mut global_params,
             asteroids_channel,
             lazy_update,
+            mut upgrade_stats,
         ) = data;
+        let dims = viewport.dimensions();
+        let (w, h) = (dims.0 as f32, dims.1 as f32);
         info!("asteroids: gameplay started");
         for flash in (&mut flashes).join() {
             flash.0 /= 1.2f32;
@@ -158,6 +168,12 @@ impl<'a> System<'a> for GamePlaySystem {
         }
         for (entity, lifetime) in (&entities, &mut lifetimes).join() {
             if lifetime.delete() {
+                if double_coins_abilities.get(entity).is_some() {
+                    upgrade_stats.coins_mult /= 2;
+                }
+                if double_exp_abilities.get(entity).is_some() {
+                    upgrade_stats.exp_mult /= 2;
+                }
                 if side_bullet_ability.get(entity).is_some() {
                     if let Some(gun) = shotguns.get_mut(char_entity) {
                         // it's hack to avoid overflow
@@ -269,11 +285,13 @@ impl<'a> System<'a> for GamePlaySystem {
             if (pos3d - collectable_position).norm() < COLLECT_RADIUS {
                 let mut rng = thread_rng();
                 if let Some(coin) = coins.get(entity) {
-                    let coin_number = rng.gen_range(1, 3);
+                    let coin_id = rng.gen_range(1, 3);
+                    let coins_add = upgrade_stats.coins_mult * coin.0;
                     add_text(
                         &entities,
-                        WorldText {
-                            text: format!("+{}", coin_number).to_string(),
+                        TextComponent {
+                            text: format!("+{}", coins_add).to_string(),
+                            color: (1.0, 1.0, 0.7, 1.0)
                         },
                         &lazy_update,
                         Point2::new(
@@ -282,7 +300,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         ),
                         Some(Lifetime::new(Duration::from_secs(1))),
                     );
-                    let coin_sound = if coin_number == 0 {
+                    let coin_sound = if coin_id == 0 {
                         preloaded_sounds.coin
                     } else {
                         preloaded_sounds.coin2
@@ -294,9 +312,9 @@ impl<'a> System<'a> for GamePlaySystem {
                             collectable_position.y,
                         ),
                     ));
-                    progress.add_coins(coin.0);
-                    progress.add_score(coin.0);
-                    macro_game.coins += coin.0;
+                    progress.add_coins(coins_add);
+                    progress.add_score(coins_add);
+                    macro_game.coins += coins_add;
                 }
                 if let Some(exp) = exps.get(entity) {
                     sounds_channel.single_write(Sound(
@@ -306,11 +324,13 @@ impl<'a> System<'a> for GamePlaySystem {
                             collectable_position.y,
                         ),
                     ));
-                    progress.add_score(3 * exp.0);
+                    let add_exp = upgrade_stats.exp_mult * exp.0;
+                    progress.add_score(3 * add_exp);
                     add_text(
                         &entities,
-                        WorldText {
-                            text: format!("+{}", exp.0).to_string(),
+                        TextComponent {
+                            text: format!("+{}", add_exp).to_string(),
+                            color: (0.6, 3.0, 1.0, 1.0)
                         },
                         &lazy_update,
                         Point2::new(
@@ -319,7 +339,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         ),
                         Some(Lifetime::new(Duration::from_secs(1))),
                     );
-                    progress.add_exp(exp.0);
+                    progress.add_exp(add_exp);
                 }
                 if let Some(health) = healths.get(entity) {
                     lifes.get_mut(char_entity).unwrap().0 += health.0;
@@ -328,8 +348,9 @@ impl<'a> System<'a> for GamePlaySystem {
                     insert_channel.single_write(InsertEvent::SideBulletAbility);
                     add_text(
                         &entities,
-                        WorldText {
-                            text: "Side bullets".to_string(),
+                        TextComponent {
+                            text: "Triple bullets".to_string(),
+                            color: (1.0, 1.0, 1.0, 1.0)
                         },
                         &lazy_update,
                         Point2::new(
@@ -348,9 +369,35 @@ impl<'a> System<'a> for GamePlaySystem {
                     }
                 }
                 if double_coins_collectable.get(entity).is_some() {
+                    add_text(
+                        &entities,
+                        TextComponent {
+                            text: "Double coins".to_string(),
+                            color: (1.0, 1.0, 1.0, 1.0)
+                        },
+                        &lazy_update,
+                        Point2::new(
+                            collectable_position.x,
+                            collectable_position.y,
+                        ),
+                        Some(Lifetime::new(Duration::from_secs(1))),
+                    );
                     insert_channel.single_write(InsertEvent::DoubleCoinsAbility)
                 }
                 if double_exp_collectable.get(entity).is_some() {
+                    add_text(
+                        &entities,
+                        TextComponent {
+                            text: "Double experience".to_string(),
+                            color: (1.0, 1.0, 1.0, 1.0)
+                        },
+                        &lazy_update,
+                        Point2::new(
+                            collectable_position.x,
+                            collectable_position.y,
+                        ),
+                        Some(Lifetime::new(Duration::from_secs(1))),
+                    );
                     insert_channel.single_write(InsertEvent::DoubleExpAbility)
                 }
                 entities.delete(entity).unwrap();
@@ -367,6 +414,19 @@ impl<'a> System<'a> for GamePlaySystem {
         if current_wave.iteration > wave.iterations {
             current_wave.iteration = 0;
             current_wave.id = (waves.0.len() - 1).min(current_wave.id + 1);
+            add_screen_text(
+                &entities,
+                TextComponent {
+                    text: format!("Wave {}", current_wave.id).to_string(),
+                    color: (1.0, 1.0, 0.7, 1.0)
+                },
+                &lazy_update,
+                Point2::new(
+                    w / 2.0,
+                    h/ 2.0,
+                ),
+                Some(Lifetime::new(Duration::from_secs(1))),
+            );
         }
         let mut rng = thread_rng();
         fn ships2insert(spawn_pos: Point2, enemy: EnemyKind) -> InsertEvent {

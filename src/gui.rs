@@ -304,6 +304,7 @@ impl Button {
                 position: crazy_position,
                 text: self.text.clone(),
                 color: (1.0, 1.0, 1.0, 1.0),
+                font_size: 1.0
             }),
             with_projection: self.with_projection,
         }
@@ -327,6 +328,7 @@ pub struct Text {
     pub position: Point2,
     pub color: (f32, f32, f32, f32),
     pub text: String,
+    pub font_size: f32
 }
 
 #[derive(Clone)]

@@ -197,6 +197,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w / 7.0, h / 20.0),
                 text: format!("FPS: {}", dev_info.fps).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
+                font_size: 1.0
             }),
             with_projection: false,
         });
@@ -207,6 +208,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w - w / 7.0, h / 20.0),
                 text: format!("Score: {}", progress.score).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
+                font_size: 1.0
             }),
             with_projection: false,
         });
@@ -216,6 +218,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w - w / 7.0, h / 20.0),
                 text: format!("$ {}", macro_game.coins).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
+                font_size: 1.0
             }),
             with_projection: false,
         });
@@ -225,6 +228,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w - w / 7.0, h / 7.0 + h / 20.0),
                 text: format!("Wave: {}", current_wave.id).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
+                font_size: 1.0
             }),
             with_projection: false,
         });
@@ -281,6 +285,7 @@ impl<'a> System<'a> for GUISystem {
                     ),
                     text: ability.text.clone(),
                     color: (1.0, 1.0, 1.0, 1.0),
+                    font_size: 1.0
                 }),
                 with_projection: false,
             });

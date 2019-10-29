@@ -28,6 +28,21 @@ pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
+#[derive(Debug)]
+pub struct UpgradesStats {
+    pub coins_mult: usize,
+    pub exp_mult: usize,
+}
+
+impl Default for UpgradesStats {
+    fn default() -> Self {
+        UpgradesStats {
+            coins_mult: 1,
+            exp_mult: 1,
+        }
+    }
+}
+
 pub struct TimeTracker {
     timestamp: Instant,
     game_timestamp: Instant,
@@ -401,9 +416,13 @@ impl ShipKindSave {
 // }
 
 #[derive(Debug, Clone, Component)]
-pub struct WorldText {
+pub struct TextComponent {
     pub text: String,
+    pub color: (f32, f32, f32, f32)
 }
+
+#[derive(Debug, Clone, Component)]
+pub struct Position2D(pub Point2);
 
 #[derive(Debug, Clone, Copy)]
 pub enum PlayState {
@@ -808,11 +827,17 @@ impl Lifetime {
     }
 
     pub fn delete(&self) -> bool {
-        Instant::now() - self.start_time > self.lifetime
+        self.rest() > self.lifetime
     }
 
     pub fn rest(&self) -> Duration {
         Instant::now() - self.start_time
+    }
+
+    pub fn rest_fraction(&self) -> f32 {
+        let rest = self.rest().as_millis();
+        let all = self.lifetime.as_millis();
+        1.0 - rest as f32 / all as f32
     }
 }
 

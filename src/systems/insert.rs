@@ -77,7 +77,7 @@ use log::info;
 
 pub fn add_text(
     entities: &Entities,
-    text: WorldText,
+    text: TextComponent,
     lazy_update: &Read<LazyUpdate>,
     position: Point2,
     lifetime: Option<Lifetime>,
@@ -88,6 +88,21 @@ pub fn add_text(
     if let Some(lifetime) = lifetime {
         lazy_update.insert(entity, lifetime);
     }
+}
+
+pub fn add_screen_text(
+    entities: &Entities,
+    text: TextComponent,
+    lazy_update: &Read<LazyUpdate>,
+    position: Point2,
+    lifetime: Option<Lifetime>,
+) {
+    let entity = entities.create();
+    lazy_update.insert(entity, text);
+    if let Some(lifetime) = lifetime {
+        lazy_update.insert(entity, lifetime);
+    }
+    lazy_update.insert(entity, Position2D(Point2::new(position.x, position.y)));
 }
 
 pub struct InsertSystem {
@@ -112,6 +127,7 @@ impl<'a> System<'a> for InsertSystem {
         Read<'a, EventChannel<InsertEvent>>,
         WriteExpect<'a, Canvas>,
         Read<'a, LazyUpdate>,
+        Write<'a, UpgradesStats>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -126,6 +142,7 @@ impl<'a> System<'a> for InsertSystem {
             insert_channel,
             mut canvas,
             lazy_update,
+            mut upgrades_stats,
         ) = data;
         let mut rng = thread_rng();
         info!("asteroids: started insert system");
@@ -594,6 +611,7 @@ impl<'a> System<'a> for InsertSystem {
                 }
                 InsertEvent::DoubleCoinsAbility => {
                     let entity = entities.create();
+                    upgrades_stats.coins_mult *= 2;
                     lazy_update.insert(entity, DoubleCoinsAbility);
                     lazy_update.insert(
                         entity,
@@ -623,6 +641,7 @@ impl<'a> System<'a> for InsertSystem {
                     );
                 }
                 InsertEvent::DoubleExpAbility => {
+                    upgrades_stats.exp_mult *= 2;
                     let entity = entities.create();
                     lazy_update.insert(entity, DoubleExpAbility);
                     lazy_update.insert(

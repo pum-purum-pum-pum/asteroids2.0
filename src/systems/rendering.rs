@@ -67,12 +67,8 @@ pub fn render_primitives<'a>(
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
-    let world_text_scale = Scale::uniform(
-        ((w * w + h * h).sqrt() / 10000.0 * mouse.hdpi as f32).round(),
-    );
-    let scale = Scale::uniform(
-        ((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round(),
-    );
+    let world_text_scale = ((w * w + h * h).sqrt() / 10000.0 * mouse.hdpi as f32).round();
+    let scale = ((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round();
     for primitive in primitives_channel.read(reader) {
         match primitive {
             Primitive {
@@ -138,10 +134,10 @@ pub fn render_primitives<'a>(
                     let point = (point.x, point.y);
                     world_text_data.glyph_brush.queue(Section {
                         text: &text.text,
-                        scale: world_text_scale,
+                        scale: Scale::uniform(world_text_scale * text.font_size),
                         screen_position: point,
                         // bounds: (w /20.0, h / 20.0),
-                        color: [1.0, 1.0, 1.0, 1.0],
+                        color: [text.color.0, text.color.1, text.color.2, text.color.3],
                         layout: Layout::default()
                             .h_align(HorizontalAlign::Center)
                             .v_align(VerticalAlign::Center),
@@ -151,10 +147,10 @@ pub fn render_primitives<'a>(
                     // orthographic projection
                     text_data.glyph_brush.queue(Section {
                         text: &text.text,
-                        scale,
+                        scale: Scale::uniform(scale * text.font_size),
                         screen_position: (text.position.x, text.position.y),
                         // bounds: (w /3.15, h),
-                        color: [1.0, 1.0, 1.0, 1.0],
+                        color: [text.color.0, text.color.1, text.color.2, text.color.3],
                         layout: Layout::default()
                             .h_align(HorizontalAlign::Center)
                             .v_align(VerticalAlign::Center),
@@ -206,8 +202,10 @@ impl<'a> System<'a> for RenderingSystem {
             ReadStorage<'a, Rift>,
             ReadStorage<'a, ThreadPin<GeometryData>>,
             ReadStorage<'a, DamageFlash>,
-            ReadStorage<'a, WorldText>,
+            WriteStorage<'a, TextComponent>,
         ),
+        WriteStorage<'a, Position2D>,
+        ReadStorage<'a, Lifetime>,
         WriteExpect<'a, TeleGraph>,
         Read<'a, Mouse>,
         ReadExpect<'a, ThreadPin<red::GL>>,
@@ -253,8 +251,10 @@ impl<'a> System<'a> for RenderingSystem {
                 rifts,
                 geom_datas,
                 damage_flash,
-                world_texts,
+                mut text_components,
             ),
+            positions2d,
+            lifetimes,
             mut telegraph,
             mouse,
             gl,
@@ -688,17 +688,36 @@ impl<'a> System<'a> for RenderingSystem {
                 Point3::new(1f32, 1f32, 1f32),
             );
         };
-        for (iso, text) in (&isometries, &world_texts).join() {
+        for (iso, text, lifetime) in (&isometries, &mut text_components, &lifetimes).join() {
+            let lifetime_fraction = lifetime.rest_fraction();
+            text.color.3 = lifetime_fraction;
             ui.primitives.push(Primitive {
                 kind: PrimitiveKind::Text(Text {
                     position: Point2::new(
                         iso.0.translation.vector.x,
                         iso.0.translation.vector.y,
                     ),
-                    color: (1.0, 1.0, 1.0, 1.0),
+                    color: text.color,
                     text: text.text.clone(),
+                    font_size: 1.0
                 }),
                 with_projection: true,
+            });
+        }
+        for (text, lifetime, position) in (&mut text_components, &lifetimes, &positions2d).join() {
+            let lifetime_fraction = lifetime.rest_fraction();
+            text.color.3 = lifetime_fraction;
+            ui.primitives.push(Primitive {
+                kind: PrimitiveKind::Text(Text {
+                    position: Point2::new(
+                        position.0.x,
+                        position.0.y,
+                    ),
+                    color: text.color,
+                    text: text.text.clone(),
+                    font_size: 13.0
+                }),
+                with_projection: false,
             });
         }
         for (i, (iso, _)) in (&isometries, &ship_markers).join().enumerate() {}
