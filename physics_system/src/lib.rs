@@ -36,7 +36,6 @@ impl<'a> System<'a> for PhysicsSystem {
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
         Read<'a, AppState>,
-        WriteExpect<'a, TimeTracker>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -55,9 +54,8 @@ impl<'a> System<'a> for PhysicsSystem {
             mut nebula_grid,
             mut planet_grid,
             app_state,
-            mut time_tracker,
         ) = data;
-        let time_scaler = normalize_60frame(time_tracker.update());
+        let time_scaler = normalize_60frame(TRACKER.lock().unwrap().update());
         world.set_timestep(PHYSICS_SIMULATION_TIME * time_scaler);
         let (character_position, character_prev_position) = {
             if let Some((character, isometry, _)) = (&entities, &isometries, &character_markers).join().next() {

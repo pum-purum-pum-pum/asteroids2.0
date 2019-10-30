@@ -193,10 +193,8 @@ impl<'a> System<'a> for GamePlaySystem {
                     {
                         multy_lazer.minus_side_lazers();
                     }
-                    entities.delete(entity).unwrap();
                 }
                 if let Some(reflect_ability) = reflect_bullet_ability.get(entity) {
-                    dbg!(reflect_bullet_ability.count());
                     if reflect_bullet_ability.count() == 1 {
                         if let Some(gun) = shotguns.get_mut(char_entity) {
                             if gun.reflection.is_some() {
@@ -207,7 +205,6 @@ impl<'a> System<'a> for GamePlaySystem {
                         //     reflection.lifetime += Duration::from_millis(200);
                         // }
                     }
-                    entities.delete(entity).unwrap();
                 }
                 if let Some(blast) = blasts.get(entity) {
                     let owner =
@@ -291,7 +288,6 @@ impl<'a> System<'a> for GamePlaySystem {
                             }
                         }
                     }
-                    entities.delete(entity).unwrap();
                 }
                 entities.delete(entity).unwrap()
             }

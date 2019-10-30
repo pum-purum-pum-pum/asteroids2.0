@@ -28,6 +28,15 @@ pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
+use once_cell::sync::{Lazy};
+use std::sync::Mutex;
+
+// lazy static for global mutable data 
+pub static TRACKER: Lazy<Mutex<TimeTracker>> = Lazy::new(|| {
+    let mut time_tracker = TimeTracker::new();
+    Mutex::new(time_tracker)
+});
+
 #[derive(Debug)]
 pub struct UpgradesStats {
     pub coins_mult: usize,
@@ -831,7 +840,7 @@ pub struct Lifetime {
 impl Lifetime {
     pub fn new(lifetime: Duration) -> Self {
         Lifetime {
-            start_time: Instant::now(),
+            start_time: TRACKER.lock().unwrap().now(),
             lifetime: lifetime,
         }
     }
@@ -841,7 +850,7 @@ impl Lifetime {
     }
 
     pub fn rest(&self) -> Duration {
-        Instant::now() - self.start_time
+        TRACKER.lock().unwrap().now() - self.start_time
     }
 
     pub fn rest_fraction(&self) -> f32 {

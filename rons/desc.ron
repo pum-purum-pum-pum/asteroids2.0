@@ -45,8 +45,8 @@
     player_guns: [
         ShotGun((
             recharge_state: 0,
-            recharge_time: (secs: 0, nanos: 300_000_000),
-            bullets_damage: 12,
+            recharge_time: (secs: 0, nanos: 150_000_000),
+            bullets_damage: 6,
             side_projectiles_number: 0,
             side_projectiles_limit: Some(1),
             angle_shift: 0.25,

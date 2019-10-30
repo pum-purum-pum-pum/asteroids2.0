@@ -25,6 +25,7 @@ pub use shrev;
 pub use specs;
 pub use specs_derive;
 pub use voronois;
+pub use once_cell;
 
 /// int SDL_main(int argc, char *argv[])
 #[no_mangle]

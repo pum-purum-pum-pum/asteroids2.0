@@ -115,7 +115,7 @@ pub fn run() -> Result<(), String> {
     specs_world.add_resource(FogGrid::new(2, 50f32, 50f32, 5f32, 5f32));
 
     // specs_world.add_resource(MacroGame{coins: 0, score_table: 0});
-    specs_world.add_resource(TimeTracker::new());
+    // specs_world.add_resource(TimeTracker::new());
     specs_world.add_resource(name_to_atlas);
     specs_world.add_resource(ThreadPin::new(music_data));
     specs_world.add_resource(Music::default());
