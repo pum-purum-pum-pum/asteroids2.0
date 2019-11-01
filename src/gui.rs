@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 cfg_if! {
     if #[cfg(any(target_os = "android"))] {
-        use crate::run::FINGER_NUMBER;
+        use components::FINGER_NUMBER;
         /// Note: ofcourse works only with orthographics projection
         pub struct VecController {
             position: Point2, // screen position, center
@@ -18,14 +18,13 @@ cfg_if! {
         impl VecController {
             pub fn new(position: Point2, radius: f32, stick_radius: f32, circle_image: AtlasImage) -> Self {
                 let controller_geometry = Primitive {
-                    kind: PrimitiveKind::Rectangle(Rectangle{
+                    kind: PrimitiveKind::Picture(Picture{
                         position: position - Vector2::new(radius, radius),
                         width: 2.0 * radius,
                         height: 2.0 * radius,
-                        color: Point3::new(1.0, 1.0, 1.0)
+                        image: circle_image
                     }),
                     with_projection: false,
-                    image: Some(circle_image)
                 };
                 VecController {
                     position: position,
@@ -86,7 +85,6 @@ cfg_if! {
                         color: Point3::new(1.0, 1.0, 1.0)
                     }),
                     with_projection: false,
-                    image: None
                 }
             }
 

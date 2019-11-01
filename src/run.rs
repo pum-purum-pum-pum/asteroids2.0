@@ -22,6 +22,7 @@ use crate::systems::{
 use common::*;
 use components::*;
 use gfx_h::{effects::MenuParticles, Canvas, MovementParticles, ParticlesData};
+// #[cfg(not(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
 use log::info;
 use physics::safe_maintain;
 use physics_system::PhysicsSystem;
@@ -267,6 +268,10 @@ pub fn run() -> Result<(), String> {
                                         finger.pressure,
                                         dims.0 as u32,
                                         dims.1 as u32,
+                                        specs_world
+                                            .read_resource::<ThreadPin<Canvas>>(
+                                            )
+                                            .z_far
                                     ));
                                 }
                                 None => (),

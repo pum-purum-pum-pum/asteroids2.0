@@ -26,6 +26,11 @@ pub use specs;
 pub use specs_derive;
 pub use voronois;
 pub use once_cell;
+#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+#[macro_use]
+extern crate log;
+#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+extern crate android_log;
 
 /// int SDL_main(int argc, char *argv[])
 #[no_mangle]

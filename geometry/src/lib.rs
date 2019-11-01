@@ -408,7 +408,7 @@ impl Polygon {
     }
 
     pub fn deconstruct(&self, bullet: Point2, sites: usize) -> Vec<Polygon> {
-        if self.min_r < 0.7 {
+        if self.max_r < 1.2 {
             return vec![];
         }
         let mut transofrmed_points = self.points.clone();

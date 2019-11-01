@@ -1,4 +1,6 @@
 use super::*;
+use crate::gui::*;
+use physics::*;
 
 #[derive(Default)]
 pub struct GUISystem;
@@ -14,6 +16,11 @@ impl<'a> System<'a> for GUISystem {
             ReadStorage<'a, DoubleCoinsAbility>,
             ReadStorage<'a, DoubleExpAbility>,
             WriteStorage<'a, ShipStats>,
+            WriteStorage<'a, ShotGun>,
+            WriteStorage<'a, Isometry>,
+            WriteStorage<'a, Velocity>,
+            WriteStorage<'a, Spin>,
+            ReadStorage<'a, PhysicsComponent>,
             ReadExpect<'a, red::Viewport>,
         ),
         ReadExpect<'a, DevInfo>,
@@ -24,6 +31,10 @@ impl<'a> System<'a> for GUISystem {
         Read<'a, CurrentWave>,
         ReadExpect<'a, Pallete>,
         ReadExpect<'a, MacroGame>,
+        ReadExpect<'a, PreloadedSounds>,
+        Write<'a, EventChannel<Sound>>,
+        WriteExpect<'a, Touches>,
+        Write<'a, World<f32>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -37,6 +48,11 @@ impl<'a> System<'a> for GUISystem {
                 double_coins_abilities,
                 double_exp_abilities,
                 mut ships_stats,
+                mut shotguns,
+                isometries,
+                mut velocities,
+                mut spins,
+                physics,
                 viewport,
             ),
             // preloaded_particles,
@@ -48,6 +64,10 @@ impl<'a> System<'a> for GUISystem {
             current_wave,
             pallete,
             macro_game,
+            preloaded_sounds,
+            mut sounds_channel,
+            touches,
+            mut world,
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -74,7 +94,7 @@ impl<'a> System<'a> for GUISystem {
             Point2::new(ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
-            Image(preloaded_images.circle),
+            preloaded_images.circle,
         );
         #[cfg(any(
             target_os = "ios",
@@ -85,9 +105,9 @@ impl<'a> System<'a> for GUISystem {
             Point2::new(w - ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
-            Image(preloaded_images.circle),
+            preloaded_images.circle,
         );
-        let (_character, ship_stats, _) = if let Some(value) =
+        let (character, ship_stats, _) = if let Some(value) =
             (&entities, &mut ships_stats, &character_markers)
                 .join()
                 .next()
@@ -97,11 +117,7 @@ impl<'a> System<'a> for GUISystem {
             return;
         };
         // move controller
-        #[cfg(any(
-            target_os = "ios",
-            target_os = "android",
-            target_os = "emscripten"
-        ))]
+        #[cfg(target_os = "android")]
         {
             match move_controller.set(0, &mut ui, &touches) {
                 Some(dir) => {
@@ -152,39 +168,35 @@ impl<'a> System<'a> for GUISystem {
             match attack_controller.set(1, &mut ui, &touches) {
                 Some(dir) => {
                     let dir = dir.normalize();
-                    let blaster = blasters.get_mut(character);
-                    if let Some(blaster) = blaster {
-                        if blaster.shoot() {
+                    let shotgun = shotguns.get_mut(character);
+                    if let Some(shotgun) = shotgun {
+                        if shotgun.shoot() {
                             let isometry = *isometries.get(character).unwrap();
                             let position = isometry.0.translation.vector;
                             // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                            let velocity_rel = blaster.bullet_speed * dir;
+                            let velocity_rel = shotgun.bullet_speed * dir;
                             let char_velocity =
                                 velocities.get(character).unwrap();
                             let projectile_velocity = Velocity::new(
                                 char_velocity.0.x + velocity_rel.x,
                                 char_velocity.0.y + velocity_rel.y,
                             );
-                            sounds_channel
-                                .single_write(Sound(preloaded_sounds.shot));
+                            sounds_channel.single_write(Sound(
+                                preloaded_sounds.shot,
+                                Point2::new(position.x, position.y),
+                            ));
                             let rotation = Rotation2::rotation_between(
                                 &Vector2::new(0.0, 1.0),
                                 &dir,
                             );
-                            insert_channel.single_write(InsertEvent::Bullet {
-                                kind: EntityType::Player,
-                                iso: Point3::new(
-                                    position.x,
-                                    position.y,
-                                    rotation.angle(),
-                                ),
-                                velocity: Point2::new(
-                                    projectile_velocity.0.x,
-                                    projectile_velocity.0.y,
-                                ),
-                                damage: blaster.bullets_damage,
-                                owner: character,
-                            });
+                            let bullets = shotgun.spawn_bullets(
+                                EntityType::Player,
+                                isometries.get(character).unwrap().0,
+                                shotgun.bullet_speed,
+                                shotgun.bullets_damage,
+                                velocities.get(character).unwrap().0,
+                                character,
+                            );
                         }
                     }
                 }

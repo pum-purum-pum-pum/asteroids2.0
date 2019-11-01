@@ -1,3 +1,9 @@
+#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+#[macro_use]
+extern crate log;
+#[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
+extern crate android_log;
+
 pub use common;
 use noise::{NoiseFn, Perlin, Seedable};
 pub use rand;

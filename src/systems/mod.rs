@@ -216,7 +216,7 @@ pub fn spawn_asteroids(
                     position: spawn_position,
                 });
         }
-        if rng.gen_range(0.0, 1.0) < 0.05 {
+        if rng.gen_range(0.0, 1.0) < 0.01 {
             insert_channel.lock().unwrap().single_write(
                 InsertEvent::SideBulletCollectable {
                     position: spawn_position,
@@ -237,7 +237,7 @@ pub fn spawn_asteroids(
                 },
             );
         }
-        if rng.gen_range(0.0, 1.0) < 0.02 {
+        if rng.gen_range(0.0, 1.0) < 0.01 {
             insert_channel.lock().unwrap().single_write(
                 InsertEvent::ReflectBulletCollectable {
                     position: spawn_position,
