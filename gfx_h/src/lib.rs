@@ -64,7 +64,7 @@ pub fn perspective(width: u32, height: u32) -> Perspective3 {
 
 fn gl_assert_ok(gl_context: &red::GL) {
     let err = unsafe { gl_context.get_error() };
-    assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));
+    // assert_eq!(err, glow::NO_ERROR, "{}", gl_err_to_str(err));
 }
 
 fn gl_err_to_str(err: u32) -> &'static str {
@@ -371,15 +371,13 @@ pub fn create_shader_program(
 ) -> Result<red::Program, String> {
     let vertex = format!("{}gles/v_{}.glsl", pref, name);
     let fragment = format!("{}gles/f_{}.glsl", pref, name);
+    #[cfg(any(target_os = "android"))]
+    trace!("{:?}, \n {:?}", vertex, fragment);
     let (vertex_shader, fragment_shader) = (
         format!("{}\n{}", glsl_version, read_file(&vertex).unwrap()),
         format!("{}\n{}", glsl_version, read_file(&fragment).unwrap()),
     );
-    #[cfg(any(
-        target_os = "ios",
-        target_os = "android",
-        target_os = "emscripten"
-    ))]
+    #[cfg(any(target_os = "android"))]
     trace!(
         "{:?} \n {:?} \n {:?}",
         vertex_shader,

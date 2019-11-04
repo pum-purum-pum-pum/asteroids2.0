@@ -81,39 +81,51 @@ members = [
 
 [profile.dev.overrides.gfx_h]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.common]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.voronoi]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.telemetry]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.components]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.geometry]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.sound]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.physics]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.physics_system]
 opt-level = 3
+debug = true
 
 [profile.dev.build-override]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides."*"]
 opt-level = 3
+debug = true
 
 [profile.dev.overrides.nphysics2d]
 opt-level = 3
+debug = true
 codegen-units = 16
 
 [profile.release]

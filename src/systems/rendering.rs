@@ -482,7 +482,7 @@ impl<'a> System<'a> for RenderingSystem {
             &mut frame,
             &sprite_batch,
             true,
-            None,
+            Some(red::Blend),
         );
         flame::end("sprite batch rendering");
         flame::start("particles rendering");

@@ -3,9 +3,12 @@ use backtrace::Backtrace;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::rwops::RWops;
+use sdl2::filesystem::pref_path;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
+#[cfg(any(target_os = "android"))]
+use log::trace;
 
 #[cfg(any(target_os = "android"))]
 use std::panic;
@@ -33,21 +36,31 @@ use std::path::Path;
 use telemetry::TimeSpans;
 
 pub fn run() -> Result<(), String> {
+    #[cfg(any(target_os = "android"))]
+    setup_android();
+    #[cfg(any(target_os = "android"))]
+    trace!("hello androigeni4!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     let mut specs_world = SpecsWorld::new();
     data_setup(&mut specs_world);
+    #[cfg(not(any(target_os = "android")))]
     let _guard = setup_logging();
     let telegraph = setup_telegraph();
     let time_spans = TimeSpans::new();
-    setup_android();
+    #[cfg(any(target_os = "android"))]
+    #[cfg(any(target_os = "android"))]
+    trace!("opa 1");
     setup_physics(&mut specs_world);
-
     // We need to own _gl_context to avoid RAII crazyness
     let (context, sdl_context, render_loop, _gl_context, hdpi, canvas) =
         setup_gfx(&mut specs_world)?;
+    #[cfg(any(target_os = "android"))]
+    trace!("opa 2");
     // Hide the cursor
     sdl_context.mouse().show_cursor(false);
     setup_text(&context, &mut specs_world);
     let atlas = read_atlas("assets/out.ron");
+    #[cfg(any(target_os = "android"))]
+    trace!("opa 3");
     let name_to_atlas = setup_images(&atlas);
     let mut asteroids_spawn_channel: EventChannel<InsertEvent> =
         EventChannel::with_capacity(100);
@@ -215,6 +228,8 @@ pub fn run() -> Result<(), String> {
             mouse_state.set_right(buttons.contains(&MouseButton::Right));
             let dims =
                 specs_world.read_resource::<red::Viewport>().dimensions();
+            #[cfg(target_os = "android")]
+            trace!("wat1");
             mouse_state.set_position(
                 state.x(),
                 state.y(),
@@ -223,6 +238,8 @@ pub fn run() -> Result<(), String> {
                 dims.1 as u32,
                 specs_world.read_resource::<ThreadPin<Canvas>>().z_far,
             );
+            #[cfg(target_os = "android")]
+            trace!("wat2");
             // fingers
             {
                 #[cfg(not(target_os = "android"))]
@@ -251,10 +268,15 @@ pub fn run() -> Result<(), String> {
                 #[cfg(target_os = "android")]
                 {
                     let mut touches = specs_world.write_resource::<Touches>();
+                    #[cfg(target_os = "android")]
+                    trace!("wat3");
                     // TODO add multy touch here
                     if sdl2::touch::num_touch_devices() > 0 {
                         let device = sdl2::touch::touch_device(0);
+                        trace!("wat4");
+                        trace!("{}", sdl2::touch::num_touch_fingers(device));
                         for i in 0..sdl2::touch::num_touch_fingers(device) {
+                            trace!("iterating over touch {}", i);
                             match sdl2::touch::touch_finger(device, i) {
                                 Some(finger) => {
                                     touches[i as usize] = Some(Finger::new(
@@ -349,8 +371,14 @@ pub fn run() -> Result<(), String> {
                         pretty,
                     )
                     .expect("Serialization failed");
+                    #[cfg(any(target_os = "android"))]
+                    let pref =pref_path("vlad", "twenty_ateroids").expect("failed to get pref path");
                     let file = "rons/macro_game.ron";
+                    #[cfg(any(target_os = "android"))]
+                    let file = format!("{}/{}", pref, file);
                     // let mut rw = RWops::from_file(Path::new(&file), "r+").expect("failed to load macro game");
+                    #[cfg(any(target_os = "android"))]
+                    trace!("starting opening");
                     eprintln!("{}", s);
                     if let Ok(mut rw) = RWops::from_file(Path::new(&file), "w+")
                     {

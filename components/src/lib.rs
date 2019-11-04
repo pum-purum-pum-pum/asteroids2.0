@@ -550,8 +550,8 @@ impl Default for MacroGame {
         MacroGame {
             score_table: vec![],
             coins: 0,
-            ships_unlocked: vec![true, false],
-            guns_unlocked: vec![true, false],
+            ships_unlocked: vec![true, false, false],
+            guns_unlocked: vec![true, false, false],
         }
     }
 }
@@ -606,8 +606,6 @@ pub struct PreloadedImages {
     pub circle: AtlasImage,
     pub lazer: AtlasImage,
     pub blaster: AtlasImage,
-    pub shotgun: AtlasImage,
-    pub play: AtlasImage,
     pub coin: AtlasImage,
     pub exp: AtlasImage,
     pub health: AtlasImage,

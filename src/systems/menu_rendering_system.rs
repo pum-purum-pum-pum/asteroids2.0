@@ -88,7 +88,7 @@ impl<'a> System<'a> for MenuRenderingSystem {
         let button_images = vec![
             preloaded_images.blaster,
             preloaded_images.lazer,
-            preloaded_images.shotgun,
+            preloaded_images.blaster,
         ];
         let shift_between = w / 20f32;
         let shift_init = w / 2.0 - shift_between - button_w - button_w / 2.0;
@@ -193,6 +193,8 @@ impl<'a> System<'a> for MenuRenderingSystem {
             Widgets::LockedSuperShip,
         ];
         for (i, ship) in description.player_ships.iter().enumerate() {
+            #[cfg(target_os = "android")]
+            trace!("{} of / {}", i, buttons_num);
             let unlocked = macro_game.ships_unlocked[i];
             let button_position = Point2::new(
                 shift_init + i as f32 * (shift_between + button_w),

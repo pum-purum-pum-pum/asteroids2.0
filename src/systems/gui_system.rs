@@ -35,6 +35,7 @@ impl<'a> System<'a> for GUISystem {
         Write<'a, EventChannel<Sound>>,
         WriteExpect<'a, Touches>,
         Write<'a, World<f32>>,
+        Write<'a, EventChannel<InsertEvent>>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -68,6 +69,7 @@ impl<'a> System<'a> for GUISystem {
             mut sounds_channel,
             touches,
             mut world,
+            mut insert_channel
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -197,6 +199,7 @@ impl<'a> System<'a> for GUISystem {
                                 velocities.get(character).unwrap().0,
                                 character,
                             );
+                            insert_channel.iter_write(bullets.into_iter());
                         }
                     }
                 }
