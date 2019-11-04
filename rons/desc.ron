@@ -55,7 +55,7 @@
             reflection: None,
             bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 1, nanos: 200_000_000),
-            bullet_image: "enemy_bullet"
+            bullet_image: "bullet"
         )),
         MultyLazer((
             angle: 0.25,

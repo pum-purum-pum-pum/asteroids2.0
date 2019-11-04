@@ -14,16 +14,18 @@ impl<'a> System<'a> for CommonRespawn {
         WriteStorage<'a, NebulaMarker>,
         WriteStorage<'a, PlanetMarker>,
         Write<'a, EventChannel<InsertEvent>>,
+        Write<'a, World<f32>>,
         WriteExpect<'a, FogGrid>,
         WriteExpect<'a, StarsGrid>,
         WriteExpect<'a, NebulaGrid>,
         WriteExpect<'a, PlanetGrid>,
+        ReadStorage<'a, PhysicsComponent>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
         let (
             entities,
-            isometries,
+            mut isometries,
             asteroid_markers,
             character_markers,
             ships,
@@ -32,10 +34,12 @@ impl<'a> System<'a> for CommonRespawn {
             nebulas,
             planets,
             mut insert_channel,
+            mut world,
             mut big_star_grid,
             mut stars_grid,
             mut nebula_grid,
             mut planet_grid,
+            physics,
         ) = data;
         let character_position =
             if let Some((_char_entity, char_isometry, _char)) =
@@ -238,15 +242,24 @@ impl<'a> System<'a> for CommonRespawn {
                 entities.delete(entity).unwrap();
             }
         }
-        for (entity, isometry, _ship) in (&entities, &isometries, &ships).join()
+        for (entity, isometry, phys, _ship) in (&entities, &mut isometries, &physics, &ships).join()
         {
             let pos3d = isometry.0.translation.vector;
-            if !is_active(
+            if !is_active_rad(
                 character_position,
                 Point2::new(pos3d.x, pos3d.y),
-                ACTIVE_AREA,
+                ENEMY_ACTIVE_AREA,
             ) {
-                entities.delete(entity).unwrap();
+                let reflected = area_reflection(
+                    character_position,
+                    Point2::new(pos3d.x, pos3d.y),
+                    ENEMY_ACTIVE_AREA
+                );
+                let body = world.rigid_body_mut(phys.body_handle).unwrap();
+                let mut physics_isometry = *body.position();
+                physics_isometry.translation.vector.x = reflected.x;
+                physics_isometry.translation.vector.y = reflected.y;
+                body.set_position(physics_isometry);
             }
         }
         // dbg!((&entities).join().count());

@@ -65,6 +65,7 @@ const SCREEN_AREA: f32 = 10f32;
 // we will spwan new objects in ACTIVE_AREA but not in PLAYER_AREA
 const PLAYER_AREA: f32 = 20f32;
 const ACTIVE_AREA: f32 = 40f32;
+const ENEMY_ACTIVE_AREA: f32 = 21f32;
 // the same for NEBULAS
 #[cfg(debug_assertions)]
 const ASTEROIDS_MIN_NUMBER: usize = 20;
@@ -130,6 +131,23 @@ pub fn is_active(
 ) -> bool {
     (point.x - character_position.x).abs() < active_area
         && (point.y - character_position.y).abs() < active_area
+}
+
+pub fn is_active_rad(
+    character_position: Point2,
+    point: Point2,
+    active_area: f32,
+) -> bool {
+    (point.coords - character_position.coords).norm() < active_area
+}
+
+pub fn area_reflection(
+    character_position: Point2,
+    point: Point2,
+    active_area: f32,
+) -> Point2 {
+    let dir = (point.coords - character_position.coords).normalize();
+    character_position - dir * active_area * 0.9
 }
 
 fn get_collision_groups(kind: EntityType) -> CollisionGroups {

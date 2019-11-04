@@ -86,7 +86,7 @@ impl<'a> System<'a> for GUISystem {
             target_os = "android",
             target_os = "emscripten"
         ))]
-        let ctrl_size = stick_size * 10.0;
+        let ctrl_size = stick_size * 5.0;
         #[cfg(any(
             target_os = "ios",
             target_os = "android",
@@ -134,6 +134,24 @@ impl<'a> System<'a> for GUISystem {
                         (*character_body.position(), *character_body.velocity())
                     };
 
+
+                    // let rotation = isometries.get(character).unwrap().0.rotation;
+                    // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
+                    let thrust = 1.5 * ship_stats.thrust_force
+                        * Vector3::new(dir.x, dir.y, 0.0);
+                    *character_velocity.as_vector_mut() += thrust;
+                    let character_body = world
+                        .rigid_body_mut(
+                            physics.get(character).unwrap().body_handle,
+                        )
+                        .unwrap();
+                    character_body.set_velocity(character_velocity);
+                }
+                None => (),
+            }
+
+            match attack_controller.set(1, &mut ui, &touches) {
+                Some(dir) => {
                     for (iso, _vel, spin, _char_marker) in (
                         &isometries,
                         &mut velocities,
@@ -152,23 +170,6 @@ impl<'a> System<'a> for GUISystem {
                             player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
                     }
 
-                    // let rotation = isometries.get(character).unwrap().0.rotation;
-                    // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
-                    let thrust = ship_stats.thrust_force
-                        * Vector3::new(dir.x, dir.y, 0.0);
-                    *character_velocity.as_vector_mut() += thrust;
-                    let character_body = world
-                        .rigid_body_mut(
-                            physics.get(character).unwrap().body_handle,
-                        )
-                        .unwrap();
-                    character_body.set_velocity(character_velocity);
-                }
-                None => (),
-            }
-
-            match attack_controller.set(1, &mut ui, &touches) {
-                Some(dir) => {
                     let dir = dir.normalize();
                     let shotgun = shotguns.get_mut(character);
                     if let Some(shotgun) = shotgun {
