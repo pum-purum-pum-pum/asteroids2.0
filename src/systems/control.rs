@@ -383,15 +383,11 @@ impl<'a> System<'a> for ControlSystem {
                     }
                     _ => (),
                 };
-                let maneuverability = ship_stats.maneuverability.unwrap();
-                let depth = 30.0 * thrust.norm();
-                let scalar =
-                    thrust.normalize().dot(&*character_velocity.as_vector());
-                if scalar < depth {
-                    let x = scalar - depth;
-                    thrust *=
-                        maneuverability * (1.0 + x.abs() * x.abs().sqrt());
-                }
+                thrust = thrust_calculation(
+                    ship_stats.maneuverability.unwrap(),
+                    thrust,
+                    *character_velocity.as_vector()
+                );
                 *character_velocity.as_vector_mut() += thrust;
             }
             let new_pressed = &self.new_keys - &self.prev_keys;

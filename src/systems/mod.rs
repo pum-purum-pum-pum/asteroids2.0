@@ -92,6 +92,22 @@ const COLLECTABLE_DOUBLE_COINS_SEC: u64 = 5;
 const COLLECTABLE_REFLECT_BULLET_SEC: u64 = 5;
 const DESTUCTION_SITES: usize = 20;
 
+pub fn thrust_calculation(
+    maneuverability: f32,
+    mut thrust: Vector3,
+    character_velocity: Vector3
+) -> Vector3 {
+    let depth = 30.0 * thrust.norm();
+    let scalar =
+        thrust.normalize().dot(&character_velocity);
+    if scalar < depth {
+        let x = scalar - depth;
+        thrust *=
+            maneuverability * (1.0 + x.abs() * x.abs().sqrt());
+    }
+    thrust
+}
+
 pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut rng = thread_rng();
     let rotation = rng.gen_range(-1E-1, 1E-1);

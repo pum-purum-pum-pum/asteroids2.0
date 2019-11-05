@@ -55,6 +55,7 @@ impl Default for UpgradesStats {
 pub struct TimeTracker {
     timestamp: Instant,
     game_timestamp: Instant,
+    delta: Duration
 }
 
 impl TimeTracker {
@@ -62,6 +63,7 @@ impl TimeTracker {
         TimeTracker {
             timestamp: Instant::now(),
             game_timestamp: Instant::now(),
+            delta: Duration::from_secs(0)
         }
     }
 
@@ -73,7 +75,12 @@ impl TimeTracker {
         }
         self.game_timestamp += res;
         self.timestamp = now;
+        self.delta = res;
         res
+    }
+
+    pub fn last_delta(&self) -> Duration {
+        self.delta
     }
 
     pub fn now(&self) -> Instant {

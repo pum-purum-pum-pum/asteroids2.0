@@ -38,31 +38,34 @@ cfg_if! {
             /// returns radius vector with lenght from 0 to 1 if updated
             pub fn set(&self, id: usize, ui: &mut UI,  touches: &Touches) -> Option<Vector2> {
                 ui.primitives.push(self.controller_geometry.clone());
+                // touches assumed to be FINGER_NUMBER sized array so we iterate over all possible touches
                 for (touch_id, touch) in touches.iter().enumerate() {
                     let previously_attached =
                         ui.widget_finger[touch_id].is_some() &&
                         ui.widget_finger[touch_id].unwrap() == id;
-                    match touch {
-                        Some(touch) => {
-                            if self.is_in(touch) || previously_attached {
-                                let mut new_pos = Point2::new(touch.x_o, touch.y_o);
-                                let mut dir = new_pos - self.position;
-                                if dir.norm() > self.radius {
-                                    dir = dir.normalize() * self.radius;
-                                }
-                                new_pos = self.position + dir;
-                                // let new_pos = Point2::new(raw.x, raw.y);
-                                ui.widget_finger[touch_id] = Some(id);
-                                ui.primitives.push(
-                                    self.stick_geometry(new_pos)
-                                );
-                                return Some(self.get_rad(new_pos))
-                            };
-                        }
-                        None => {
+                    if let Some(touch) = touch {
+                        if self.is_in(touch) || previously_attached {
+                            let mut new_pos = Point2::new(touch.x_o, touch.y_o);
+                            let mut dir = new_pos - self.position;
+                            if dir.norm() > self.radius {
+                                dir = dir.normalize() * self.radius;
+                            }
+                            new_pos = self.position + dir;
+                            // let new_pos = Point2::new(raw.x, raw.y);
+                            ui.widget_finger[touch_id] = Some(id);
+                            ui.primitives.push(
+                                self.stick_geometry(new_pos)
+                            );
+                            return Some(self.get_rad(new_pos))
+                        } else {
                             if previously_attached {
                                 ui.widget_finger[touch_id] = None;
                             }
+                        }
+                    }
+                    else {
+                        if previously_attached {
+                            ui.widget_finger[touch_id] = None;
                         }
                     }
                 }

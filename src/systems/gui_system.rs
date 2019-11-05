@@ -75,34 +75,18 @@ impl<'a> System<'a> for GUISystem {
         let (w, h) = (dims.0 as f32, dims.1 as f32);
         let d = (w * w + h * h).sqrt();
         //contorls
-        #[cfg(any(
-            target_os = "ios",
-            target_os = "android",
-            target_os = "emscripten"
-        ))]
+        #[cfg(any(target_os = "android"))]
         let stick_size = w / 80.0;
-        #[cfg(any(
-            target_os = "ios",
-            target_os = "android",
-            target_os = "emscripten"
-        ))]
-        let ctrl_size = stick_size * 5.0;
-        #[cfg(any(
-            target_os = "ios",
-            target_os = "android",
-            target_os = "emscripten"
-        ))]
+        #[cfg(any(target_os = "android"))]
+        let ctrl_size = stick_size * 10.0;
+        #[cfg(any(target_os = "android"))]
         let move_controller = VecController::new(
             Point2::new(ctrl_size, h - ctrl_size),
             ctrl_size,
             stick_size,
             preloaded_images.circle,
         );
-        #[cfg(any(
-            target_os = "ios",
-            target_os = "android",
-            target_os = "emscripten"
-        ))]
+        #[cfg(any(target_os = "android"))]
         let attack_controller = VecController::new(
             Point2::new(w - ctrl_size, h - ctrl_size),
             ctrl_size,
@@ -121,90 +105,86 @@ impl<'a> System<'a> for GUISystem {
         // move controller
         #[cfg(target_os = "android")]
         {
-            match move_controller.set(0, &mut ui, &touches) {
-                Some(dir) => {
-                    let (character, _) =
-                        (&entities, &character_markers).join().next().unwrap();
-                    let (_character_isometry, mut character_velocity) = {
-                        let character_body = world
-                            .rigid_body(
-                                physics.get(character).unwrap().body_handle,
-                            )
-                            .unwrap();
-                        (*character_body.position(), *character_body.velocity())
-                    };
-
-
-                    // let rotation = isometries.get(character).unwrap().0.rotation;
-                    // let thrust = player_stats.thrust_force * (rotation * Vector3::new(0.0, -1.0, 0.0));
-                    let thrust = 1.5 * ship_stats.thrust_force
-                        * Vector3::new(dir.x, dir.y, 0.0);
-                    *character_velocity.as_vector_mut() += thrust;
+            if let Some(dir) = move_controller.set(0, &mut ui, &touches) {
+                let (character, _) =
+                    (&entities, &character_markers).join().next().unwrap();
+                let (_character_isometry, mut character_velocity) = {
                     let character_body = world
-                        .rigid_body_mut(
+                        .rigid_body(
                             physics.get(character).unwrap().body_handle,
                         )
                         .unwrap();
-                    character_body.set_velocity(character_velocity);
-                }
-                None => (),
-            }
-
-            match attack_controller.set(1, &mut ui, &touches) {
-                Some(dir) => {
-                    for (iso, _vel, spin, _char_marker) in (
-                        &isometries,
-                        &mut velocities,
-                        &mut spins,
-                        &character_markers,
+                    (*character_body.position(), *character_body.velocity())
+                };
+                let time_scaler = normalize_60frame(TRACKER.lock().unwrap().last_delta());
+                let mut thrust = time_scaler * ship_stats.thrust_force
+                    * Vector3::new(dir.x, dir.y, 0.0);
+                thrust = thrust_calculation(
+                    ship_stats.maneuverability.unwrap(),
+                    thrust,
+                    *character_velocity.as_vector()
+                );
+                *character_velocity.as_vector_mut() += thrust;
+                let character_body = world
+                    .rigid_body_mut(
+                        physics.get(character).unwrap().body_handle,
                     )
-                        .join()
-                    {
-                        let player_torque = DT
-                            * calculate_player_ship_spin_for_aim(
-                                dir,
-                                iso.rotation(),
-                                spin.0,
-                            );
-                        spin.0 +=
-                            player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
-                    }
+                    .unwrap();
+                character_body.set_velocity(character_velocity);
+            } 
 
-                    let dir = dir.normalize();
-                    let shotgun = shotguns.get_mut(character);
-                    if let Some(shotgun) = shotgun {
-                        if shotgun.shoot() {
-                            let isometry = *isometries.get(character).unwrap();
-                            let position = isometry.0.translation.vector;
-                            // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
-                            let velocity_rel = shotgun.bullet_speed * dir;
-                            let char_velocity =
-                                velocities.get(character).unwrap();
-                            let projectile_velocity = Velocity::new(
-                                char_velocity.0.x + velocity_rel.x,
-                                char_velocity.0.y + velocity_rel.y,
-                            );
-                            sounds_channel.single_write(Sound(
-                                preloaded_sounds.shot,
-                                Point2::new(position.x, position.y),
-                            ));
-                            let rotation = Rotation2::rotation_between(
-                                &Vector2::new(0.0, 1.0),
-                                &dir,
-                            );
-                            let bullets = shotgun.spawn_bullets(
-                                EntityType::Player,
-                                isometries.get(character).unwrap().0,
-                                shotgun.bullet_speed,
-                                shotgun.bullets_damage,
-                                velocities.get(character).unwrap().0,
-                                character,
-                            );
-                            insert_channel.iter_write(bullets.into_iter());
-                        }
+            if let Some(dir) = attack_controller.set(1, &mut ui, &touches) {
+                for (iso, _vel, spin, _char_marker) in (
+                    &isometries,
+                    &mut velocities,
+                    &mut spins,
+                    &character_markers,
+                )
+                    .join()
+                {
+                    let player_torque = DT
+                        * calculate_player_ship_spin_for_aim(
+                            dir,
+                            iso.rotation(),
+                            spin.0,
+                        );
+                    spin.0 +=
+                        player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                }
+
+                let dir = dir.normalize();
+                let shotgun = shotguns.get_mut(character);
+                if let Some(shotgun) = shotgun {
+                    if shotgun.shoot() {
+                        let isometry = *isometries.get(character).unwrap();
+                        let position = isometry.0.translation.vector;
+                        // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
+                        let velocity_rel = shotgun.bullet_speed * dir;
+                        let char_velocity =
+                            velocities.get(character).unwrap();
+                        let projectile_velocity = Velocity::new(
+                            char_velocity.0.x + velocity_rel.x,
+                            char_velocity.0.y + velocity_rel.y,
+                        );
+                        sounds_channel.single_write(Sound(
+                            preloaded_sounds.shot,
+                            Point2::new(position.x, position.y),
+                        ));
+                        let rotation = Rotation2::rotation_between(
+                            &Vector2::new(0.0, 1.0),
+                            &dir,
+                        );
+                        let bullets = shotgun.spawn_bullets(
+                            EntityType::Player,
+                            isometries.get(character).unwrap().0,
+                            shotgun.bullet_speed,
+                            shotgun.bullets_damage,
+                            velocities.get(character).unwrap().0,
+                            character,
+                        );
+                        insert_channel.iter_write(bullets.into_iter());
                     }
                 }
-                None => (),
             }
         }
         // FPS

@@ -268,35 +268,31 @@ pub fn run() -> Result<(), String> {
                 #[cfg(target_os = "android")]
                 {
                     let mut touches = specs_world.write_resource::<Touches>();
-                    #[cfg(target_os = "android")]
-                    trace!("wat3");
                     // TODO add multy touch here
                     if sdl2::touch::num_touch_devices() > 0 {
                         let device = sdl2::touch::touch_device(0);
-                        trace!("wat4");
-                        trace!("{}", sdl2::touch::num_touch_fingers(device));
-                        for i in 0..sdl2::touch::num_touch_fingers(device) {
+                        for i in 0..FINGER_NUMBER as i32 {
                             trace!("iterating over touch {}", i);
-                            match sdl2::touch::touch_finger(device, i) {
-                                Some(finger) => {
-                                    touches[i as usize] = Some(Finger::new(
-                                        finger.id as usize,
-                                        finger.x * dims.0 as f32,
-                                        finger.y * dims.1 as f32,
-                                        specs_world
-                                            .read_resource::<ThreadPin<Canvas>>(
-                                            )
-                                            .observer(),
-                                        finger.pressure,
-                                        dims.0 as u32,
-                                        dims.1 as u32,
-                                        specs_world
-                                            .read_resource::<ThreadPin<Canvas>>(
-                                            )
-                                            .z_far
-                                    ));
-                                }
-                                None => (),
+                            if let Some(finger) = sdl2::touch::touch_finger(device, i) {
+                                touches[i as usize] = Some(Finger::new(
+                                    finger.id as usize,
+                                    finger.x * dims.0 as f32,
+                                    finger.y * dims.1 as f32,
+                                    specs_world
+                                        .read_resource::<ThreadPin<Canvas>>(
+                                        )
+                                        .observer(),
+                                    finger.pressure,
+                                    dims.0 as u32,
+                                    dims.1 as u32,
+                                    specs_world
+                                        .read_resource::<ThreadPin<Canvas>>(
+                                        )
+                                        .z_far
+                                ));
+                            }
+                            else {
+                                touches[i as usize] = None
                             }
                         }
                     }
