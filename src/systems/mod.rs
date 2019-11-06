@@ -39,6 +39,7 @@ mod rendering;
 mod score_table;
 mod sound_system;
 mod upgrade_ui;
+mod ui_controlling;
 
 pub use ai::*;
 pub use collision::*;
@@ -56,6 +57,7 @@ pub use rendering::*;
 pub use score_table::*;
 pub use sound_system::*;
 pub use upgrade_ui::*;
+pub use ui_controlling::*;
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const VELOCITY_MAX: f32 = 1f32;

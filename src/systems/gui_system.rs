@@ -36,6 +36,7 @@ impl<'a> System<'a> for GUISystem {
         WriteExpect<'a, Touches>,
         Write<'a, World<f32>>,
         Write<'a, EventChannel<InsertEvent>>,
+        Write<'a, AppState>,
     );
 
     fn run(&mut self, data: Self::SystemData) {
@@ -69,7 +70,8 @@ impl<'a> System<'a> for GUISystem {
             mut sounds_channel,
             touches,
             mut world,
-            mut insert_channel
+            mut insert_channel,
+            mut app_state,
         ) = data;
         let dims = viewport.dimensions();
         let (w, h) = (dims.0 as f32, dims.1 as f32);
@@ -105,6 +107,7 @@ impl<'a> System<'a> for GUISystem {
         // move controller
         #[cfg(target_os = "android")]
         {
+            let mut controlling = touches.iter().any(|x| x.is_some());
             if let Some(dir) = move_controller.set(0, &mut ui, &touches) {
                 let (character, _) =
                     (&entities, &character_markers).join().next().unwrap();
@@ -117,7 +120,7 @@ impl<'a> System<'a> for GUISystem {
                     (*character_body.position(), *character_body.velocity())
                 };
                 let time_scaler = normalize_60frame(TRACKER.lock().unwrap().last_delta());
-                let mut thrust = time_scaler * ship_stats.thrust_force
+                let mut thrust = ship_stats.thrust_force
                     * Vector3::new(dir.x, dir.y, 0.0);
                 thrust = thrust_calculation(
                     ship_stats.maneuverability.unwrap(),
