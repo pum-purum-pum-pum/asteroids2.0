@@ -113,28 +113,25 @@ impl<'a> System<'a> for GUISystem {
                     (&entities, &character_markers).join().next().unwrap();
                 let (_character_isometry, mut character_velocity) = {
                     let character_body = world
-                        .rigid_body(
-                            physics.get(character).unwrap().body_handle,
-                        )
+                        .rigid_body(physics.get(character).unwrap().body_handle)
                         .unwrap();
                     (*character_body.position(), *character_body.velocity())
                 };
-                let time_scaler = normalize_60frame(TRACKER.lock().unwrap().last_delta());
-                let mut thrust = ship_stats.thrust_force
-                    * Vector3::new(dir.x, dir.y, 0.0);
+                let time_scaler =
+                    normalize_60frame(TRACKER.lock().unwrap().last_delta());
+                let mut thrust =
+                    ship_stats.thrust_force * Vector3::new(dir.x, dir.y, 0.0);
                 thrust = thrust_calculation(
                     ship_stats.maneuverability.unwrap(),
                     thrust,
-                    *character_velocity.as_vector()
+                    *character_velocity.as_vector(),
                 );
                 *character_velocity.as_vector_mut() += thrust;
                 let character_body = world
-                    .rigid_body_mut(
-                        physics.get(character).unwrap().body_handle,
-                    )
+                    .rigid_body_mut(physics.get(character).unwrap().body_handle)
                     .unwrap();
                 character_body.set_velocity(character_velocity);
-            } 
+            }
 
             if let Some(dir) = attack_controller.set(1, &mut ui, &touches) {
                 for (iso, _vel, spin, _char_marker) in (
@@ -151,8 +148,7 @@ impl<'a> System<'a> for GUISystem {
                             iso.rotation(),
                             spin.0,
                         );
-                    spin.0 +=
-                        player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                    spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
                 }
 
                 let dir = dir.normalize();
@@ -163,8 +159,7 @@ impl<'a> System<'a> for GUISystem {
                         let position = isometry.0.translation.vector;
                         // let direction = isometry.0 * Vector3::new(0f32, -1f32, 0f32);
                         let velocity_rel = shotgun.bullet_speed * dir;
-                        let char_velocity =
-                            velocities.get(character).unwrap();
+                        let char_velocity = velocities.get(character).unwrap();
                         let projectile_velocity = Velocity::new(
                             char_velocity.0.x + velocity_rel.x,
                             char_velocity.0.y + velocity_rel.y,
@@ -196,7 +191,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w / 7.0, h / 20.0),
                 text: format!("FPS: {}", dev_info.fps).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
-                font_size: 1.0
+                font_size: 1.0,
             }),
             with_projection: false,
         });
@@ -207,7 +202,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w - w / 7.0, h / 20.0),
                 text: format!("Score: {}", progress.score).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
-                font_size: 1.0
+                font_size: 1.0,
             }),
             with_projection: false,
         });
@@ -217,7 +212,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w - w / 7.0, h / 20.0),
                 text: format!("$ {}", macro_game.coins).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
-                font_size: 1.0
+                font_size: 1.0,
             }),
             with_projection: false,
         });
@@ -227,7 +222,7 @@ impl<'a> System<'a> for GUISystem {
                 position: Point2::new(w - w / 7.0, h / 7.0 + h / 20.0),
                 text: format!("Wave: {}", current_wave.id).to_string(),
                 color: (1.0, 1.0, 1.0, 1.0),
-                font_size: 1.0
+                font_size: 1.0,
             }),
             with_projection: false,
         });
@@ -284,7 +279,7 @@ impl<'a> System<'a> for GUISystem {
                     ),
                     text: ability.text.clone(),
                     color: (1.0, 1.0, 1.0, 1.0),
-                    font_size: 1.0
+                    font_size: 1.0,
                 }),
                 with_projection: false,
             });

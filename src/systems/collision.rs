@@ -1,5 +1,7 @@
 use super::*;
 use log::info;
+use nphysics2d::algebra::Force2;
+use nphysics2d::algebra::ForceType;
 
 const ASTEROID_DAMAGE: usize = 150usize;
 
@@ -208,6 +210,32 @@ impl<'a> System<'a> for CollisionSystem {
                 let asteroid = entity1;
                 let mut asteroid_explosion = false;
                 let mut bullet_position = None;
+                // 
+                if asteroids.get(entity2).is_some() {
+                    // let asteroid1 = entity1;
+                    // let asteroid2 = entity2;
+                    // let (pos1, pos2) = {
+                    //     let iso1 = isometries.get(entity1).unwrap();
+                    //     let iso2 = isometries.get(entity2).unwrap();
+                    //     let (pos1, pos2) = (iso1.0.translation.vector, iso2.0.translation.vector);
+                    //     (Vector2::new(pos1.x, pos1.y), Vector2::new(pos2.x, pos2.y))
+                    // };
+                    // let (poly1, poly2) = {
+                    //     (polygons.get(asteroid1).unwrap(), polygons.get(asteroid2).unwrap())
+                    // };
+                    // let phys1 = physics_components.get(asteroid1).unwrap();
+                    // let phys2 = physics_components.get(asteroid2).unwrap();
+                    // let rigid_body1 = world
+                    //     .rigid_body_mut(phys1.body_handle).unwrap();
+                    // let dir1 = pos1 - pos2;
+                    // let force1 = Force2::new(poly1.min_r * 0.3 * (dir1).normalize(), 0.0);
+                    // rigid_body1.apply_force(0, &force1, ForceType::Force, true);
+                    // let rigid_body2 = world
+                    //     .rigid_body_mut(phys2.body_handle).unwrap();
+                    // let dir2 = pos2 - pos1;
+                    // let force2 = Force2::new(poly2.min_r * 0.3 * (dir2).normalize(), 0.0);
+                    // rigid_body2.apply_force(0, &force2, ForceType::Force, true);
+                }
                 if projectiles.get(entity2).is_some() {
                     let proj_pos =
                         isometries.get(entity2).unwrap().0.translation.vector;

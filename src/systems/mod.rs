@@ -38,8 +38,8 @@ mod menu_rendering_system;
 mod rendering;
 mod score_table;
 mod sound_system;
-mod upgrade_ui;
 mod ui_controlling;
+mod upgrade_ui;
 
 pub use ai::*;
 pub use collision::*;
@@ -56,8 +56,8 @@ pub use physics_system::*;
 pub use rendering::*;
 pub use score_table::*;
 pub use sound_system::*;
-pub use upgrade_ui::*;
 pub use ui_controlling::*;
+pub use upgrade_ui::*;
 
 const DAMPING_FACTOR: f32 = 0.98f32;
 const VELOCITY_MAX: f32 = 1f32;
@@ -72,7 +72,7 @@ const ENEMY_ACTIVE_AREA: f32 = 21f32;
 #[cfg(debug_assertions)]
 const ASTEROIDS_MIN_NUMBER: usize = 20;
 #[cfg(not(debug_assertions))]
-const ASTEROIDS_MIN_NUMBER: usize = 100;
+const ASTEROIDS_MIN_NUMBER: usize = 70;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
@@ -97,15 +97,13 @@ const DESTUCTION_SITES: usize = 20;
 pub fn thrust_calculation(
     maneuverability: f32,
     mut thrust: Vector3,
-    character_velocity: Vector3
+    character_velocity: Vector3,
 ) -> Vector3 {
     let depth = 30.0 * thrust.norm();
-    let scalar =
-        thrust.normalize().dot(&character_velocity);
+    let scalar = thrust.normalize().dot(&character_velocity);
     if scalar < depth {
         let x = scalar - depth;
-        thrust *=
-            maneuverability * (1.0 + x.abs() * x.abs().sqrt());
+        thrust *= maneuverability * (1.0 + x.abs() * x.abs().sqrt());
     }
     thrust
 }
@@ -113,8 +111,22 @@ pub fn thrust_calculation(
 pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut rng = thread_rng();
     let rotation = rng.gen_range(-1E-1, 1E-1);
+    let mut sign = || 1i32 - 2 * rng.gen_range(0, 2);
+    let signx = sign() as f32;
+    let signy = sign() as f32;
+    let absx = rng.gen_range(0.1, 0.3);
+    let absy = rng.gen_range(0.1, 0.3);
     let linear_velocity =
-        Vector2::new(rng.gen_range(-1E-1, 1E-1), rng.gen_range(-1E-1, 1E-1));
+        Vector2::new(signx * absx, signy * absy);
+    Velocity2::new(linear_velocity, rotation)
+}
+
+pub fn initial_shard_velocity() -> Velocity2 {
+    let mut rng = thread_rng();
+    let rotation = rng.gen_range(-2E-1, 2E-1);
+    let v = 5E-2;
+    let linear_velocity =
+        Vector2::new(rng.gen_range(-v, v), rng.gen_range(-v, v));
     Velocity2::new(linear_velocity, rotation)
 }
 
@@ -197,7 +209,6 @@ fn get_collision_groups(kind: EntityType) -> CollisionGroups {
     }
 }
 
-
 // side effect -- spawn all kind of dropables from asteroid
 pub fn spawn_asteroids(
     isometry: Isometry3,
@@ -224,7 +235,7 @@ pub fn spawn_asteroids(
                     position.y,
                     isometry.rotation.euler_angles().2,
                 ),
-                velocity: initial_asteroid_velocity(),
+                velocity: initial_shard_velocity(),
                 polygon: poly.clone(),
                 spin: rng.gen_range(-1E-2, 1E-2),
             };

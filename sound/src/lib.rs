@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 use sdl2::mixer::{
     InitFlag, Music, Sdl2MixerContext, AUDIO_S16LSB, DEFAULT_CHANNELS,
 };
-use sdl2::{AudioSubsystem, TimerSubsystem};
 use sdl2::rwops::RWops;
+use sdl2::{AudioSubsystem, TimerSubsystem};
 use specs::prelude::*;
 use specs_derive::Component;
 
@@ -96,7 +96,11 @@ pub fn init_sound<'a>(
     let chunk_size = 1_024;
     sdl2::mixer::open_audio(frequency, format, channels, chunk_size)?;
     let mixer_context = sdl2::mixer::init(
-        InitFlag::MP3 | InitFlag::FLAC | InitFlag::MOD | InitFlag::OGG | InitFlag::MID,
+        InitFlag::MP3
+            | InitFlag::FLAC
+            | InitFlag::MOD
+            | InitFlag::OGG
+            | InitFlag::MID,
     )?;
     sdl2::mixer::allocate_channels(SOUND_CHANNELS);
     let mut name_to_sound: HashMap<String, specs::Entity> = HashMap::new();

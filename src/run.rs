@@ -1,14 +1,14 @@
 #[cfg(any(target_os = "android"))]
 use backtrace::Backtrace;
+#[cfg(any(target_os = "android"))]
+use log::trace;
+use sdl2::filesystem::pref_path;
 use sdl2::keyboard::Keycode;
 use sdl2::mouse::MouseButton;
 use sdl2::rwops::RWops;
-use sdl2::filesystem::pref_path;
 use shrev::EventChannel;
 use specs::prelude::*;
 use specs::World as SpecsWorld;
-#[cfg(any(target_os = "android"))]
-use log::trace;
 
 #[cfg(any(target_os = "android"))]
 use std::panic;
@@ -17,10 +17,10 @@ use std::sync::{Arc, Mutex};
 use crate::gui::{Primitive, UI};
 use crate::setup::*;
 use crate::systems::{
-    AISystem, CollisionSystem, CommonRespawn, ControlSystem, DeadScreen,
-    DestroySync, GUISystem, GamePlaySystem, InsertSystem, KinematicSystem,
-    MenuRenderingSystem, RenderingSystem, ScoreTableRendering, SoundSystem,
-    UpgradeGUI,
+    AISystem, CollisionSystem, CommonRespawn, ControlSystem, ControllingSystem,
+    DeadScreen, DestroySync, GUISystem, GamePlaySystem, InsertSystem,
+    KinematicSystem, MenuRenderingSystem, RenderingSystem, ScoreTableRendering,
+    SoundSystem, UpgradeGUI,
 };
 use common::*;
 use components::*;
@@ -39,7 +39,9 @@ pub fn run() -> Result<(), String> {
     #[cfg(any(target_os = "android"))]
     setup_android();
     #[cfg(any(target_os = "android"))]
-    trace!("hello androigeni4!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+    trace!(
+        "hello androigeni4!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    );
     let mut specs_world = SpecsWorld::new();
     data_setup(&mut specs_world);
     #[cfg(not(any(target_os = "android")))]
@@ -121,6 +123,7 @@ pub fn run() -> Result<(), String> {
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
     let gui_system = GUISystem::default();
+    let controlling_system = ControllingSystem::default();
     let (preloaded_sounds, music_data, _audio, _mixer, timer) =
         init_sound(&sdl_context, &mut specs_world)?;
     specs_world.add_resource(NebulaGrid::new(1, 100f32, 100f32, 50f32, 50f32));
@@ -176,10 +179,12 @@ pub fn run() -> Result<(), String> {
         .with_thread_local(insert_system)
         .build();
     let mut gui_dispatcher = DispatcherBuilder::new()
+        .with(controlling_system.clone(), "controlling", &[])
         .with_thread_local(gui_system)
         .build();
     let upgrade_gui_system = UpgradeGUI::default();
     let mut upgrade_gui_dispatcher = DispatcherBuilder::new()
+        .with(controlling_system, "controlling", &[])
         .with_thread_local(upgrade_gui_system)
         .build();
     specs_world.add_resource(keys_channel);
@@ -273,25 +278,24 @@ pub fn run() -> Result<(), String> {
                         let device = sdl2::touch::touch_device(0);
                         for i in 0..FINGER_NUMBER as i32 {
                             trace!("iterating over touch {}", i);
-                            if let Some(finger) = sdl2::touch::touch_finger(device, i) {
+                            if let Some(finger) =
+                                sdl2::touch::touch_finger(device, i)
+                            {
                                 touches[i as usize] = Some(Finger::new(
                                     finger.id as usize,
                                     finger.x * dims.0 as f32,
                                     finger.y * dims.1 as f32,
                                     specs_world
-                                        .read_resource::<ThreadPin<Canvas>>(
-                                        )
+                                        .read_resource::<ThreadPin<Canvas>>()
                                         .observer(),
                                     finger.pressure,
                                     dims.0 as u32,
                                     dims.1 as u32,
                                     specs_world
-                                        .read_resource::<ThreadPin<Canvas>>(
-                                        )
-                                        .z_far
+                                        .read_resource::<ThreadPin<Canvas>>()
+                                        .z_far,
                                 ));
-                            }
-                            else {
+                            } else {
                                 touches[i as usize] = None
                             }
                         }
@@ -368,7 +372,8 @@ pub fn run() -> Result<(), String> {
                     )
                     .expect("Serialization failed");
                     #[cfg(any(target_os = "android"))]
-                    let pref =pref_path("vlad", "twenty_ateroids").expect("failed to get pref path");
+                    let pref = pref_path("vlad", "twenty_ateroids")
+                        .expect("failed to get pref path");
                     let file = "rons/macro_game.ron";
                     #[cfg(any(target_os = "android"))]
                     let file = format!("{}/{}", pref, file);

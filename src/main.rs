@@ -19,13 +19,13 @@ pub use nalgebra;
 pub use ncollide2d;
 pub use nphysics2d;
 pub use num_enum;
+pub use once_cell;
 pub use rand;
 pub use sdl2;
 pub use shrev;
 pub use specs;
 pub use specs_derive;
 pub use voronois;
-pub use once_cell;
 #[cfg(any(target_os = "ios", target_os = "android", target_os = "emscripten"))]
 #[macro_use]
 extern crate log;

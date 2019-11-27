@@ -9,8 +9,8 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 1,
-                max_health: 1000,
-                max_shield: 500,
+                max_health: 300,
+                max_shield: 300,
                 damage: 10
             ),
             image: "basic_select"
@@ -22,8 +22,8 @@
                 torque: 0.07,
                 health_regen: 0,
                 shield_regen: 1,
-                max_health: 2000,
-                max_shield: 2000,
+                max_health: 400,
+                max_shield: 400,
                 damage: 20
             ),
             image: "heavy_select"
@@ -35,8 +35,8 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 1,
-                max_health: 2000,
-                max_shield: 2000,
+                max_health: 400,
+                max_shield: 400,
                 damage: 20
             ),
             image: "super_ship"
@@ -189,7 +189,7 @@
                 shield_regen: 0,
                 max_health: 10,
                 max_shield: 0,
-                damage: 100
+                damage: 150
             ),
             size: 0.4,
             image_name: "kamikadzer",
@@ -206,7 +206,7 @@
                 bullet_speed: 0.2,
                 bullet_size: 0.4,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
-                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_lifetime: (secs: 3, nanos: 200_000_000),
                 bullet_image: "enemy_bullet"
             )),
             ship_stats: (
@@ -259,7 +259,7 @@
                 bullet_speed: 0.2,
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
-                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_lifetime: (secs: 2, nanos: 200_000_000),
                 bullet_image: "enemy_bullet"
             )),
             ship_stats: (
@@ -288,7 +288,7 @@
                 bullet_speed: 0.08,
                 bullet_size: 0.2,
                 bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
-                bullet_lifetime: (secs: 1, nanos: 200_000_000),
+                bullet_lifetime: (secs: 2, nanos: 200_000_000),
                 bullet_image: "enemy_bullet2"
             )),
             ship_stats: (
@@ -433,7 +433,7 @@
                 bullets_damage: 0,
                 bullet_size: 0.2,
                 bullet_speed: 0.12,
-                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0),
+                bullet_blast: Blast(blast_damage: 250, blast_radius: 3.0),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "bomb"
             )),
@@ -483,7 +483,7 @@
                 bullets_damage: 0,
                 bullet_size: 0.2,
                 bullet_speed: 0.12,
-                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0),
+                bullet_blast: Blast(blast_damage: 250, blast_radius: 3.0),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "bomb"
             )),
@@ -507,7 +507,7 @@
                 bullets_damage: 0,
                 bullet_size: 0.2,
                 bullet_speed: 0,
-                bullet_blast: Blast(blast_damage: 400, blast_radius: 3.0),
+                bullet_blast: Blast(blast_damage: 250, blast_radius: 3.0),
                 bullet_lifetime: (secs: 1, nanos: 200_000_000),
                 bullet_image: "bomb"
             )),

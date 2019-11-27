@@ -28,13 +28,13 @@
 //        assigned: [ToGun(ShotGun)]
 //    ),
 
-    (
-        upgrade_type: ShipSpeed,
-        image: "speed_upgrade",
-        name: "Ship speed",
-        description: "+ X% ship speed",
-        assigned: [General]
-    ),
+//    (
+//        upgrade_type: ShipSpeed,
+//        image: "speed_upgrade",
+//        name: "Ship speed",
+//        description: "+ X% ship speed",
+//        assigned: [General]
+//    ),
     (
         upgrade_type: ShipRotationSpeed,
         image: "rotate_upgrade",

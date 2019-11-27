@@ -654,8 +654,12 @@ impl<'a> System<'a> for InsertSystem {
                 InsertEvent::ReflectBulletCollectable { position } => {
                     let iso = Isometry::new(position.x, position.y, 0f32);
                     let reflect_bullet_entity = entities.create();
-                    lazy_update.insert(reflect_bullet_entity, CollectableMarker);
-                    lazy_update.insert(reflect_bullet_entity, ReflectBulletCollectable);
+                    lazy_update
+                        .insert(reflect_bullet_entity, CollectableMarker);
+                    lazy_update.insert(
+                        reflect_bullet_entity,
+                        ReflectBulletCollectable,
+                    );
                     lazy_update.insert(
                         reflect_bullet_entity,
                         Lifetime::new(Duration::from_secs(
@@ -664,15 +668,14 @@ impl<'a> System<'a> for InsertSystem {
                     );
                     lazy_update.insert(reflect_bullet_entity, iso);
                     lazy_update.insert(reflect_bullet_entity, Size(0.5));
-                    lazy_update
-                        .insert(reflect_bullet_entity, preloaded_images.attack_speed_upgrade);
+                    lazy_update.insert(
+                        reflect_bullet_entity,
+                        preloaded_images.attack_speed_upgrade,
+                    );
                 }
                 InsertEvent::ReflectBulletAbility => {
                     let (character, _) =
-                        (&entities, &character_markers)
-                            .join()
-                            .next()
-                            .unwrap();
+                        (&entities, &character_markers).join().next().unwrap();
                     if let Some(gun) = shotguns.get_mut(character) {
                         if let Some(ref mut reflection) = gun.reflection {
                             reflection.lifetime += Duration::from_millis(200);

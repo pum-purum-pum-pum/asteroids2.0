@@ -12,7 +12,7 @@ use specs::Component;
 // #[cfg(debug_assertions)]
 // pub const PHYSICS_SIMULATION_TIME: f32 = 1.7;
 // #[cfg(not(debug_assertions))]
-pub const PHYSICS_SIMULATION_TIME: f32 = 1.0;
+pub const PHYSICS_SIMULATION_TIME: f32 = 0.8;
 pub const DT: f32 = 1f32 / 60f32;
 pub const MAX_TORQUE: f32 = 10f32;
 

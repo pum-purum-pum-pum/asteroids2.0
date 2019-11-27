@@ -28,10 +28,10 @@ pub const SHIP_ROTATION_SPEED_INIT: f32 = 1.0;
 pub type Canvas = ThreadPin<SDLCanvas>;
 pub type SpawnedUpgrades = Vec<[usize; 2]>;
 
-use once_cell::sync::{Lazy};
+use once_cell::sync::Lazy;
 use std::sync::Mutex;
 
-// lazy static for global mutable data 
+// lazy static for global mutable data
 pub static TRACKER: Lazy<Mutex<TimeTracker>> = Lazy::new(|| {
     let mut time_tracker = TimeTracker::new();
     Mutex::new(time_tracker)
@@ -55,7 +55,7 @@ impl Default for UpgradesStats {
 pub struct TimeTracker {
     timestamp: Instant,
     game_timestamp: Instant,
-    delta: Duration
+    delta: Duration,
 }
 
 impl TimeTracker {
@@ -63,7 +63,7 @@ impl TimeTracker {
         TimeTracker {
             timestamp: Instant::now(),
             game_timestamp: Instant::now(),
-            delta: Duration::from_secs(0)
+            delta: Duration::from_secs(0),
         }
     }
 
@@ -438,13 +438,13 @@ impl ShipKindSave {
 #[derive(Debug, Clone, Component)]
 pub struct TextComponent {
     pub text: String,
-    pub color: (f32, f32, f32, f32)
+    pub color: (f32, f32, f32, f32),
 }
 
 #[derive(Debug, Clone, Component)]
 pub struct Position2D(pub Point2);
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PlayState {
     Action,
     Upgrade,
@@ -623,6 +623,7 @@ pub struct PreloadedImages {
     pub upg_bar: AtlasImage,
     pub transparent_sqr: AtlasImage,
     pub basic_ship: AtlasImage,
+    pub glow: AtlasImage,
     pub heavy_ship: AtlasImage,
     pub super_ship: AtlasImage,
     pub explosion: Animation,

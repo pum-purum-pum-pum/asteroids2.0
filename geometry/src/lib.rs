@@ -8,6 +8,7 @@ use voronois::destruction;
 
 pub const EPS: f32 = 1E-3;
 pub const SHADOW_LENGTH: f32 = 100f32;
+pub const DECONSTRUCT_SHADR_MIN_R: f32 = 0.1f32;
 
 #[derive(Component, Debug, Clone)]
 pub enum Geometry {
@@ -435,7 +436,10 @@ impl Polygon {
                 p.y *= h_div;
                 p.y -= self.height / 2.0;
             }
-            res.push(Polygon::new(poly.to_vec()));
+            let poly = Polygon::new(poly.to_vec());
+            if poly.min_r > DECONSTRUCT_SHADR_MIN_R {
+                res.push(poly);
+            }
         }
         res
     }

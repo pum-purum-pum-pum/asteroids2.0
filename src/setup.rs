@@ -1,3 +1,5 @@
+#[cfg(any(target_os = "android"))]
+use backtrace::Backtrace;
 use common::*;
 use components::*;
 use gfx_h::{
@@ -5,14 +7,10 @@ use gfx_h::{
     TextData, TextVertexBuffer, WorldTextData,
 };
 use glyph_brush::*;
-use packer::SerializedSpriteSheet;
-#[cfg(any(target_os = "android"))]
-use std::panic;
-#[cfg(any(target_os = "android"))]
-use backtrace::Backtrace;
 #[cfg(any(target_os = "android"))]
 use log::trace;
 use nphysics2d::world::World;
+use packer::SerializedSpriteSheet;
 use physics::PHYSICS_SIMULATION_TIME;
 use red::{self, glow, GL};
 use ron::de::from_str;
@@ -22,6 +20,8 @@ use slog::o;
 use specs::World as SpecsWorld;
 use std::collections::HashMap;
 use std::io::Read;
+#[cfg(any(target_os = "android"))]
+use std::panic;
 use std::path::Path;
 use std::time::Duration;
 use telemetry::TeleGraph;
@@ -38,7 +38,7 @@ pub fn preloaded_images(
         nebula_images.push(nebula_image);
     }
     let mut stars_images = vec![];
-    for i in 1..=4 {
+    for i in 2..=4 {
         let stars_image = name_to_atlas[&format!("stars{}", i)];
         stars_images.push(stars_image);
     }
@@ -67,6 +67,7 @@ pub fn preloaded_images(
         bar: name_to_atlas["bar"],
         upg_bar: name_to_atlas["upg_bar"],
         transparent_sqr: name_to_atlas["transparent_sqr"],
+        glow: name_to_atlas["glow"],
         explosion: name_to_animation["explosion_anim"].clone(),
         blast: name_to_animation["blast2_anim"].clone(),
         bullet_contact: name_to_animation["bullet_contact_anim"].clone(),
@@ -374,7 +375,6 @@ pub fn data_setup(specs_world: &mut SpecsWorld) {
     specs_world.register::<Position2D>();
     specs_world.register::<ReflectBulletCollectable>();
     specs_world.register::<ReflectBulletAbility>();
-    
 
     specs_world.add_resource(UpgradesStats::default());
     specs_world.add_resource(DevInfo::new());

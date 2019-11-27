@@ -386,7 +386,7 @@ impl<'a> System<'a> for ControlSystem {
                 thrust = thrust_calculation(
                     ship_stats.maneuverability.unwrap(),
                     thrust,
-                    *character_velocity.as_vector()
+                    *character_velocity.as_vector(),
                 );
                 *character_velocity.as_vector_mut() += thrust;
             }

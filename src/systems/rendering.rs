@@ -67,7 +67,8 @@ pub fn render_primitives<'a>(
 ) {
     let dims = viewport.dimensions();
     let (w, h) = (dims.0 as f32, dims.1 as f32);
-    let world_text_scale = ((w * w + h * h).sqrt() / 10000.0 * mouse.hdpi as f32).round();
+    let world_text_scale =
+        ((w * w + h * h).sqrt() / 10000.0 * mouse.hdpi as f32).round();
     let scale = ((w * w + h * h).sqrt() / 11000.0 * mouse.hdpi as f32).round();
     for primitive in primitives_channel.read(reader) {
         match primitive {
@@ -134,10 +135,17 @@ pub fn render_primitives<'a>(
                     let point = (point.x, point.y);
                     world_text_data.glyph_brush.queue(Section {
                         text: &text.text,
-                        scale: Scale::uniform(world_text_scale * text.font_size),
+                        scale: Scale::uniform(
+                            world_text_scale * text.font_size,
+                        ),
                         screen_position: point,
                         // bounds: (w /20.0, h / 20.0),
-                        color: [text.color.0, text.color.1, text.color.2, text.color.3],
+                        color: [
+                            text.color.0,
+                            text.color.1,
+                            text.color.2,
+                            text.color.3,
+                        ],
                         layout: Layout::default()
                             .h_align(HorizontalAlign::Center)
                             .v_align(VerticalAlign::Center),
@@ -150,7 +158,12 @@ pub fn render_primitives<'a>(
                         scale: Scale::uniform(scale * text.font_size),
                         screen_position: (text.position.x, text.position.y),
                         // bounds: (w /3.15, h),
-                        color: [text.color.0, text.color.1, text.color.2, text.color.3],
+                        color: [
+                            text.color.0,
+                            text.color.1,
+                            text.color.2,
+                            text.color.3,
+                        ],
                         layout: Layout::default()
                             .h_align(HorizontalAlign::Center)
                             .v_align(VerticalAlign::Center),
@@ -390,7 +403,10 @@ impl<'a> System<'a> for RenderingSystem {
                 self.sizes.extend(other.sizes.iter());
             }
         }
-        let mut all_batch = MiniBatch::new();
+        let mut hide_batch = MiniBatch::new();
+        let mut background_batch = MiniBatch::new();
+        let mut hide_foreground_batch = MiniBatch::new();
+        let mut visible_foreground_batch = MiniBatch::new();
         let mut stars_batch = MiniBatch::new();
         let mut nebulas_batch = MiniBatch::new();
         let mut planets_batch = MiniBatch::new();
@@ -412,10 +428,10 @@ impl<'a> System<'a> for RenderingSystem {
                 fog_batch.append(*atlas_image, iso.0, size.0)
             }
         }
-        all_batch.extend(stars_batch);
-        all_batch.extend(nebulas_batch);
-        all_batch.extend(planets_batch);
-        all_batch.extend(fog_batch);
+        background_batch.extend(stars_batch);
+        background_batch.extend(nebulas_batch);
+        background_batch.extend(planets_batch);
+        background_batch.extend(fog_batch);
         for (entity, iso, atlas_image, size, (), (), (), ()) in (
             &entities,
             &isometries,
@@ -435,16 +451,19 @@ impl<'a> System<'a> for RenderingSystem {
                 0f32
             };
             image.color = (1f32, 1f32, 1f32, intensity);
-            all_batch.append(image, iso.0, size.0);
+            hide_foreground_batch.append(image, iso.0, size.0);
         }
-        // flame::start("animation");
         for (iso, size, animation) in
             (&isometries, &sizes, &mut animations).join()
         {
             if visible(&*canvas, &iso.0, dims) {
                 let animation_frame = animation.next_frame();
                 if let Some(animation_frame) = animation_frame {
-                    all_batch.append(animation_frame.image, iso.0, size.0);
+                    hide_foreground_batch.append(
+                        animation_frame.image,
+                        iso.0,
+                        size.0,
+                    );
                 };
             }
         }
@@ -454,7 +473,7 @@ impl<'a> System<'a> for RenderingSystem {
             let cursor_image = preloaded_images.cursor;
             let cursor_size = 0.5f32;
             let cursor_scale = if mouse.left { 1f32 } else { 2f32 };
-            all_batch.append(
+            visible_foreground_batch.append(
                 cursor_image,
                 cursor_iso.0,
                 cursor_size * cursor_scale,
@@ -467,14 +486,28 @@ impl<'a> System<'a> for RenderingSystem {
             {
                 let mut glow_image = preloaded_images.basic_ship;
                 glow_image.transparency = vel.0.norm().min(1f32);
-                all_batch.append(glow_image, iso.0, 1f32);
+                background_batch.append(glow_image, iso.0, 1f32);
             }
         }
         let sprite_batch = SpriteBatch::new(
             &gl,
-            &all_batch.images,
-            &all_batch.isometries,
-            &all_batch.sizes,
+            &background_batch.images,
+            &background_batch.isometries,
+            &background_batch.sizes,
+        );
+        canvas.render_sprite_batch(
+            &gl,
+            &viewport,
+            &mut frame,
+            &sprite_batch,
+            false,
+            Some(red::Blend),
+        );
+        let sprite_batch = SpriteBatch::new(
+            &gl,
+            &hide_foreground_batch.images,
+            &hide_foreground_batch.isometries,
+            &hide_foreground_batch.sizes,
         );
         canvas.render_sprite_batch(
             &gl,
@@ -530,7 +563,7 @@ impl<'a> System<'a> for RenderingSystem {
                 .unwrap()
             {
                 ParticlesData::MovementParticles(ref mut particles) => {
-                    particles.update(1.0 * Vector2::new(-vel.0.x, -vel.0.y));
+                    particles.update(PHYSICS_SIMULATION_TIME * 1.0 * Vector2::new(-vel.0.x, -vel.0.y));
                     canvas.render_instancing(
                         &gl,
                         &viewport,
@@ -688,7 +721,9 @@ impl<'a> System<'a> for RenderingSystem {
                 Point3::new(1f32, 1f32, 1f32),
             );
         };
-        for (iso, text, lifetime) in (&isometries, &mut text_components, &lifetimes).join() {
+        for (iso, text, lifetime) in
+            (&isometries, &mut text_components, &lifetimes).join()
+        {
             let lifetime_fraction = lifetime.rest_fraction();
             text.color.3 = lifetime_fraction;
             ui.primitives.push(Primitive {
@@ -699,23 +734,22 @@ impl<'a> System<'a> for RenderingSystem {
                     ),
                     color: text.color,
                     text: text.text.clone(),
-                    font_size: 1.0
+                    font_size: 1.0,
                 }),
                 with_projection: true,
             });
         }
-        for (text, lifetime, position) in (&mut text_components, &lifetimes, &positions2d).join() {
+        for (text, lifetime, position) in
+            (&mut text_components, &lifetimes, &positions2d).join()
+        {
             let lifetime_fraction = lifetime.rest_fraction();
             text.color.3 = lifetime_fraction;
             ui.primitives.push(Primitive {
                 kind: PrimitiveKind::Text(Text {
-                    position: Point2::new(
-                        position.0.x,
-                        position.0.y,
-                    ),
+                    position: Point2::new(position.0.x, position.0.y),
                     color: text.color,
                     text: text.text.clone(),
-                    font_size: 13.0
+                    font_size: 13.0,
                 }),
                 with_projection: false,
             });
@@ -736,6 +770,21 @@ impl<'a> System<'a> for RenderingSystem {
             &mut world_text_data,
         );
         flame::end("primitives rendering");
+        // kind of hacky to write it here. and for now it only used as cursor wich would be convinient to draw with other ui
+        let sprite_batch = SpriteBatch::new(
+            &gl,
+            &visible_foreground_batch.images,
+            &visible_foreground_batch.isometries,
+            &visible_foreground_batch.sizes,
+        );
+        canvas.render_sprite_batch(
+            &gl,
+            &viewport,
+            &mut frame,
+            &sprite_batch,
+            false,
+            Some(red::Blend),
+        );
         // for (name, span) in time_spans.iter() {
         //     telegraph.insert(name.to_string(), span.evaluate().as_millis() as f32 / 1000.0 * 60.0); // TODO "xFPS" actually
         // }

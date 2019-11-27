@@ -55,7 +55,7 @@ impl<'a> System<'a> for ScoreTableRendering {
                     position: Point2::new(w / 20.0, current_h),
                     color: (1.0, 1.0, 1.0, 1.0),
                     text: format!("{}", score).to_string(),
-                    font_size: 1.0
+                    font_size: 1.0,
                 }),
                 with_projection: false,
             });

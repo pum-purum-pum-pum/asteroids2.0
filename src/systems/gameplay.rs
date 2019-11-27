@@ -147,15 +147,15 @@ impl<'a> System<'a> for GamePlaySystem {
         let character_position = Point2::new(pos3d.x, pos3d.y);
         {
             // player trace
-            let mut transparent_basic = preloaded_images.basic_ship;
+            let mut transparent_basic = preloaded_images.glow;
             transparent_basic.transparency = 0.1;
             let trace = entities.create();
-            lazy_update.insert(trace, *sizes.get(char_entity).unwrap());
+            lazy_update
+                .insert(trace, Size(sizes.get(char_entity).unwrap().0 * 1.3)); // hack
             lazy_update.insert(trace, transparent_basic);
             lazy_update.insert(trace, char_isometry);
             lazy_update
                 .insert(trace, Lifetime::new(Duration::from_millis(300)));
-            // let transparent_projectile = ;
             for (entity, iso, projectile, bullet_image, size) in
                 (&entities, &isometries, &projectiles, &atlas_images, &sizes)
                     .join()
@@ -194,7 +194,9 @@ impl<'a> System<'a> for GamePlaySystem {
                         multy_lazer.minus_side_lazers();
                     }
                 }
-                if let Some(reflect_ability) = reflect_bullet_ability.get(entity) {
+                if let Some(reflect_ability) =
+                    reflect_bullet_ability.get(entity)
+                {
                     if reflect_bullet_ability.count() == 1 {
                         if let Some(gun) = shotguns.get_mut(char_entity) {
                             if gun.reflection.is_some() {
@@ -309,7 +311,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         &entities,
                         TextComponent {
                             text: format!("+{}", coins_add).to_string(),
-                            color: (1.0, 1.0, 0.7, 1.0)
+                            color: (1.0, 1.0, 0.7, 1.0),
                         },
                         &lazy_update,
                         Point2::new(
@@ -348,7 +350,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         &entities,
                         TextComponent {
                             text: format!("+{}", add_exp).to_string(),
-                            color: (0.6, 3.0, 1.0, 1.0)
+                            color: (0.6, 3.0, 1.0, 1.0),
                         },
                         &lazy_update,
                         Point2::new(
@@ -368,7 +370,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         &entities,
                         TextComponent {
                             text: "Triple bullets".to_string(),
-                            color: (1.0, 1.0, 1.0, 1.0)
+                            color: (1.0, 1.0, 1.0, 1.0),
                         },
                         &lazy_update,
                         Point2::new(
@@ -391,7 +393,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         &entities,
                         TextComponent {
                             text: "Double coins".to_string(),
-                            color: (1.0, 1.0, 1.0, 1.0)
+                            color: (1.0, 1.0, 1.0, 1.0),
                         },
                         &lazy_update,
                         Point2::new(
@@ -407,7 +409,7 @@ impl<'a> System<'a> for GamePlaySystem {
                         &entities,
                         TextComponent {
                             text: "Reflectable".to_string(),
-                            color: (1.0, 1.0, 1.0, 1.0)
+                            color: (1.0, 1.0, 1.0, 1.0),
                         },
                         &lazy_update,
                         Point2::new(
@@ -416,14 +418,15 @@ impl<'a> System<'a> for GamePlaySystem {
                         ),
                         Some(Lifetime::new(Duration::from_secs(1))),
                     );
-                    insert_channel.single_write(InsertEvent::ReflectBulletAbility)
+                    insert_channel
+                        .single_write(InsertEvent::ReflectBulletAbility)
                 }
                 if double_exp_collectable.get(entity).is_some() {
                     add_text(
                         &entities,
                         TextComponent {
                             text: "Double experience".to_string(),
-                            color: (1.0, 1.0, 1.0, 1.0)
+                            color: (1.0, 1.0, 1.0, 1.0),
                         },
                         &lazy_update,
                         Point2::new(
@@ -452,13 +455,10 @@ impl<'a> System<'a> for GamePlaySystem {
                 &entities,
                 TextComponent {
                     text: format!("Wave {}", current_wave.id).to_string(),
-                    color: (1.0, 1.0, 0.7, 1.0)
+                    color: (1.0, 1.0, 0.7, 1.0),
                 },
                 &lazy_update,
-                Point2::new(
-                    w / 2.0,
-                    h/ 2.0,
-                ),
+                Point2::new(w / 2.0, h / 2.0),
                 Some(Lifetime::new(Duration::from_secs(1))),
             );
         }

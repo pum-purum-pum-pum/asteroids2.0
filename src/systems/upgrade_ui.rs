@@ -107,7 +107,7 @@ impl<'a> System<'a> for UpgradeGUI {
                         ),
                         text: upg.name.clone(),
                         color: (1.0, 1.0, 1.0, 1.0),
-                        font_size: 1.0
+                        font_size: 1.0,
                     }),
                     with_projection: false,
                 });
@@ -159,7 +159,7 @@ impl<'a> System<'a> for UpgradeGUI {
                         ),
                         color: (1.0, 1.0, 1.0, 1.0),
                         text: avaliable_upgrades[upgrade].description.clone(),
-                        font_size: 1.0
+                        font_size: 1.0,
                     }),
                     with_projection: false,
                 });
@@ -234,10 +234,10 @@ impl<'a> System<'a> for UpgradeGUI {
                     ship_stats.shield_regen += 1;
                 }
                 UpgradeType::HealthSize => {
-                    ship_stats.max_health += 20;
+                    ship_stats.max_health = ship_stats.max_health + (0.1 * ship_stats.max_health as f32) as usize;
                 }
                 UpgradeType::ShieldSize => {
-                    ship_stats.max_shield += 20;
+                    ship_stats.max_shield = ship_stats.max_shield + (0.1 * ship_stats.max_shield as f32) as usize;
                 }
                 UpgradeType::Maneuverability => {
                     *ship_stats.maneuverability.as_mut().unwrap() += 1.0;

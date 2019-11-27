@@ -242,7 +242,8 @@ impl<'a> System<'a> for CommonRespawn {
                 entities.delete(entity).unwrap();
             }
         }
-        for (entity, isometry, phys, _ship) in (&entities, &mut isometries, &physics, &ships).join()
+        for (entity, isometry, phys, _ship) in
+            (&entities, &mut isometries, &physics, &ships).join()
         {
             let pos3d = isometry.0.translation.vector;
             if !is_active_rad(
@@ -253,7 +254,7 @@ impl<'a> System<'a> for CommonRespawn {
                 let reflected = area_reflection(
                     character_position,
                     Point2::new(pos3d.x, pos3d.y),
-                    ENEMY_ACTIVE_AREA
+                    ENEMY_ACTIVE_AREA,
                 );
                 let body = world.rigid_body_mut(phys.body_handle).unwrap();
                 let mut physics_isometry = *body.position();
