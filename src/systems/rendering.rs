@@ -644,11 +644,12 @@ impl<'a> System<'a> for RenderingSystem {
         );
         // let mut lazers = Triangulation::new();
         for (iso, multy_lazer) in (&isometries, &multy_lazers).join() {
-            for (angle, lazer) in multy_lazer.iter() {
+            for (i, (angle, lazer)) in multy_lazer.iter().enumerate() {
                 // let rotation = Rotation2::new(i as f32 * std::f32::consts::PI / 2.0);
                 let rotation = Rotation2::new(angle);
                 lazer_geometries
                     .extend(render_lazer(iso, lazer, false, rotation));
+                dbg!("lazer draw {}", i);
             }
         }
         // render lazers with only one draw call

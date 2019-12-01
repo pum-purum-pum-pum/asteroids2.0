@@ -59,7 +59,7 @@ pub use sound_system::*;
 pub use ui_controlling::*;
 pub use upgrade_ui::*;
 
-const DAMPING_FACTOR: f32 = 0.98f32;
+const DAMPING_FACTOR: f32 = 1.0f32; // TODO is it used only for ships. no? separate then
 const VELOCITY_MAX: f32 = 1f32;
 const SCREEN_AREA: f32 = 10f32;
 // it's a kludge -- TODO redo with camera and screen sizes
@@ -114,8 +114,8 @@ pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut sign = || 1i32 - 2 * rng.gen_range(0, 2);
     let signx = sign() as f32;
     let signy = sign() as f32;
-    let absx = rng.gen_range(0.1, 0.3);
-    let absy = rng.gen_range(0.1, 0.3);
+    let absx = rng.gen_range(0.1, 0.25);
+    let absy = rng.gen_range(0.1, 0.25);
     let linear_velocity =
         Vector2::new(signx * absx, signy * absy);
     Velocity2::new(linear_velocity, rotation)

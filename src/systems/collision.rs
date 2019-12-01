@@ -3,7 +3,7 @@ use log::info;
 use nphysics2d::algebra::Force2;
 use nphysics2d::algebra::ForceType;
 
-const ASTEROID_DAMAGE: usize = 150usize;
+const ASTEROID_DAMAGE: usize = 140usize;
 
 fn reflect_bullet(
     projectile: specs::Entity,

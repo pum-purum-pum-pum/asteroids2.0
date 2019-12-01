@@ -1,4 +1,5 @@
 use super::*;
+use nphysics2d::algebra::Velocity2;
 use log::info;
 
 /// here we update isometry, velocity
@@ -42,7 +43,16 @@ impl<'a> System<'a> for KinematicSystem {
             let body =
                 world.rigid_body_mut(physics_component.body_handle).unwrap();
             let mut velocity = *body.velocity();
+            let max_velocity = 0.245f32;
             *velocity.as_vector_mut() *= DAMPING_FACTOR;
+            let vel = *velocity.as_vector_mut();
+            let velocity = if velocity.as_vector_mut().norm() > max_velocity {
+                max_velocity * vel.normalize()
+            } else {
+                vel
+            };
+            // let v = velocity.as_vector();
+            let velocity = Velocity2::new(Vector2::new(velocity.x, velocity.y), velocity.z);
             body.set_velocity(velocity);
             body.activate();
         }

@@ -109,17 +109,19 @@ impl<'a> System<'a> for ControlSystem {
                 .join()
             {
                 character = Some(entity);
-                let player_torque = DT
-                    * calculate_player_ship_spin_for_aim(
-                        Vector2::new(mouse_state.x, mouse_state.y)
-                            - Vector2::new(
-                                iso.0.translation.vector.x,
-                                iso.0.translation.vector.y,
-                            ),
-                        iso.rotation(),
-                        spin.0,
-                    );
-                spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                if mouse_state.left {
+                    let player_torque = DT
+                        * calculate_player_ship_spin_for_aim(
+                            Vector2::new(mouse_state.x, mouse_state.y)
+                                - Vector2::new(
+                                    iso.0.translation.vector.x,
+                                    iso.0.translation.vector.y,
+                                ),
+                            iso.rotation(),
+                            spin.0,
+                        );
+                    spin.0 += player_torque.max(-MAX_TORQUE).min(MAX_TORQUE);
+                }
             }
             let character = character.unwrap();
             let (character_isometry, mut character_velocity) = {
@@ -357,6 +359,7 @@ impl<'a> System<'a> for ControlSystem {
             info!("asteroids: started reading keys");
             self.prev_keys = self.new_keys.clone();
             self.new_keys.clear();
+            let mut angular_vel = None;
             for key in keys_channel.read(&mut self.reader) {
                 self.new_keys.insert(*key);
                 let mut thrust = match key {
@@ -380,6 +383,43 @@ impl<'a> System<'a> for ControlSystem {
                     }
                     Keycode::RightBracket => {
                         canvas.z_far += 0.5;
+                    }
+                    Keycode::Left => {
+                        let player_torque = -5. * DT;
+                        let character_body = world
+                            .rigid_body_mut(physics.get(character).unwrap().body_handle)
+                            .unwrap();
+                        angular_vel = Some(player_torque.max(-MAX_TORQUE).min(MAX_TORQUE));
+                        // character_body.set_angular_velocity(player_torque.max(-MAX_TORQUE).min(MAX_TORQUE));
+                    }
+                    Keycode::Right => {
+                        let player_torque = 5. * DT;
+                        let character_body = world
+                            .rigid_body_mut(physics.get(character).unwrap().body_handle)
+                            .unwrap();
+                        angular_vel = Some(player_torque.max(-MAX_TORQUE).min(MAX_TORQUE));
+                        // character_body.set_angular_velocity(player_torque.max(-MAX_TORQUE).min(MAX_TORQUE));
+                    }
+                    Keycode::Up => {
+                        // copy paste TODO
+                        if let Some(shotgun) = shotguns.get_mut(character) {
+                            if shotgun.shoot() {
+                                let bullets = shotgun.spawn_bullets(
+                                    EntityType::Player,
+                                    isometries.get(character).unwrap().0,
+                                    shotgun.bullet_speed,
+                                    shotgun.bullets_damage,
+                                    velocities.get(character).unwrap().0,
+                                    character,
+                                );
+                                info!("asteroids: bullets {:?} processed", bullets);
+                                sounds_channel.single_write(Sound(
+                                    preloaded_sounds.shot,
+                                    gun_position,
+                                ));
+                                insert_channel.iter_write(bullets.into_iter());
+                            }
+                        }
                     }
                     _ => (),
                 };
@@ -414,6 +454,9 @@ impl<'a> System<'a> for ControlSystem {
                 .rigid_body_mut(physics.get(character).unwrap().body_handle)
                 .unwrap();
             character_body.set_velocity(character_velocity);
+            if let Some(angular_vel) = angular_vel {
+                character_body.set_angular_velocity(angular_vel);
+            }
         }
         info!("asteroids: ended process crazyness");
         info!("asteroids: ended control system");

@@ -1,3 +1,4 @@
+
 (
     ship_costs: [0, 200, 300, 10000],
     gun_costs: [0, 100, 300, 10000],
@@ -9,8 +10,8 @@
                 torque: 0.2,
                 health_regen: 0,
                 shield_regen: 1,
-                max_health: 300,
-                max_shield: 300,
+                max_health: 350,
+                max_shield: 350,
                 damage: 10
             ),
             image: "basic_select"

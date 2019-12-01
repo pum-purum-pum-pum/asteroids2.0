@@ -1,6 +1,4 @@
 cargo-features = ["profile-overrides"]
-[build]
-incremental = true
 [package]
 name = "sdl-app"
 version = "0.1.0"
@@ -79,39 +77,39 @@ members = [
 	"packer"
 ]
 
-[profile.dev.overrides.gfx_h]
+[profile.dev.package.gfx_h]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.common]
+[profile.dev.package.common]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.voronoi]
+[profile.dev.package.voronoi]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.telemetry]
+[profile.dev.package.telemetry]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.components]
+[profile.dev.package.components]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.geometry]
+[profile.dev.package.geometry]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.sound]
+[profile.dev.package.sound]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.physics]
+[profile.dev.package.physics]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.physics_system]
+[profile.dev.package.physics_system]
 opt-level = 3
 debug = true
 
@@ -119,11 +117,11 @@ debug = true
 opt-level = 3
 debug = true
 
-[profile.dev.overrides."*"]
+[profile.dev.package."*"]
 opt-level = 3
 debug = true
 
-[profile.dev.overrides.nphysics2d]
+[profile.dev.package.nphysics2d]
 opt-level = 3
 debug = true
 codegen-units = 16

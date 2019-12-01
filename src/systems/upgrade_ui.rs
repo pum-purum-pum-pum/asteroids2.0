@@ -234,10 +234,10 @@ impl<'a> System<'a> for UpgradeGUI {
                     ship_stats.shield_regen += 1;
                 }
                 UpgradeType::HealthSize => {
-                    ship_stats.max_health = ship_stats.max_health + (0.1 * ship_stats.max_health as f32) as usize;
+                    ship_stats.max_health = ship_stats.max_health + (0.05 * ship_stats.max_health as f32) as usize;
                 }
                 UpgradeType::ShieldSize => {
-                    ship_stats.max_shield = ship_stats.max_shield + (0.1 * ship_stats.max_shield as f32) as usize;
+                    ship_stats.max_shield = ship_stats.max_shield + (0.05 * ship_stats.max_shield as f32) as usize;
                 }
                 UpgradeType::Maneuverability => {
                     *ship_stats.maneuverability.as_mut().unwrap() += 1.0;
