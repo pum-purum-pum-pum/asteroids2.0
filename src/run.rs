@@ -20,7 +20,7 @@ use crate::systems::{
     AISystem, CollisionSystem, CommonRespawn, ControlSystem, ControllingSystem,
     DeadScreen, DestroySync, GUISystem, GamePlaySystem, InsertSystem,
     KinematicSystem, MenuRenderingSystem, RenderingSystem, ScoreTableRendering,
-    SoundSystem, UpgradeGUI,
+    SoundSystem, UpgradeGUI, UpgradeControlSystem
 };
 use common::*;
 use components::*;
@@ -119,6 +119,7 @@ pub fn run() -> Result<(), String> {
         .build();
     let sound_system = SoundSystem::new(sounds_channel.register_reader());
     let control_system = ControlSystem::new(keys_channel.register_reader());
+    let upgrade_control_system = UpgradeControlSystem::default();
     let gameplay_sytem = GamePlaySystem::default();
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
@@ -184,9 +185,12 @@ pub fn run() -> Result<(), String> {
         .build();
     let upgrade_gui_system = UpgradeGUI::default();
     let mut upgrade_gui_dispatcher = DispatcherBuilder::new()
+        .with(upgrade_control_system, "upgrade_control_system", &[])
         .with(controlling_system, "controlling", &[])
         .with_thread_local(upgrade_gui_system)
         .build();
+    let keys_vec: Vec<Keycode> = vec![];
+    specs_world.add_resource(keys_vec);
     specs_world.add_resource(keys_channel);
     specs_world.add_resource(sounds_channel);
     specs_world.add_resource(insert_channel);
@@ -221,7 +225,10 @@ pub fn run() -> Result<(), String> {
             .collect();
         specs_world
             .write_resource::<EventChannel<Keycode>>()
-            .iter_write(keys_iter);
+            .iter_write(keys_iter.clone());
+        *specs_world
+            .write_resource::<Vec<Keycode>>()
+            = keys_iter;
         // Create a set of pressed Keys.
         flame::start("control crazyness");
         info!("asteroids: control crazyness");

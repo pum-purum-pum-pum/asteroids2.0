@@ -119,6 +119,24 @@ pub struct UI {
     pub sounds: Vec<Sound>,
 }
 
+impl UI {
+    pub fn selected(&self, selector_id: usize, button_id: usize) -> bool {
+        self.selectors[&selector_id].map(|id| id == button_id).unwrap_or(false)
+    }
+
+    pub fn select(&mut self, selector_id: usize, button_id: usize) {
+        self.selectors.insert(selector_id, Some(button_id));
+    }
+
+    pub fn free_selector(&self, selector_id: usize) -> bool {
+        // dbg!(!self.selectors.contains_key(&selector_id) ||
+        // self.selectors[&selector_id].is_none());
+        // dbg!(self.selectors[&selector_id]);
+        !self.selectors.contains_key(&selector_id) ||
+        self.selectors[&selector_id].is_none()
+    }
+}
+
 pub struct Selector {
     pub buttons: Vec<Button>,
     pub id: usize,
@@ -142,6 +160,7 @@ impl Selector {
         }
         None
     }
+
 }
 
 pub struct Button {

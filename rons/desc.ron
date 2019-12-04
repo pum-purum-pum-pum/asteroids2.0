@@ -46,13 +46,13 @@
     player_guns: [
         ShotGun((
             recharge_state: 0,
-            recharge_time: (secs: 0, nanos: 150_000_000),
-            bullets_damage: 6,
+            recharge_time: (secs: 0, nanos: 250_000_000),
+            bullets_damage: 9,
             side_projectiles_number: 0,
             side_projectiles_limit: Some(1),
             angle_shift: 0.25,
             bullet_speed: 0.5,
-            bullet_size: 0.4,
+            bullet_size: 0.3,
             reflection: None,
             bullet_reflection_lifetime: (secs:0, nanos: 150_000_000),
             bullet_lifetime: (secs: 1, nanos: 200_000_000),

@@ -40,6 +40,7 @@ mod score_table;
 mod sound_system;
 mod ui_controlling;
 mod upgrade_ui;
+mod upgrade_control;
 
 pub use ai::*;
 pub use collision::*;
@@ -58,6 +59,7 @@ pub use score_table::*;
 pub use sound_system::*;
 pub use ui_controlling::*;
 pub use upgrade_ui::*;
+pub use upgrade_control::*;
 
 const DAMPING_FACTOR: f32 = 1.0f32; // TODO is it used only for ships. no? separate then
 const VELOCITY_MAX: f32 = 1f32;
@@ -72,7 +74,7 @@ const ENEMY_ACTIVE_AREA: f32 = 21f32;
 #[cfg(debug_assertions)]
 const ASTEROIDS_MIN_NUMBER: usize = 20;
 #[cfg(not(debug_assertions))]
-const ASTEROIDS_MIN_NUMBER: usize = 70;
+const ASTEROIDS_MIN_NUMBER: usize = 40;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
@@ -114,8 +116,8 @@ pub fn initial_asteroid_velocity() -> Velocity2 {
     let mut sign = || 1i32 - 2 * rng.gen_range(0, 2);
     let signx = sign() as f32;
     let signy = sign() as f32;
-    let absx = rng.gen_range(0.1, 0.25);
-    let absy = rng.gen_range(0.1, 0.25);
+    let absx = rng.gen_range(0.17, 0.3);
+    let absy = rng.gen_range(0.17, 0.3);
     let linear_velocity =
         Vector2::new(signx * absx, signy * absy);
     Velocity2::new(linear_velocity, rotation)
