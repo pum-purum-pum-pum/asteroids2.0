@@ -20,7 +20,7 @@ use crate::systems::{
     AISystem, CollisionSystem, CommonRespawn, ControlSystem, ControllingSystem,
     DeadScreen, DestroySync, GUISystem, GamePlaySystem, InsertSystem,
     KinematicSystem, MenuRenderingSystem, RenderingSystem, ScoreTableRendering,
-    SoundSystem, UpgradeGUI, UpgradeControlSystem
+    SoundSystem, UpgradeGUI, UpgradeControlSystem, Upgrader
 };
 use common::*;
 use components::*;
@@ -120,6 +120,7 @@ pub fn run() -> Result<(), String> {
     let sound_system = SoundSystem::new(sounds_channel.register_reader());
     let control_system = ControlSystem::new(keys_channel.register_reader());
     let upgrade_control_system = UpgradeControlSystem::default();
+    let upgrader = Upgrader::default();
     let gameplay_sytem = GamePlaySystem::default();
     let collision_system = CollisionSystem::default();
     let ai_system = AISystem::default();
@@ -186,10 +187,13 @@ pub fn run() -> Result<(), String> {
     let upgrade_gui_system = UpgradeGUI::default();
     let mut upgrade_gui_dispatcher = DispatcherBuilder::new()
         .with(upgrade_control_system, "upgrade_control_system", &[])
+        .with(upgrader, "upgrader", &["upgrade_control_system"])
         .with(controlling_system, "controlling", &[])
         .with_thread_local(upgrade_gui_system)
         .build();
     let keys_vec: Vec<Keycode> = vec![];
+    let upgrades_vec: Vec<UpgradeType> = vec![];
+    specs_world.add_resource(upgrades_vec);
     specs_world.add_resource(keys_vec);
     specs_world.add_resource(keys_channel);
     specs_world.add_resource(sounds_channel);

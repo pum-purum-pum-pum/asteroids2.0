@@ -52,6 +52,7 @@ pub enum Widgets {
     Done,
     WeaponSelector,
     ShipsSelector,
+    UpgradeSelector
 }
 
 pub fn render_primitives<'a>(

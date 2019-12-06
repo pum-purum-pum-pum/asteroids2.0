@@ -27,7 +27,7 @@ impl<'a> System<'a> for UpgradeControlSystem {
     	) = data;
     	let upgrades = spawned_upgrades.last();
         let widget_ids = [Widgets::Upgrade1, Widgets::Upgrade2];
-        let widget_selector = Widgets::WeaponSelector as usize;
+        let widget_selector = Widgets::UpgradeSelector as usize;
     	swap(&mut self.prev_keys, &mut self.new_keys);
     	self.new_keys.clear();
     	for key in key_codes.drain(..) {
@@ -41,15 +41,15 @@ impl<'a> System<'a> for UpgradeControlSystem {
 	                Keycode::Left | Keycode::Right => {
 	                	if ui.selected(widget_selector, widget_ids[0] as usize) 
 	                			|| ui.free_selector(widget_selector) {
-	                		dbg!("a");
 							ui_state.choosed_upgrade = Some(upgrades[1]);
 	                		ui.select(widget_selector, widget_ids[1] as usize)
 	                	} else if ui.selected(widget_selector, widget_ids[1] as usize) {
-	                		dbg!("b");
 							ui_state.choosed_upgrade = Some(upgrades[0]);
 	                		ui.select(widget_selector, widget_ids[0] as usize)
 	                	}
-	                	dbg!("asd");
+	                }
+	                Keycode::Space => {
+	                	
 	                }
 	                // Keycode::Right => {
 	                // 	dbg!("sd");

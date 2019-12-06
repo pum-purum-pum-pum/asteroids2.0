@@ -41,6 +41,7 @@ mod sound_system;
 mod ui_controlling;
 mod upgrade_ui;
 mod upgrade_control;
+mod upgrader;
 
 pub use ai::*;
 pub use collision::*;
@@ -60,6 +61,7 @@ pub use sound_system::*;
 pub use ui_controlling::*;
 pub use upgrade_ui::*;
 pub use upgrade_control::*;
+pub use upgrader::*;
 
 const DAMPING_FACTOR: f32 = 1.0f32; // TODO is it used only for ships. no? separate then
 const VELOCITY_MAX: f32 = 1f32;

@@ -110,7 +110,8 @@ fn check_in(x: f32, a: f32, b: f32) -> bool {
 pub struct UI {
     // mouse controls
     hover: Option<usize>,
-    selectors: HashMap<usize, Option<usize>>,
+    // TODO: just use usize instead of Option<usize> and delete entry if needed. wtf?
+    pub selectors: HashMap<usize, Option<usize>>,
     // touch controls
     // for each finger we have id of pressed widget
     #[cfg(any(target_os = "android"))]
@@ -121,7 +122,8 @@ pub struct UI {
 
 impl UI {
     pub fn selected(&self, selector_id: usize, button_id: usize) -> bool {
-        self.selectors[&selector_id].map(|id| id == button_id).unwrap_or(false)
+        // why we even have Option<usize>
+        self.selectors.get(&selector_id).and_then(|id| id.map(|i| i == button_id)).unwrap_or(false)
     }
 
     pub fn select(&mut self, selector_id: usize, button_id: usize) {
