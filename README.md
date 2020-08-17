@@ -23,10 +23,16 @@ All graphics sources are located  [here](https://github.com/pum-purum-pum-pum/tw
 
 # Code
 The code is the worst thing that ever existed (How do you like it Terry Cavanagh?). 
-Don't use this code to "learn Rust". It's a collection of worst practices. I highly recommend reading [makepad](https://github.com/makepad/makepad) for education purposes.
+Don't use this code to "learn Rust". It's a collection of worst practices. I highly recommend reading [makepad](https://github.com/makepad/makepad) for education/inspiration purposes.
 
 I wrote it during my "learning Rust/gamedev/graphics" times. Don't read it :) I don't know why I haven't used linters at least... But I guess the moment is lost :)
 
 It will not compile without provided Cargo.lock :\ 
 
 Yes, there are too many dependencies.
+
+# New game
+Check out the [announcement of the game that I'm working now](https://twitter.com/VladZhukov0/status/1288091150339969024?s=20)
+It has nothing in common with twenty asteroids -- it's a strategy and it's online! 
+
+It's written much more carefully, but nothing is yet opensourced.
