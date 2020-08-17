@@ -18,6 +18,9 @@ cargo run --release
 ```
 And wait while it compiles 
 
+# Art
+All graphics sources are located  [here](https://github.com/pum-purum-pum-pum/twenty_assets)
+
 # Code
 The code is the worst thing that ever existed (How do you like it Terry Cavanagh?). 
 Don't use this code to "learn Rust". It's a collection of worst practices. I highly recommend reading [makepad](https://github.com/makepad/makepad) for education purposes.
