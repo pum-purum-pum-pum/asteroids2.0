@@ -76,7 +76,7 @@ const ENEMY_ACTIVE_AREA: f32 = 21f32;
 #[cfg(debug_assertions)]
 const ASTEROIDS_MIN_NUMBER: usize = 20;
 #[cfg(not(debug_assertions))]
-const ASTEROIDS_MIN_NUMBER: usize = 40;
+const ASTEROIDS_MIN_NUMBER: usize = 20;
 const ASTEROID_MAX_RADIUS: f32 = 4.2f32;
 const ASTEROID_MIN_RADIUS: f32 = 0.5;
 const ASTEROID_INERTIA: f32 = 2f32;
