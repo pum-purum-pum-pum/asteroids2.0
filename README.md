@@ -1,4 +1,4 @@
-Subscribe to my [twitter](https://twitter.com/VladZhukov0) !
+Subscribe to my [twitter](https://twitter.com/VladZhukov0)
 
 # How to run
 
