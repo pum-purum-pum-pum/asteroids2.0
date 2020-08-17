@@ -1,0 +1,15 @@
+[package]
+name = "packer"
+version = "0.1.0"
+authors = ["vlad <vladzhukovtirko@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sheep = "0.3.0"
+image = "0.21.0"
+ron = "0.5.1"
+serde = "*"
+serde_derive = "*"
+texture_packer = {path = "texture_packer"}
