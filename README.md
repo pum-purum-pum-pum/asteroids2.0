@@ -1,4 +1,8 @@
 Subscribe to my [twitter](https://twitter.com/VladZhukov0)
+# Twenty asteroids
+Asteroids with procedural destruction and fog of war written in Rust
+
+![twenty asteroids](cover.png "Twenty asteroids")
 
 # How to run
 
@@ -14,10 +18,6 @@ cargo run --release
 ```
 And wait while it compiles 
 ![twenty asteroids](compiling.png "compiles :) ")
-# Twenty asteroids
-Asteroids with procedural destruction and fog of war written in Rust
-
-![twenty asteroids](cover.png "Twenty asteroids")
 
 # Code
 The code is the worst thing that ever existed (How do you like it Terry Cavanagh?). 
