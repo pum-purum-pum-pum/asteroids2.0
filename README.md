@@ -17,7 +17,6 @@ Then with cargo (install if needed):
 cargo run --release
 ```
 And wait while it compiles 
-![twenty asteroids](compiling.png "compiles :) ")
 
 # Code
 The code is the worst thing that ever existed (How do you like it Terry Cavanagh?). 
