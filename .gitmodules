@@ -4,6 +4,3 @@
 [submodule "voronois"]
 	path = voronois
 	url = https://github.com/pum-purum-pum-pum/voronois.git
-[submodule "packer/texture_packer"]
-	path = packer/texture_packer
-	url = git@github.com:pum-purum-pum-pum/PackPack.git
