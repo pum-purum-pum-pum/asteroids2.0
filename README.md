@@ -13,6 +13,12 @@ To clone the repo
 git clone git@github.com:pum-purum-pum-pum/asteroids2.0.git
 git submodule update --init --recursive
 ```
+Install SDL deps.
+For example on Ubuntu:
+```
+sudo apt-get install libsdl2-dev
+sudo apt install libjpeg-dev libwebp-dev libtiff5-dev libsdl2-image-dev libsdl2-image-2.0-0 -y;
+```
 
 Then with cargo (install if needed):
 ```
