@@ -1,7 +1,8 @@
 Subscribe to my [twitter](https://twitter.com/VladZhukov0)
 # Twenty asteroids
-The project is abandoned long time ago.
 Asteroids with procedural destruction and fog of war written in Rust
+
+### The project is abandoned long time ago.
 
 ![twenty asteroids](cover.png "Twenty asteroids")
 
