@@ -1,4 +1,3 @@
-Subscribe to my [twitter](https://twitter.com/VladZhukov0)
 # Twenty asteroids
 Asteroids with procedural destruction and fog of war written in Rust
 
